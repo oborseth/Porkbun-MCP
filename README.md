@@ -21,7 +21,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 You'll need [Node.js](https://nodejs.org) 18 or newer.
 
 ```bash
-npx -y @porkbun/mcp-server
+npx -y @porkbunllc/mcp-server
 ```
 
 This downloads and runs the latest version on demand. No global install needed.
@@ -37,7 +37,7 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json` (m
   "mcpServers": {
     "porkbun": {
       "command": "npx",
-      "args": ["-y", "@porkbun/mcp-server"],
+      "args": ["-y", "@porkbunllc/mcp-server"],
       "env": {
         "PORKBUN_API_KEY": "pk1_your_public_key_here",
         "PORKBUN_SECRET_API_KEY": "sk1_your_secret_key_here"
