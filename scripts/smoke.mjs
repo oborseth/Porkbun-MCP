@@ -107,14 +107,16 @@ async function main() {
   const listed = await send("tools/list");
   const tools = listed.result?.tools ?? [];
   const expected = [
-    "ping", "check_domain", "get_pricing", "list_domains", "get_balance",
+    "ping", "check_domain", "get_pricing", "list_marketplace",
+    "list_domains", "get_balance", "get_api_settings",
     "get_nameservers", "list_dns_records", "list_dnssec_records", "list_url_forwards",
-    "list_transfers", "get_transfer_status", "get_ssl_bundle",
+    "list_glue_records", "list_transfers", "get_transfer_status", "get_ssl_bundle",
     "register_domain", "renew_domain", "transfer_domain",
     "update_auto_renew", "update_nameservers",
     "create_dns_record", "update_dns_record", "delete_dns_record",
     "create_dnssec_record", "delete_dnssec_record",
     "create_url_forward", "delete_url_forward",
+    "create_glue_record", "update_glue_record", "delete_glue_record",
   ];
   const names = new Set(tools.map((t) => t.name));
   const missing = expected.filter((n) => !names.has(n));

@@ -2,9 +2,9 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.3 — covers most of what you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.3.1 — covers everything you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (v0.3 — 24 tools)
+## What's included (v0.3.1 — 30 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -13,12 +13,15 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `ping` | Verify API connectivity and credentials |
 | `check_domain` | Check availability and pricing for a single domain |
 | `get_pricing` | Get registration/renewal/transfer pricing for all TLDs (no auth needed) |
+| `list_marketplace` | Browse the Porkbun aftermarket — filter by TLD, max price, name substring |
 | `list_domains` | Paginate through domains in the authenticated account |
 | `get_balance` | Get account credit balance |
+| `get_api_settings` | Get monthly spend limit, low-balance alert, auto top-up config, MTD spend |
 | `get_nameservers` | Get current nameservers for a domain |
 | `list_dns_records` | List DNS records for a domain |
 | `list_dnssec_records` | List DNSSEC DS records published at the registry |
 | `list_url_forwards` | List URL forwarding rules for a domain |
+| `list_glue_records` | List glue records (host-to-IP mappings) for a domain |
 | `list_transfers` | List in-progress and recent inbound transfers |
 | `get_transfer_status` | Get status of a specific inbound transfer |
 | `get_ssl_bundle` | Retrieve the free Porkbun-issued SSL bundle for a domain |
@@ -38,7 +41,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `update_auto_renew` | Turn auto-renewal on or off |
 | `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
 
-**DNS / DNSSEC / URL-forwarding writes (free)**
+**DNS / DNSSEC / URL-forwarding / glue writes (free)**
 
 | Tool | Description |
 |---|---|
@@ -49,6 +52,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `delete_dnssec_record` | Remove a DNSSEC DS record by key tag |
 | `create_url_forward` | Create a URL forwarding rule |
 | `delete_url_forward` | Delete a URL forwarding rule by ID |
+| `create_glue_record` | Create a glue record (host-to-IP mapping at the registry) |
+| `update_glue_record` | Replace the IP list for a glue record |
+| `delete_glue_record` | Delete a glue record by host |
 
 ## Install
 

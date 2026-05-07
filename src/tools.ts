@@ -209,6 +209,178 @@ const get_transfer_status: Tool = {
   },
 };
 
+const list_marketplace: Tool = {
+  name: "list_marketplace",
+  description:
+    "Browse domains for sale on the Porkbun marketplace (aftermarket — domains owned by other users, not new registrations). Returns each domain's name, TLD, price (in USD), and listing date. Optional client-side filters: `tld` matches the TLD exactly, `max_price` filters to listings at or below that USD amount, `name_contains` filters to domain names containing the substring (case-insensitive). The Porkbun marketplace has thousands of listings — when filters are provided, this tool fetches pages until it finds matches or reaches a reasonable cap.",
+  inputSchema: {
+    tld: z
+      .string()
+      .optional()
+      .describe("Filter to a specific TLD (without the leading dot), e.g. `com`, `io`, `xyz`."),
+    max_price: z
+      .number()
+      .positive()
+      .optional()
+      .describe("Filter to listings at or below this price in USD (e.g. `100` for $100 or less)."),
+    name_contains: z
+      .string()
+      .optional()
+      .describe("Filter to domain names containing this substring (case-insensitive)."),
+    start: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Pagination offset when no filters are used. Defaults to 0."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(5000)
+      .optional()
+      .describe("Maximum results to return after filtering. Defaults to 100. The API caps at 5000 per page."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const tld = args.tld !== undefined ? String(args.tld).toLowerCase() : undefined;
+    const maxPriceCents = args.max_price !== undefined ? Math.round(Number(args.max_price) * 100) : undefined;
+    const nameContains = args.name_contains !== undefined ? String(args.name_contains).toLowerCase() : undefined;
+    const limit = args.limit !== undefined ? Number(args.limit) : 100;
+    const filtering = tld !== undefined || maxPriceCents !== undefined || nameContains !== undefined;
+
+    type Listing = { domain: string; tld: string; price: number; create_date: string };
+    const results: Listing[] = [];
+    let start = filtering ? 0 : Number(args.start ?? 0);
+    const PAGE = 1000;
+    const MAX_SCAN = 10_000; // cap on how many entries we'll scan when filtering
+    let scanned = 0;
+
+    while (results.length < limit && scanned < MAX_SCAN) {
+      const page = (await call(config, "/marketplace/getAll", {
+        method: "POST",
+        body: { start, limit: PAGE },
+      })) as { status: string; count?: number; domains?: Listing[] };
+      const items = Array.isArray(page.domains) ? page.domains : [];
+      scanned += items.length;
+      for (const item of items) {
+        if (tld !== undefined && String(item.tld).toLowerCase() !== tld) continue;
+        if (maxPriceCents !== undefined && Math.round(item.price * 100) > maxPriceCents) continue;
+        if (nameContains !== undefined && !String(item.domain).toLowerCase().includes(nameContains)) continue;
+        results.push(item);
+        if (results.length >= limit) break;
+      }
+      if (items.length < PAGE) break; // last page
+      if (!filtering) break; // single-page mode
+      start += PAGE;
+    }
+
+    return {
+      status: "SUCCESS",
+      count: results.length,
+      scanned,
+      truncated: scanned >= MAX_SCAN && results.length < limit,
+      domains: results,
+    };
+  },
+};
+
+const get_api_settings: Tool = {
+  name: "get_api_settings",
+  description:
+    "Get the authenticated account's API spend control configuration: monthly spend limit, low-balance alert threshold, auto top-up settings, and current month's API spend total. All amounts are in cents. Useful for an agent to check budget headroom before initiating expensive operations — `register_domain` will be hard-blocked if it would push monthly spend over the configured limit.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/account/apiSettings", { method: "GET" });
+  },
+};
+
+const list_glue_records: Tool = {
+  name: "list_glue_records",
+  description:
+    "List glue records for a domain. Glue records associate a host (e.g. `ns1.example.com`) with one or more IP addresses at the registry, used when running your own nameservers on the same domain they serve. Returns the host, IPv4 addresses, and IPv6 addresses for each glue record.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to list glue records for, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/getGlue/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const create_glue_record: Tool = {
+  name: "create_glue_record",
+  description:
+    "Create a glue record for a host on a domain. Used when running your own nameservers on the same domain they serve (e.g. `ns1.example.com` serving `example.com`). The `subdomain` is just the host part (e.g. `ns1`), not the full FQDN. Provide IPs as an array of IPv4 and/or IPv6 addresses. Idempotent.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Parent domain, e.g. `example.com`"),
+    subdomain: z
+      .string()
+      .min(1)
+      .describe("Host portion only (no domain), e.g. `ns1`."),
+    ips: z
+      .array(z.string().min(7))
+      .min(1)
+      .describe("Array of IPv4 and/or IPv6 addresses to associate with the host."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const subdomain = String(args.subdomain).toLowerCase();
+    return await call(
+      config,
+      `/domain/createGlue/${encodeURIComponent(domain)}/${encodeURIComponent(subdomain)}`,
+      { method: "POST", idempotent: true, body: { ips: args.ips } }
+    );
+  },
+};
+
+const update_glue_record: Tool = {
+  name: "update_glue_record",
+  description:
+    "Update the IP addresses associated with an existing glue record. Replaces the full IP list — pass all IPs you want set, not just additions. Idempotent.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Parent domain, e.g. `example.com`"),
+    subdomain: z.string().min(1).describe("Host portion only, e.g. `ns1`."),
+    ips: z
+      .array(z.string().min(7))
+      .min(1)
+      .describe("Full replacement set of IPv4/IPv6 addresses for the host."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const subdomain = String(args.subdomain).toLowerCase();
+    return await call(
+      config,
+      `/domain/updateGlue/${encodeURIComponent(domain)}/${encodeURIComponent(subdomain)}`,
+      { method: "POST", idempotent: true, body: { ips: args.ips } }
+    );
+  },
+};
+
+const delete_glue_record: Tool = {
+  name: "delete_glue_record",
+  description:
+    "Delete a glue record by host on a domain. Idempotent: deleting a non-existent glue record returns success.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Parent domain, e.g. `example.com`"),
+    subdomain: z.string().min(1).describe("Host portion only, e.g. `ns1`."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const subdomain = String(args.subdomain).toLowerCase();
+    return await call(
+      config,
+      `/domain/deleteGlue/${encodeURIComponent(domain)}/${encodeURIComponent(subdomain)}`,
+      { method: "POST", idempotent: true }
+    );
+  },
+};
+
 // ─── Domain lifecycle (write — these spend account credit) ──────────────────
 
 const DNS_RECORD_TYPES = [
@@ -590,16 +762,20 @@ const update_nameservers: Tool = {
 };
 
 export const tools: Tool[] = [
-  // read
+  // read — global / account
   ping,
   check_domain,
   get_pricing,
+  list_marketplace,
   list_domains,
   get_balance,
+  get_api_settings,
+  // read — per-domain
   get_nameservers,
   list_dns_records,
   list_dnssec_records,
   list_url_forwards,
+  list_glue_records,
   list_transfers,
   get_transfer_status,
   get_ssl_bundle,
@@ -620,4 +796,8 @@ export const tools: Tool[] = [
   // write — URL forwarding
   create_url_forward,
   delete_url_forward,
+  // write — glue records
+  create_glue_record,
+  update_glue_record,
+  delete_glue_record,
 ];
