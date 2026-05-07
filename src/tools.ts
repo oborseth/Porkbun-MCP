@@ -21,7 +21,7 @@ const ping: Tool = {
 const check_domain: Tool = {
   name: "check_domain",
   description:
-    "Check whether a single domain is available for registration and what it costs. Returns availability, registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost` doesn't match the current quote.",
+    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost` doesn't match the current quote.",
   inputSchema: {
     domain: z
       .string()
@@ -30,8 +30,8 @@ const check_domain: Tool = {
   },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    return await call(config, `/domain/checkSingleDomain/${encodeURIComponent(domain)}`, {
-      method: "GET",
+    return await call(config, `/domain/checkDomain/${encodeURIComponent(domain)}`, {
+      method: "POST",
     });
   },
 };
