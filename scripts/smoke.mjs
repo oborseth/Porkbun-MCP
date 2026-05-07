@@ -107,10 +107,14 @@ async function main() {
   const listed = await send("tools/list");
   const tools = listed.result?.tools ?? [];
   const expected = [
-    "ping", "check_domain", "list_domains", "get_balance", "get_pricing",
-    "list_dns_records", "get_ssl_bundle", "register_domain", "renew_domain",
-    "transfer_domain", "create_dns_record", "update_dns_record",
-    "delete_dns_record", "update_nameservers",
+    "ping", "check_domain", "get_pricing", "list_domains", "get_balance",
+    "get_nameservers", "list_dns_records", "list_dnssec_records", "list_url_forwards",
+    "list_transfers", "get_transfer_status", "get_ssl_bundle",
+    "register_domain", "renew_domain", "transfer_domain",
+    "update_auto_renew", "update_nameservers",
+    "create_dns_record", "update_dns_record", "delete_dns_record",
+    "create_dnssec_record", "delete_dnssec_record",
+    "create_url_forward", "delete_url_forward",
   ];
   const names = new Set(tools.map((t) => t.name));
   const missing = expected.filter((n) => !names.has(n));
@@ -144,7 +148,19 @@ async function main() {
     record("list_domains", r?.status === "SUCCESS", `${count} domains in first page`);
   } catch (e) { record("list_domains", false, e.message); }
 
+  try {
+    const r = await callTool("list_transfers");
+    const count = Array.isArray(r?.transfers) ? r.transfers.length : 0;
+    record("list_transfers", r?.status === "SUCCESS", `${count} active`);
+  } catch (e) { record("list_transfers", false, e.message); }
+
   if (testDomain) {
+    try {
+      const r = await callTool("get_nameservers", { domain: testDomain });
+      const count = Array.isArray(r?.ns) ? r.ns.length : 0;
+      record("get_nameservers", r?.status === "SUCCESS", `${count} nameservers on ${testDomain}`);
+    } catch (e) { record("get_nameservers", false, e.message); }
+
     try {
       const r = await callTool("list_dns_records", { domain: testDomain });
       const count = Array.isArray(r?.records) ? r.records.length : 0;
@@ -152,12 +168,23 @@ async function main() {
     } catch (e) { record("list_dns_records", false, e.message); }
 
     try {
+      const r = await callTool("list_dnssec_records", { domain: testDomain });
+      record("list_dnssec_records", r?.status === "SUCCESS", "ok");
+    } catch (e) { record("list_dnssec_records", false, e.message); }
+
+    try {
+      const r = await callTool("list_url_forwards", { domain: testDomain });
+      const count = Array.isArray(r?.forwards) ? r.forwards.length : 0;
+      record("list_url_forwards", r?.status === "SUCCESS", `${count} forwards`);
+    } catch (e) { record("list_url_forwards", false, e.message); }
+
+    try {
       const r = await callTool("get_ssl_bundle", { domain: testDomain });
       const hasCert = typeof r?.certificatechain === "string" && r.certificatechain.includes("BEGIN CERTIFICATE");
       record("get_ssl_bundle", hasCert, hasCert ? "got cert chain" : "no cert chain in response");
     } catch (e) { record("get_ssl_bundle", false, e.message); }
   } else {
-    console.log("· list_dns_records and get_ssl_bundle skipped (set TEST_DOMAIN to enable)");
+    console.log("· per-domain reads skipped (set TEST_DOMAIN to enable)");
   }
 
   // Tear down.

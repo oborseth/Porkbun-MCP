@@ -2,38 +2,53 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.2 — full domain lifecycle (register, renew, transfer) plus DNS and nameserver writes. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.3 — covers most of what you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (v0.2)
+## What's included (v0.3 — 24 tools)
 
-**Read tools**
+**Read tools (free, no spend, no state changes)**
 
 | Tool | Description |
 |---|---|
 | `ping` | Verify API connectivity and credentials |
 | `check_domain` | Check availability and pricing for a single domain |
+| `get_pricing` | Get registration/renewal/transfer pricing for all TLDs (no auth needed) |
 | `list_domains` | Paginate through domains in the authenticated account |
 | `get_balance` | Get account credit balance |
-| `get_pricing` | Get registration/renewal/transfer pricing for all TLDs |
+| `get_nameservers` | Get current nameservers for a domain |
 | `list_dns_records` | List DNS records for a domain |
+| `list_dnssec_records` | List DNSSEC DS records published at the registry |
+| `list_url_forwards` | List URL forwarding rules for a domain |
+| `list_transfers` | List in-progress and recent inbound transfers |
+| `get_transfer_status` | Get status of a specific inbound transfer |
 | `get_ssl_bundle` | Retrieve the free Porkbun-issued SSL bundle for a domain |
 
-**Write tools (spend account credit — register/renew/transfer)**
+**Domain lifecycle writes (spend account credit)**
 
 | Tool | Description |
 |---|---|
-| `register_domain` | Register a new domain — workflow: `check_domain` first to confirm price |
+| `register_domain` | Register a new domain — call `check_domain` first to confirm price |
 | `renew_domain` | Renew an existing domain |
 | `transfer_domain` | Initiate an inbound transfer (returns transferId; takes 5-7 days) |
 
-**DNS and nameserver writes (free)**
+**Domain settings writes (free)**
+
+| Tool | Description |
+|---|---|
+| `update_auto_renew` | Turn auto-renewal on or off |
+| `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
+
+**DNS / DNSSEC / URL-forwarding writes (free)**
 
 | Tool | Description |
 |---|---|
 | `create_dns_record` | Create a new DNS record (A, AAAA, CNAME, MX, TXT, etc.) |
 | `update_dns_record` | Update an existing DNS record by its ID |
 | `delete_dns_record` | Delete a DNS record by its ID |
-| `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
+| `create_dnssec_record` | Submit a DNSSEC DS record to the registry |
+| `delete_dnssec_record` | Remove a DNSSEC DS record by key tag |
+| `create_url_forward` | Create a URL forwarding rule |
+| `delete_url_forward` | Delete a URL forwarding rule by ID |
 
 ## Install
 

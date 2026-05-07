@@ -136,6 +136,79 @@ const get_ssl_bundle: Tool = {
   },
 };
 
+const get_nameservers: Tool = {
+  name: "get_nameservers",
+  description:
+    "Get the current nameservers configured for a domain in the authenticated account. Returns an array of nameserver hostnames. Read-only complement to `update_nameservers`.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/getNs/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const list_url_forwards: Tool = {
+  name: "list_url_forwards",
+  description:
+    "List all URL forwarding rules configured for a domain. Each entry includes its `id` (used by `delete_url_forward`), the source subdomain, the destination URL, the redirect type (permanent/temporary), and whether the request path and wildcards are forwarded.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/getUrlForwarding/${encodeURIComponent(domain)}`, {
+      method: "GET",
+    });
+  },
+};
+
+const list_dnssec_records: Tool = {
+  name: "list_dnssec_records",
+  description:
+    "List the DNSSEC DS records currently submitted to the registry for a domain. Returns key tag, algorithm, digest type, and digest. Use this to verify DNSSEC chain-of-trust setup. Empty array = DNSSEC not configured.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/dns/getDnssecRecords/${encodeURIComponent(domain)}`, {
+      method: "GET",
+    });
+  },
+};
+
+const list_transfers: Tool = {
+  name: "list_transfers",
+  description:
+    "List all in-progress and recent inbound domain transfers for the authenticated account. Returns each transfer's domain, status (`NEW`, `PENDINGAUTH`, `PENDINGSUBMIT`, `PENDINGTRANSFER`, `DONE`, `CANCELED`, etc.), and create date. Use this to monitor transfers initiated by `transfer_domain`.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/domain/listTransfers", { method: "GET" });
+  },
+};
+
+const get_transfer_status: Tool = {
+  name: "get_transfer_status",
+  description:
+    "Get the status of a specific inbound transfer for a domain. Useful for polling after `transfer_domain` to know when the transfer completes (typical window: 5-7 days). Returns the same status values as `list_transfers`, plus a human-readable description.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose transfer status to check, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/getTransfer/${encodeURIComponent(domain)}`, {
+      method: "GET",
+    });
+  },
+};
+
 // ─── Domain lifecycle (write — these spend account credit) ──────────────────
 
 const DNS_RECORD_TYPES = [
@@ -233,6 +306,27 @@ const transfer_domain: Tool = {
         cost: Number(args.cost),
         authCode: String(args.auth_code),
       },
+    });
+  },
+};
+
+const update_auto_renew: Tool = {
+  name: "update_auto_renew",
+  description:
+    "Turn auto-renewal on or off for a domain in the authenticated account. When auto-renew is on, Porkbun automatically charges your account credit at expiration. When off, you must manually renew or the domain expires. Idempotent.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to update, e.g. `example.com`"),
+    status: z
+      .enum(["on", "off"])
+      .describe("`on` enables auto-renew, `off` disables it."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/updateAutoRenew/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body: { status: args.status },
     });
   },
 };
@@ -343,6 +437,133 @@ const delete_dns_record: Tool = {
   },
 };
 
+// ─── DNSSEC writes ──────────────────────────────────────────────────────────
+
+const create_dnssec_record: Tool = {
+  name: "create_dnssec_record",
+  description:
+    "Submit a DNSSEC DS record to the registry for a domain. Use when you sign DNS yourself (custom nameservers running BIND/Knot/PowerDNS/etc.) and need to publish the chain-of-trust at the parent zone. Required: keyTag, algorithm, digestType, digest. Optional key-data fields for registries that require full DNSKEY (rare).",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to add the DS record to."),
+    keyTag: z.string().describe("DNSSEC key tag (16-bit identifier of the key)."),
+    alg: z
+      .string()
+      .describe("Algorithm number, e.g. `13` for ECDSA P-256 SHA-256, `8` for RSA SHA-256."),
+    digestType: z.string().describe("Digest type, e.g. `2` for SHA-256, `4` for SHA-384."),
+    digest: z.string().describe("Hex-encoded DS digest value."),
+    maxSigLife: z.string().optional().describe("Maximum signature lifetime in seconds (registry-specific, optional)."),
+    keyDataFlags: z.string().optional().describe("DNSKEY flags (optional — typically 256 or 257)."),
+    keyDataProtocol: z.string().optional().describe("DNSKEY protocol (optional — almost always 3)."),
+    keyDataAlgo: z.string().optional().describe("DNSKEY algorithm (optional)."),
+    keyDataPubKey: z.string().optional().describe("Base64-encoded public key (optional)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {
+      keyTag: args.keyTag,
+      alg: args.alg,
+      digestType: args.digestType,
+      digest: args.digest,
+    };
+    for (const k of ["maxSigLife", "keyDataFlags", "keyDataProtocol", "keyDataAlgo", "keyDataPubKey"]) {
+      if (args[k] !== undefined) body[k] = args[k];
+    }
+    return await call(config, `/dns/createDnssecRecord/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body,
+    });
+  },
+};
+
+const delete_dnssec_record: Tool = {
+  name: "delete_dnssec_record",
+  description:
+    "Remove a DNSSEC DS record from the registry for a domain, identified by key tag. Use when retiring a key. Idempotent: deleting a non-existent key tag returns success.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to remove the DS record from."),
+    keyTag: z.string().describe("Key tag of the DS record to remove (from `list_dnssec_records`)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const keyTag = String(args.keyTag);
+    return await call(
+      config,
+      `/dns/deleteDnssecRecord/${encodeURIComponent(domain)}/${encodeURIComponent(keyTag)}`,
+      { method: "POST", idempotent: true }
+    );
+  },
+};
+
+// ─── URL forwarding writes ──────────────────────────────────────────────────
+
+const create_url_forward: Tool = {
+  name: "create_url_forward",
+  description:
+    "Add a URL forwarding rule for a domain. Forwards a subdomain (or apex if `subdomain` is empty/omitted) to an arbitrary destination URL. Useful for redirects without setting up a web server. Free.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to add the forward to, e.g. `example.com`"),
+    location: z
+      .string()
+      .url()
+      .describe("Destination URL to forward visitors to, e.g. `https://newsite.example.com`"),
+    type: z
+      .enum(["permanent", "temporary"])
+      .describe("`permanent` sends HTTP 301 (browsers cache); `temporary` is the configurable default redirect."),
+    includePath: z
+      .enum(["yes", "no"])
+      .describe("`yes` appends the request URI path to the forward target; `no` always sends to the bare destination."),
+    wildcard: z
+      .enum(["yes", "no"])
+      .describe("`yes` also forwards all sub-subdomains; `no` forwards only the exact subdomain."),
+    subdomain: z
+      .string()
+      .optional()
+      .describe("Subdomain prefix to forward. Empty/omitted = the apex (root domain). Examples: `www`, `shop`."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {
+      location: args.location,
+      type: args.type,
+      includePath: args.includePath,
+      wildcard: args.wildcard,
+    };
+    if (args.subdomain !== undefined) body.subdomain = args.subdomain;
+    return await call(config, `/domain/addUrlForward/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body,
+    });
+  },
+};
+
+const delete_url_forward: Tool = {
+  name: "delete_url_forward",
+  description:
+    "Delete a URL forwarding rule by its `id` (obtained from `list_url_forwards`). Idempotent.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the forward belongs to."),
+    record_id: z
+      .string()
+      .min(1)
+      .describe("Numeric forward record ID from `list_url_forwards`."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const recordId = String(args.record_id);
+    return await call(
+      config,
+      `/domain/deleteUrlForward/${encodeURIComponent(domain)}/${encodeURIComponent(recordId)}`,
+      { method: "POST", idempotent: true }
+    );
+  },
+};
+
 // ─── Nameservers ────────────────────────────────────────────────────────────
 
 const update_nameservers: Tool = {
@@ -372,19 +593,31 @@ export const tools: Tool[] = [
   // read
   ping,
   check_domain,
+  get_pricing,
   list_domains,
   get_balance,
-  get_pricing,
+  get_nameservers,
   list_dns_records,
+  list_dnssec_records,
+  list_url_forwards,
+  list_transfers,
+  get_transfer_status,
   get_ssl_bundle,
-  // write — domain lifecycle
+  // write — domain lifecycle (spend account credit)
   register_domain,
   renew_domain,
   transfer_domain,
+  // write — domain settings
+  update_auto_renew,
+  update_nameservers,
   // write — DNS
   create_dns_record,
   update_dns_record,
   delete_dns_record,
-  // write — nameservers
-  update_nameservers,
+  // write — DNSSEC
+  create_dnssec_record,
+  delete_dnssec_record,
+  // write — URL forwarding
+  create_url_forward,
+  delete_url_forward,
 ];
