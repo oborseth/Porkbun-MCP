@@ -212,76 +212,41 @@ const get_transfer_status: Tool = {
 const list_marketplace: Tool = {
   name: "list_marketplace",
   description:
-    "Browse domains for sale on the Porkbun marketplace (aftermarket — domains owned by other users, not new registrations). Returns each domain's name, TLD, price (in USD), and listing date. Optional client-side filters: `tld` matches the TLD exactly, `max_price` filters to listings at or below that USD amount, `name_contains` filters to domain names containing the substring (case-insensitive). The Porkbun marketplace has thousands of listings — when filters are provided, this tool fetches pages until it finds matches or reaches a reasonable cap.",
+    "Browse domains for sale on the Porkbun marketplace (aftermarket — domains owned by other users, not new registrations). Returns each listing's domain, TLD, SLD length, price (in USD), and listing date.\n\nFilters (all optional, server-side, mirroring the porkbun.com/marketplace UI):\n- `query`: SLD substring match. Multi-word queries: prefix a word with `-` to exclude it (e.g. `\"ai -test\"` matches SLDs containing 'ai' but not 'test').\n- `tlds`: limit to a list of TLDs (without the leading dot).\n- `sld_length_min`, `sld_length_max`: SLD character length bounds.\n- `sort_name`: `domain` | `tld` | `price` | `sld_length`.\n- `sort_direction`: `asc` | `desc`.\n\nWhen any filter is set, server returns up to 1000 matching listings. With no filters, supports raw pagination via `start` / `limit` (max 5000).",
   inputSchema: {
-    tld: z
-      .string()
+    query: z.string().optional().describe("SLD substring search. Use `-word` to exclude. Example: `'ai -test'`."),
+    tlds: z
+      .array(z.string())
       .optional()
-      .describe("Filter to a specific TLD (without the leading dot), e.g. `com`, `io`, `xyz`."),
-    max_price: z
-      .number()
-      .positive()
+      .describe("Limit to these TLDs (no leading dot). Example: `['com', 'io', 'ai']`."),
+    sld_length_min: z.number().int().min(1).optional().describe("Minimum SLD character length."),
+    sld_length_max: z.number().int().min(1).optional().describe("Maximum SLD character length."),
+    sort_name: z
+      .enum(["domain", "tld", "price", "sld_length"])
       .optional()
-      .describe("Filter to listings at or below this price in USD (e.g. `100` for $100 or less)."),
-    name_contains: z
-      .string()
-      .optional()
-      .describe("Filter to domain names containing this substring (case-insensitive)."),
-    start: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe("Pagination offset when no filters are used. Defaults to 0."),
+      .describe("Sort field. Default: `sld_length` asc when query is set, else `create_date` desc."),
+    sort_direction: z.enum(["asc", "desc"]).optional().describe("Sort direction."),
+    start: z.number().int().min(0).optional().describe("Pagination offset (no-filter mode only). Default 0."),
     limit: z
       .number()
       .int()
       .min(1)
       .max(5000)
       .optional()
-      .describe("Maximum results to return after filtering. Defaults to 100. The API caps at 5000 per page."),
+      .describe("Page size (no-filter mode only). Default 1000, max 5000."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
-    const tld = args.tld !== undefined ? String(args.tld).toLowerCase() : undefined;
-    const maxPriceCents = args.max_price !== undefined ? Math.round(Number(args.max_price) * 100) : undefined;
-    const nameContains = args.name_contains !== undefined ? String(args.name_contains).toLowerCase() : undefined;
-    const limit = args.limit !== undefined ? Number(args.limit) : 100;
-    const filtering = tld !== undefined || maxPriceCents !== undefined || nameContains !== undefined;
-
-    type Listing = { domain: string; tld: string; price: number; create_date: string };
-    const results: Listing[] = [];
-    let start = filtering ? 0 : Number(args.start ?? 0);
-    const PAGE = 1000;
-    const MAX_SCAN = 10_000; // cap on how many entries we'll scan when filtering
-    let scanned = 0;
-
-    while (results.length < limit && scanned < MAX_SCAN) {
-      const page = (await call(config, "/marketplace/getAll", {
-        method: "POST",
-        body: { start, limit: PAGE },
-      })) as { status: string; count?: number; domains?: Listing[] };
-      const items = Array.isArray(page.domains) ? page.domains : [];
-      scanned += items.length;
-      for (const item of items) {
-        if (tld !== undefined && String(item.tld).toLowerCase() !== tld) continue;
-        if (maxPriceCents !== undefined && Math.round(item.price * 100) > maxPriceCents) continue;
-        if (nameContains !== undefined && !String(item.domain).toLowerCase().includes(nameContains)) continue;
-        results.push(item);
-        if (results.length >= limit) break;
-      }
-      if (items.length < PAGE) break; // last page
-      if (!filtering) break; // single-page mode
-      start += PAGE;
-    }
-
-    return {
-      status: "SUCCESS",
-      count: results.length,
-      scanned,
-      truncated: scanned >= MAX_SCAN && results.length < limit,
-      domains: results,
-    };
+    const body: Record<string, unknown> = {};
+    if (args.query !== undefined) body.query = args.query;
+    if (Array.isArray(args.tlds) && args.tlds.length) body.tlds = args.tlds;
+    if (args.sld_length_min !== undefined) body.sldLengthMin = args.sld_length_min;
+    if (args.sld_length_max !== undefined) body.sldLengthMax = args.sld_length_max;
+    if (args.sort_name !== undefined) body.sortName = args.sort_name;
+    if (args.sort_direction !== undefined) body.sortDirection = args.sort_direction;
+    if (args.start !== undefined) body.start = args.start;
+    if (args.limit !== undefined) body.limit = args.limit;
+    return await call(config, "/marketplace/getAll", { method: "POST", body });
   },
 };
 
