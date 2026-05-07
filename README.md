@@ -1,10 +1,14 @@
 # Porkbun MCP Server
 
+[![npm version](https://img.shields.io/npm/v/@porkbunllc/mcp-server.svg?color=cb3837&label=npm)](https://www.npmjs.com/package/@porkbunllc/mcp-server)
+[![npm downloads](https://img.shields.io/npm/dm/@porkbunllc/mcp-server.svg)](https://www.npmjs.com/package/@porkbunllc/mcp-server)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.3.1 — covers everything you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.3.2 — covers everything you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (v0.3.1 — 30 tools)
+## What's included (30 tools)
 
 **Read tools (free, no spend, no state changes)**
 
