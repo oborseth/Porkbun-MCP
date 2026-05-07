@@ -2,9 +2,11 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.1 — read-only tools only. Write operations (register, DNS edits, SSL provisioning) coming in subsequent releases.
+> **Status:** v0.2 — full domain lifecycle (register, renew, transfer) plus DNS and nameserver writes. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (v0.1)
+## What's included (v0.2)
+
+**Read tools**
 
 | Tool | Description |
 |---|---|
@@ -15,6 +17,23 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `get_pricing` | Get registration/renewal/transfer pricing for all TLDs |
 | `list_dns_records` | List DNS records for a domain |
 | `get_ssl_bundle` | Retrieve the free Porkbun-issued SSL bundle for a domain |
+
+**Write tools (spend account credit — register/renew/transfer)**
+
+| Tool | Description |
+|---|---|
+| `register_domain` | Register a new domain — workflow: `check_domain` first to confirm price |
+| `renew_domain` | Renew an existing domain |
+| `transfer_domain` | Initiate an inbound transfer (returns transferId; takes 5-7 days) |
+
+**DNS and nameserver writes (free)**
+
+| Tool | Description |
+|---|---|
+| `create_dns_record` | Create a new DNS record (A, AAAA, CNAME, MX, TXT, etc.) |
+| `update_dns_record` | Update an existing DNS record by its ID |
+| `delete_dns_record` | Delete a DNS record by its ID |
+| `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
 
 ## Install
 

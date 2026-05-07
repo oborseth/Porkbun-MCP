@@ -1,18 +1,35 @@
 import { z, type ZodRawShape } from "zod";
 import { call, type PorkbunConfig } from "./api.js";
 
+export interface ToolAnnotations {
+  /** Human-readable title (sometimes shown in MCP client UIs). */
+  title?: string;
+  /** True if this tool only reads state — never modifies anything. */
+  readOnlyHint?: boolean;
+  /** True if this tool can destroy or irreversibly modify state. */
+  destructiveHint?: boolean;
+  /** True if calling the tool repeatedly with the same args has the same effect as calling once. */
+  idempotentHint?: boolean;
+  /** True if the tool interacts with state outside the MCP server (the real world / network). */
+  openWorldHint?: boolean;
+}
+
 export interface Tool<S extends ZodRawShape = ZodRawShape> {
   name: string;
   description: string;
   inputSchema: S;
+  annotations?: ToolAnnotations;
   handler: (config: PorkbunConfig, args: Record<string, unknown>) => Promise<unknown>;
 }
+
+// ─── Read-only tools ────────────────────────────────────────────────────────
 
 const ping: Tool = {
   name: "ping",
   description:
     "Verify the Porkbun API connection and credentials. Returns the caller's public IP and whether the API key is valid. Use this as a first sanity check before making other calls.",
   inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
     return await call(config, "/ping", { method: "POST" });
   },
@@ -28,6 +45,7 @@ const check_domain: Tool = {
       .min(3)
       .describe("Fully qualified domain name to check, e.g. `example.com`"),
   },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/checkDomain/${encodeURIComponent(domain)}`, {
@@ -52,6 +70,7 @@ const list_domains: Tool = {
       .optional()
       .describe("If true, include user-defined domain labels in the response."),
   },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const params = new URLSearchParams();
     if (args.start !== undefined) params.set("start", String(args.start));
@@ -66,6 +85,7 @@ const get_balance: Tool = {
   description:
     "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Use this to check spend headroom before initiating registrations or renewals.",
   inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
     return await call(config, "/account/balance", { method: "GET" });
   },
@@ -76,6 +96,7 @@ const get_pricing: Tool = {
   description:
     "Get current Porkbun pricing for all supported TLDs. Returns registration, renewal, and transfer prices per TLD in USD. No authentication required. Useful when an agent needs to compare TLD costs before registering. Note: this returns standard pricing only — premium domains have their own per-domain pricing reported by check_domain.",
   inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
     return await call(config, "/pricing/get", { method: "POST" });
   },
@@ -91,6 +112,7 @@ const list_dns_records: Tool = {
       .min(3)
       .describe("Fully qualified domain name registered at Porkbun, e.g. `example.com`"),
   },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/retrieve/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -107,13 +129,247 @@ const get_ssl_bundle: Tool = {
       .min(3)
       .describe("Fully qualified domain name registered at Porkbun, e.g. `example.com`"),
   },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/ssl/retrieve/${encodeURIComponent(domain)}`, { method: "GET" });
   },
 };
 
+// ─── Domain lifecycle (write — these spend account credit) ──────────────────
+
+const DNS_RECORD_TYPES = [
+  "A",
+  "AAAA",
+  "CNAME",
+  "MX",
+  "TXT",
+  "NS",
+  "ALIAS",
+  "SRV",
+  "TLSA",
+  "CAA",
+  "HTTPS",
+  "SVCB",
+] as const;
+
+const register_domain: Tool = {
+  name: "register_domain",
+  description:
+    "**Spends account credit.** Registers a new domain on the authenticated Porkbun account. The `cost` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified, and the account must have at least one prior registration order before this works.",
+  inputSchema: {
+    domain: z
+      .string()
+      .min(3)
+      .describe("Fully qualified domain name to register, e.g. `example.com`"),
+    cost: z
+      .number()
+      .int()
+      .positive()
+      .describe(
+        "Registration price in cents. Must match the value returned by `check_domain` for this domain (multiplied by years if duration > 1)."
+      ),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/create/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body: {
+        cost: Number(args.cost),
+        agreeToTerms: "yes",
+      },
+    });
+  },
+};
+
+const renew_domain: Tool = {
+  name: "renew_domain",
+  description:
+    "**Spends account credit.** Renews an existing domain in the authenticated account. The `cost` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
+    cost: z
+      .number()
+      .int()
+      .positive()
+      .describe("Renewal price in cents. Must match the value returned by `check_domain`."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/renew/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body: { cost: Number(args.cost) },
+    });
+  },
+};
+
+const transfer_domain: Tool = {
+  name: "transfer_domain",
+  description:
+    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Returns immediately with a `transferId`; the actual registry transfer takes 5-7 days for most TLDs. Use `get_transfer_status` to poll. Requires the auth/EPP code from the losing registrar. The `cost` must match the current transfer price from `check_domain`. .uk domains and a few TLDs do not support inbound API transfers. Idempotency-safe.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to transfer in, e.g. `example.com`"),
+    cost: z
+      .number()
+      .int()
+      .positive()
+      .describe("Transfer price in cents. Must match the value returned by `check_domain`."),
+    auth_code: z
+      .string()
+      .min(1)
+      .describe("Authorization (EPP) code from the losing registrar."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/transfer/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body: {
+        cost: Number(args.cost),
+        authCode: String(args.auth_code),
+      },
+    });
+  },
+};
+
+// ─── DNS writes ─────────────────────────────────────────────────────────────
+
+const create_dns_record: Tool = {
+  name: "create_dns_record",
+  description:
+    "Create a DNS record on a domain in the authenticated account. Returns the new record's `id` so it can be referenced by `update_dns_record` and `delete_dns_record`. For the `name` field: omit or pass empty string for the apex/root, otherwise pass the subdomain prefix only (e.g. `www`, not `www.example.com`). For MX and SRV records, set `prio` (priority). Free, doesn't spend account credit.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to add the record to, e.g. `example.com`"),
+    type: z
+      .enum(DNS_RECORD_TYPES)
+      .describe("Record type. Common: A, AAAA, CNAME, MX, TXT."),
+    content: z
+      .string()
+      .min(1)
+      .describe("Record value (e.g. an IP for A, a hostname for CNAME, the text body for TXT)."),
+    name: z
+      .string()
+      .optional()
+      .describe("Subdomain prefix (no domain). Empty string or omitted = apex. Examples: `www`, `mail`, `api.staging`."),
+    ttl: z
+      .number()
+      .int()
+      .min(60)
+      .optional()
+      .describe("Time-to-live in seconds. Minimum 60. Defaults to 600 if omitted."),
+    prio: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Priority — required for MX and SRV records, ignored otherwise."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {
+      type: args.type,
+      content: args.content,
+    };
+    if (args.name !== undefined) body.name = args.name;
+    if (args.ttl !== undefined) body.ttl = String(args.ttl);
+    if (args.prio !== undefined) body.prio = String(args.prio);
+
+    return await call(config, `/dns/create/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body,
+    });
+  },
+};
+
+const update_dns_record: Tool = {
+  name: "update_dns_record",
+  description:
+    "Update an existing DNS record by its numeric `record_id` (obtained from `list_dns_records`). All fields except `record_id` and `domain` are optional — pass only the ones you want to change. Idempotent: applying the same update twice is a no-op.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the record belongs to, e.g. `example.com`"),
+    record_id: z
+      .string()
+      .min(1)
+      .describe("Numeric record ID (as a string). Get this from `list_dns_records`."),
+    type: z.enum(DNS_RECORD_TYPES).optional().describe("New record type (rarely changed)."),
+    content: z.string().min(1).optional().describe("New record value."),
+    name: z.string().optional().describe("New subdomain prefix (empty string = apex)."),
+    ttl: z.number().int().min(60).optional().describe("New TTL in seconds."),
+    prio: z.number().int().min(0).optional().describe("New priority (MX/SRV only)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const recordId = String(args.record_id);
+    const body: Record<string, unknown> = {};
+    if (args.type !== undefined) body.type = args.type;
+    if (args.content !== undefined) body.content = args.content;
+    if (args.name !== undefined) body.name = args.name;
+    if (args.ttl !== undefined) body.ttl = String(args.ttl);
+    if (args.prio !== undefined) body.prio = String(args.prio);
+
+    return await call(
+      config,
+      `/dns/edit/${encodeURIComponent(domain)}/${encodeURIComponent(recordId)}`,
+      { method: "POST", idempotent: true, body }
+    );
+  },
+};
+
+const delete_dns_record: Tool = {
+  name: "delete_dns_record",
+  description:
+    "Delete a single DNS record by its numeric `record_id` (obtained from `list_dns_records`). Idempotent: deleting an already-deleted record returns success. Free.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the record belongs to, e.g. `example.com`"),
+    record_id: z.string().min(1).describe("Numeric record ID (as a string)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const recordId = String(args.record_id);
+    return await call(
+      config,
+      `/dns/delete/${encodeURIComponent(domain)}/${encodeURIComponent(recordId)}`,
+      { method: "POST", idempotent: true }
+    );
+  },
+};
+
+// ─── Nameservers ────────────────────────────────────────────────────────────
+
+const update_nameservers: Tool = {
+  name: "update_nameservers",
+  description:
+    "Replace the nameservers for a domain in the authenticated account. **This is a full replacement, not an append** — the supplied list becomes the complete set of nameservers. Most TLDs require 2-13 entries. Setting custom nameservers disables Porkbun's free DNS hosting for the domain. Idempotent: applying the same NS list twice is a no-op.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to update, e.g. `example.com`"),
+    nameservers: z
+      .array(z.string().min(3))
+      .min(2)
+      .max(13)
+      .describe("Full list of nameservers (e.g. `['ns1.example.com', 'ns2.example.com']`). Minimum 2, maximum 13."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/updateNs/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body: { ns: args.nameservers },
+    });
+  },
+};
+
 export const tools: Tool[] = [
+  // read
   ping,
   check_domain,
   list_domains,
@@ -121,4 +377,14 @@ export const tools: Tool[] = [
   get_pricing,
   list_dns_records,
   get_ssl_bundle,
+  // write — domain lifecycle
+  register_domain,
+  renew_domain,
+  transfer_domain,
+  // write — DNS
+  create_dns_record,
+  update_dns_record,
+  delete_dns_record,
+  // write — nameservers
+  update_nameservers,
 ];

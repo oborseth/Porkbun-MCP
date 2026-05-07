@@ -6,7 +6,7 @@ import { tools } from "./tools.js";
 
 const server = new McpServer({
   name: "porkbun-mcp",
-  version: "0.1.0",
+  version: "0.2.0",
 });
 
 // Defer config loading until the first tool call. tools/list works without
@@ -23,6 +23,7 @@ for (const tool of tools) {
     {
       description: tool.description,
       inputSchema: tool.inputSchema,
+      ...(tool.annotations ? { annotations: tool.annotations } : {}),
     },
     async (args) => {
       try {
