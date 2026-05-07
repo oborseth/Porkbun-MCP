@@ -15,6 +15,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsc --watch",
+    "smoke": "node scripts/smoke.mjs",
     "prepublishOnly": "rm -rf dist && tsc"
   },
   "keywords": [
