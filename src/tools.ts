@@ -57,26 +57,52 @@ const check_domain: Tool = {
 const list_domains: Tool = {
   name: "list_domains",
   description:
-    "List domains in the authenticated Porkbun account. Returns one page of domains with metadata (expire date, auto-renew status, lock status, whois privacy status). Supports pagination with `start`. Use `includeLabels` to also return user-defined labels.",
+    "List domains in the authenticated Porkbun account. Returns one page (up to 1000) with metadata: expire date, auto-renew, security lock, WHOIS privacy, API access opt-in, and notLocal flag.\n\nFilters (all optional):\n- `domain`: exact match. Returns 0 or 1.\n- `name_contains`: substring search on domain name.\n- `tlds`: limit to these TLDs (no leading dot).\n- `expiring_within_days`: only domains expiring within N days. Useful for renewal automation.\n- `auto_renew`: 'yes' or 'no'.\n- `api_access`: 'yes' or 'no'. Filter to domains an API key can actually operate on — eliminates `API_ACCESS_DISABLED` errors downstream.\n- `sort_name`: 'domain' | 'tld' | 'create_date' | 'expire_date'. Default expire_date.\n- `sort_direction`: 'asc' | 'desc'. Default asc.\n\nFor a single domain by name, use `get_domain` instead — cleaner shape and 404-on-not-found semantics.",
   inputSchema: {
-    start: z
-      .number()
-      .int()
-      .min(0)
-      .optional()
-      .describe("Pagination offset. Defaults to 0. Each page returns up to 1000 domains."),
-    includeLabels: z
-      .boolean()
-      .optional()
-      .describe("If true, include user-defined domain labels in the response."),
+    domain: z.string().optional().describe("Exact domain match — returns 0 or 1 result."),
+    name_contains: z.string().optional().describe("Case-insensitive substring on the full domain name."),
+    tlds: z.array(z.string()).optional().describe("Limit to these TLDs (no leading dot). Example: ['com', 'io']"),
+    expiring_within_days: z.number().int().min(0).optional().describe("Only domains expiring within this many days from now."),
+    auto_renew: z.enum(["yes", "no"]).optional().describe("Filter to domains with auto-renew on or off."),
+    api_access: z.enum(["yes", "no"]).optional().describe("Filter to domains opted in to API access."),
+    sort_name: z.enum(["domain", "tld", "create_date", "expire_date"]).optional().describe("Sort field."),
+    sort_direction: z.enum(["asc", "desc"]).optional().describe("Sort direction."),
+    start: z.number().int().min(0).optional().describe("Pagination offset. Default 0."),
+    include_labels: z.boolean().optional().describe("Include user-defined domain labels in the response."),
   },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const params = new URLSearchParams();
+    if (args.domain) params.set("domain", String(args.domain));
+    if (args.name_contains) params.set("nameContains", String(args.name_contains));
+    if (args.expiring_within_days !== undefined) params.set("expiringWithinDays", String(args.expiring_within_days));
+    if (args.auto_renew) params.set("autoRenew", String(args.auto_renew));
+    if (args.api_access) params.set("apiAccess", String(args.api_access));
+    if (args.sort_name) params.set("sortName", String(args.sort_name));
+    if (args.sort_direction) params.set("sortDirection", String(args.sort_direction));
     if (args.start !== undefined) params.set("start", String(args.start));
-    if (args.includeLabels) params.set("includeLabels", "yes");
+    if (args.include_labels) params.set("includeLabels", "yes");
+    if (Array.isArray(args.tlds)) {
+      for (const t of args.tlds) params.append("tlds[]", String(t));
+    }
     const qs = params.toString() ? `?${params.toString()}` : "";
     return await call(config, `/domain/listAll${qs}`, { method: "GET" });
+  },
+};
+
+const get_domain: Tool = {
+  name: "get_domain",
+  description:
+    "Get the metadata for a single domain in the authenticated account: status, TLD, create date, expire date, security lock, WHOIS privacy, auto-renew, API access opt-in, and (optionally) labels. Returns an error with code `DOMAIN_NOT_FOUND` if the domain isn't in the account.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name in the account, e.g. `example.com`"),
+    include_labels: z.boolean().optional().describe("Include user-defined domain labels in the response."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const qs = args.include_labels ? "?includeLabels=yes" : "";
+    return await call(config, `/domain/get/${encodeURIComponent(domain)}${qs}`, { method: "GET" });
   },
 };
 
@@ -733,6 +759,7 @@ export const tools: Tool[] = [
   get_pricing,
   list_marketplace,
   list_domains,
+  get_domain,
   get_balance,
   get_api_settings,
   // read — per-domain

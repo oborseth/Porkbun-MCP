@@ -8,7 +8,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.3.2 — covers everything you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (30 tools)
+## What's included (31 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -18,7 +18,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `check_domain` | Check availability and pricing for a single domain |
 | `get_pricing` | Get registration/renewal/transfer pricing for all TLDs (no auth needed) |
 | `list_marketplace` | Browse the Porkbun aftermarket — filter by TLD, max price, name substring |
-| `list_domains` | Paginate through domains in the authenticated account |
+| `list_domains` | Paginate through domains; filter by tld, expiry, auto-renew, API access |
+| `get_domain` | Get metadata for a single domain in the account |
 | `get_balance` | Get account credit balance |
 | `get_api_settings` | Get monthly spend limit, low-balance alert, auto top-up config, MTD spend |
 | `get_nameservers` | Get current nameservers for a domain |

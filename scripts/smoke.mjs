@@ -108,7 +108,7 @@ async function main() {
   const tools = listed.result?.tools ?? [];
   const expected = [
     "ping", "check_domain", "get_pricing", "list_marketplace",
-    "list_domains", "get_balance", "get_api_settings",
+    "list_domains", "get_domain", "get_balance", "get_api_settings",
     "get_nameservers", "list_dns_records", "list_dnssec_records", "list_url_forwards",
     "list_glue_records", "list_transfers", "get_transfer_status", "get_ssl_bundle",
     "register_domain", "renew_domain", "transfer_domain",
