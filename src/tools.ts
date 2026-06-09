@@ -385,6 +385,7 @@ const DNS_RECORD_TYPES = [
   "SRV",
   "TLSA",
   "CAA",
+  "SSHFP",
   "HTTPS",
   "SVCB",
 ] as const;
