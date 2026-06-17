@@ -406,17 +406,22 @@ const register_domain: Tool = {
       .describe(
         "Registration price in cents. Must match the value returned by `check_domain` for this domain (multiplied by years if duration > 1)."
       ),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe(
+        "If true, validate everything (availability, price match, eligibility, funds, spend limit) and return a preview with `dryRun: true` and `wouldSucceed` WITHOUT registering or charging. Use to safely confirm before committing."
+      ),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { cost: Number(args.cost), agreeToTerms: "yes" };
+    if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/create/${encodeURIComponent(domain)}`, {
       method: "POST",
-      idempotent: true,
-      body: {
-        cost: Number(args.cost),
-        agreeToTerms: "yes",
-      },
+      idempotent: !args.dry_run,
+      body,
     });
   },
 };
@@ -432,14 +437,20 @@ const renew_domain: Tool = {
       .int()
       .positive()
       .describe("Renewal price in cents. Must match the value returned by `check_domain`."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate and preview (`dryRun: true`, `wouldSucceed`) WITHOUT renewing or charging."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { cost: Number(args.cost) };
+    if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/renew/${encodeURIComponent(domain)}`, {
       method: "POST",
-      idempotent: true,
-      body: { cost: Number(args.cost) },
+      idempotent: !args.dry_run,
+      body,
     });
   },
 };
@@ -459,17 +470,20 @@ const transfer_domain: Tool = {
       .string()
       .min(1)
       .describe("Authorization (EPP) code from the losing registrar."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate and preview (`dryRun: true`, `wouldSucceed`) WITHOUT initiating the transfer or charging."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { cost: Number(args.cost), authCode: String(args.auth_code) };
+    if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/transfer/${encodeURIComponent(domain)}`, {
       method: "POST",
-      idempotent: true,
-      body: {
-        cost: Number(args.cost),
-        authCode: String(args.auth_code),
-      },
+      idempotent: !args.dry_run,
+      body,
     });
   },
 };
