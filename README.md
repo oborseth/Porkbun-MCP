@@ -6,9 +6,9 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.3.2 — covers everything you can do in the Porkbun web UI. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.6.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (31 tools)
+## What's included (42 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -30,6 +30,11 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `list_transfers` | List in-progress and recent inbound transfers |
 | `get_transfer_status` | Get status of a specific inbound transfer |
 | `get_ssl_bundle` | Retrieve the free Porkbun-issued SSL bundle for a domain |
+| `get_webhook_event_types` | List the event types a webhook endpoint can subscribe to |
+| `list_webhooks` | List webhook endpoints (URL, events, status, delivery health, secret) |
+| `get_webhook` | Get a single webhook endpoint by id |
+| `list_webhook_deliveries` | List recent delivery attempts (status, attempts, HTTP, error); ~30-day history |
+| `get_webhook_delivery` | Get a single delivery incl. the full signed payload |
 
 **Domain lifecycle writes (spend account credit)**
 
@@ -60,6 +65,19 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `create_glue_record` | Create a glue record (host-to-IP mapping at the registry) |
 | `update_glue_record` | Replace the IP list for a glue record |
 | `delete_glue_record` | Delete a glue record by host |
+
+**Webhook writes (free)**
+
+| Tool | Description |
+|---|---|
+| `create_webhook` | Register an HTTPS endpoint to receive signed event payloads; returns the signing secret |
+| `update_webhook` | Change an endpoint's URL, events, or status (ACTIVE/DISABLED) |
+| `rotate_webhook_secret` | Generate a new signing secret for an endpoint |
+| `test_webhook` | Send a `webhook.test` event to confirm reachability and signature verification |
+| `resend_webhook` | Re-queue a past delivery (reuses the original event id) |
+| `delete_webhook` | Delete a webhook endpoint |
+
+Porkbun POSTs a signed JSON payload to your endpoint when subscribed events occur (`domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, `dns.record.created|updated|deleted`). Verify the `X-Porkbun-Signature` header — it's `sha256=` + HMAC-SHA256 of `{timestamp}.{rawBody}` keyed by the endpoint secret, where `{timestamp}` is the `X-Porkbun-Webhook-Timestamp` header.
 
 ## Install
 

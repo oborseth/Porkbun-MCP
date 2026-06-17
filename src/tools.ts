@@ -767,6 +767,174 @@ const update_nameservers: Tool = {
   },
 };
 
+// ─── Webhooks ───────────────────────────────────────────────────────────────
+
+const get_webhook_event_types: Tool = {
+  name: "get_webhook_event_types",
+  description:
+    "List the event types you can subscribe a webhook endpoint to. Returns event-type strings like `domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, and `dns.record.created|updated|deleted`. Use these values (or `*` for all, or a prefix wildcard like `dns.*`) when calling create_webhook.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/webhook/eventTypes", { method: "GET" });
+  },
+};
+
+const list_webhooks: Tool = {
+  name: "list_webhooks",
+  description:
+    "List the webhook endpoints registered on the authenticated account. Each endpoint includes its id, URL, subscribed events, status (ACTIVE|DISABLED), consecutive failure count, last success/failure timestamps, last error, and signing secret. Porkbun POSTs a signed JSON payload to each endpoint when subscribed events occur; deliveries are signed with the endpoint's secret via HMAC-SHA256 over `{timestamp}.{rawBody}` and sent in the `X-Porkbun-Signature` header.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/webhook/list", { method: "GET" });
+  },
+};
+
+const get_webhook: Tool = {
+  name: "get_webhook",
+  description:
+    "Fetch a single webhook endpoint by its numeric id, including its signing secret and delivery health (consecutive failures, last success/failure).",
+  inputSchema: {
+    id: z.number().int().positive().describe("The webhook endpoint id (from list_webhooks or create_webhook)."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, `/webhook/get/${encodeURIComponent(String(args.id))}`, { method: "GET" });
+  },
+};
+
+const create_webhook: Tool = {
+  name: "create_webhook",
+  description:
+    "Register a webhook endpoint. Porkbun will POST a signed JSON payload to `url` whenever a subscribed event occurs. Returns the new endpoint including its `secret` — store it securely; it's used to verify the `X-Porkbun-Signature` header (HMAC-SHA256 over `{timestamp}.{rawBody}`). `url` must be HTTPS. Omit `events` (or pass `['*']`) to subscribe to all event types; you can also pass prefix wildcards like `dns.*`.",
+  inputSchema: {
+    url: z.string().url().describe("HTTPS URL Porkbun will POST event payloads to."),
+    events: z
+      .array(z.string())
+      .optional()
+      .describe(
+        "Event types to subscribe to, e.g. `['domain.registered','dns.*']`. Omit or use `['*']` for all events. Call get_webhook_event_types for the catalog."
+      ),
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { url: args.url };
+    if (Array.isArray(args.events) && args.events.length > 0) body.events = args.events;
+    return await call(config, "/webhook/create", { method: "POST", body });
+  },
+};
+
+const update_webhook: Tool = {
+  name: "update_webhook",
+  description:
+    "Update a webhook endpoint. Only the supplied fields change. Set `status` to `DISABLED` to pause deliveries or `ACTIVE` to resume (resuming also clears the consecutive-failure counter). Idempotent.",
+  inputSchema: {
+    id: z.number().int().positive().describe("The webhook endpoint id."),
+    url: z.string().url().optional().describe("New HTTPS URL."),
+    events: z.array(z.string()).optional().describe("Replacement event subscription list (or `['*']` for all)."),
+    status: z.enum(["ACTIVE", "DISABLED"]).optional().describe("Enable or pause the endpoint."),
+  },
+  annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { id: args.id };
+    if (args.url !== undefined) body.url = args.url;
+    if (args.events !== undefined) body.events = args.events;
+    if (args.status !== undefined) body.status = args.status;
+    return await call(config, "/webhook/update", { method: "POST", body, idempotent: true });
+  },
+};
+
+const rotate_webhook_secret: Tool = {
+  name: "rotate_webhook_secret",
+  description:
+    "Generate a new signing secret for a webhook endpoint and return the endpoint with the new secret. Deliveries are signed with the new secret immediately, so update your verifier as part of the same operation.",
+  inputSchema: {
+    id: z.number().int().positive().describe("The webhook endpoint id."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/webhook/rotateSecret", { method: "POST", body: { id: args.id } });
+  },
+};
+
+const test_webhook: Tool = {
+  name: "test_webhook",
+  description:
+    "Send a `webhook.test` event to an endpoint to confirm it's reachable and that signature verification works. The endpoint must be ACTIVE. Delivery happens asynchronously (usually within a minute); check the endpoint's last_success_date via get_webhook afterward.",
+  inputSchema: {
+    id: z.number().int().positive().describe("The webhook endpoint id to send a test event to."),
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/webhook/test", { method: "POST", body: { id: args.id } });
+  },
+};
+
+const delete_webhook: Tool = {
+  name: "delete_webhook",
+  description:
+    "Delete a webhook endpoint by id. Deliveries stop immediately. Idempotent in effect: deleting a non-existent endpoint returns an error you can safely ignore.",
+  inputSchema: {
+    id: z.number().int().positive().describe("The webhook endpoint id to delete."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/webhook/delete", { method: "POST", body: { id: args.id } });
+  },
+};
+
+const list_webhook_deliveries: Tool = {
+  name: "list_webhook_deliveries",
+  description:
+    "List recent webhook delivery attempts (newest first), across all endpoints or filtered to one. Each row reports event type, event id, status (PENDING|PROCESSING|DELIVERED|FAILED), attempt count, HTTP status, and last error. Delivery history is retained ~30 days. Use this to audit what was sent and to find a delivery id to resend. The payload is omitted here — use get_webhook_delivery for the full signed payload.",
+  inputSchema: {
+    endpointId: z.number().int().positive().optional().describe("Only deliveries for this endpoint."),
+    status: z
+      .enum(["PENDING", "PROCESSING", "DELIVERED", "FAILED"])
+      .optional()
+      .describe("Filter by delivery status."),
+    start: z.number().int().min(0).optional().describe("Offset for pagination (default 0)."),
+    limit: z.number().int().min(1).max(200).optional().describe("Page size, 1-200 (default 50)."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const params = new URLSearchParams();
+    if (args.endpointId !== undefined) params.set("endpointId", String(args.endpointId));
+    if (args.status !== undefined) params.set("status", String(args.status));
+    if (args.start !== undefined) params.set("start", String(args.start));
+    if (args.limit !== undefined) params.set("limit", String(args.limit));
+    const qs = params.toString();
+    return await call(config, `/webhook/deliveries${qs ? `?${qs}` : ""}`, { method: "GET" });
+  },
+};
+
+const get_webhook_delivery: Tool = {
+  name: "get_webhook_delivery",
+  description:
+    "Fetch a single webhook delivery by id, including the full JSON payload that was (or will be) sent and its delivery status. Get delivery ids from list_webhook_deliveries.",
+  inputSchema: {
+    id: z.number().int().positive().describe("The delivery id."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, `/webhook/delivery/${encodeURIComponent(String(args.id))}`, { method: "GET" });
+  },
+};
+
+const resend_webhook: Tool = {
+  name: "resend_webhook",
+  description:
+    "Re-queue a past webhook delivery to its endpoint. Clones the delivery into a fresh attempt, reusing the ORIGINAL event id — so a consumer that dedupes on X-Porkbun-Webhook-Id treats the resend as the same event. The endpoint must still exist and be ACTIVE. Use after fixing a downstream bug to replay a delivery that previously FAILED.",
+  inputSchema: {
+    id: z.number().int().positive().describe("The delivery id to resend (from list_webhook_deliveries)."),
+  },
+  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/webhook/resend", { method: "POST", body: { id: args.id } });
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -807,4 +975,17 @@ export const tools: Tool[] = [
   create_glue_record,
   update_glue_record,
   delete_glue_record,
+  // read — webhooks
+  get_webhook_event_types,
+  list_webhooks,
+  get_webhook,
+  list_webhook_deliveries,
+  get_webhook_delivery,
+  // write — webhooks
+  create_webhook,
+  update_webhook,
+  rotate_webhook_secret,
+  test_webhook,
+  resend_webhook,
+  delete_webhook,
 ];
