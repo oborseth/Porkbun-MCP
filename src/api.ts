@@ -104,12 +104,21 @@ export async function call<T = unknown>(
     );
   }
 
-  const data = parsed as { status?: string; message?: string; code?: string };
+  const data = parsed as {
+    status?: string;
+    message?: string;
+    code?: string;
+    next_action?: { type?: string; hint?: string; url?: string };
+  };
 
   if (!res.ok || data.status === "ERROR") {
     const code = data.code ? ` [${data.code}]` : "";
     const msg = data.message ?? `HTTP ${res.status}`;
-    throw new Error(`Porkbun API error${code}: ${msg}`);
+    // Surface the API's machine remediation hint so the agent can self-correct.
+    const na = data.next_action?.hint
+      ? ` — next: ${data.next_action.hint}${data.next_action.url ? ` (${data.next_action.url})` : ""}`
+      : "";
+    throw new Error(`Porkbun API error${code}: ${msg}${na}`);
   }
 
   return parsed as T;

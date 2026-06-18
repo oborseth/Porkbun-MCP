@@ -6,7 +6,7 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.8.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.9.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
 ## What's included (46 tools)
 
