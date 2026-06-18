@@ -1,11 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 const DEFAULT_BASE_URL = "https://api.porkbun.com/api/json/v3";
+const DEFAULT_DOCS_BASE_URL = "https://porkbun.com";
 
 export interface PorkbunConfig {
   apiKey: string;
   secretApiKey: string;
   baseUrl: string;
+  /** Website host serving the public docs (/llms, /llms/<topic>, /llms-full.txt). */
+  docsBaseUrl: string;
   userAgent: string;
 }
 
@@ -13,6 +16,7 @@ export function loadConfig(): PorkbunConfig {
   const apiKey = process.env.PORKBUN_API_KEY?.trim() ?? "";
   const secretApiKey = process.env.PORKBUN_SECRET_API_KEY?.trim() ?? "";
   const baseUrl = (process.env.PORKBUN_BASE_URL?.trim() || DEFAULT_BASE_URL).replace(/\/$/, "");
+  const docsBaseUrl = (process.env.PORKBUN_DOCS_BASE?.trim() || DEFAULT_DOCS_BASE_URL).replace(/\/$/, "");
   const userAgent = `porkbun-mcp/${process.env.npm_package_version ?? "0.1.0"}`;
 
   if (!apiKey || !secretApiKey) {
@@ -22,7 +26,26 @@ export function loadConfig(): PorkbunConfig {
     );
   }
 
-  return { apiKey, secretApiKey, baseUrl, userAgent };
+  return { apiKey, secretApiKey, baseUrl, docsBaseUrl, userAgent };
+}
+
+/**
+ * Fetch a public documentation resource (Markdown / plain text) from the
+ * Porkbun website host — e.g. `/llms`, `/llms/dns`, `/llms-full.txt`. Docs are
+ * unauthenticated and live at the site root (not under the API base), so no
+ * credentials are sent. Returns the raw text.
+ */
+export async function fetchDoc(config: PorkbunConfig, path: string): Promise<string> {
+  const url = `${config.docsBaseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { "User-Agent": config.userAgent, Accept: "text/markdown, text/plain, */*" },
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    throw new Error(`Porkbun docs request failed (HTTP ${res.status}) for ${url}`);
+  }
+  return text;
 }
 
 export interface CallOptions {

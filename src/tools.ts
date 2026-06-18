@@ -1,5 +1,5 @@
 import { z, type ZodRawShape } from "zod";
-import { call, type PorkbunConfig } from "./api.js";
+import { call, fetchDoc, type PorkbunConfig } from "./api.js";
 
 export interface ToolAnnotations {
   /** Human-readable title (sometimes shown in MCP client UIs). */
@@ -935,6 +935,117 @@ const resend_webhook: Tool = {
   },
 };
 
+// ─── Documentation (read-only, grounds the agent in Porkbun's own docs) ──────
+
+// Map a friendly topic name to its docs path. Per-topic pages live at
+// /llms/<tag>; a few aliases point at the overview / full reference / index.
+function docPathForTopic(topic: string): string {
+  const t = topic.trim().toLowerCase().replace(/^\/+|\/+$/g, "");
+  if (t === "" || t === "index" || t === "topics") return "/llms";
+  if (t === "overview" || t === "llms" || t === "llms.txt") return "/llms.txt";
+  if (t === "full" || t === "all" || t === "everything" || t === "reference") return "/llms-full.txt";
+  // Already a path like "llms/dns" or "dns" → normalize to /llms/<slug>.
+  const slug = t.replace(/^llms\//, "");
+  return `/llms/${encodeURIComponent(slug)}`;
+}
+
+const list_doc_topics: Tool = {
+  name: "list_doc_topics",
+  description:
+    "List the available Porkbun API documentation topics. Returns the docs index (Markdown) — every per-topic page (e.g. dns, domain, webhooks, ssl, pricing) with a one-line description and endpoint count, plus links to the full reference and the OpenAPI spec. Use this first to discover what docs exist, then read_doc to read one. Grounds an agent in Porkbun's own docs without leaving the conversation.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    const text = await fetchDoc(config, "/llms");
+    return { topic: "index", url: `${config.docsBaseUrl}/llms`, content: text };
+  },
+};
+
+const read_doc: Tool = {
+  name: "read_doc",
+  description:
+    "Read a Porkbun documentation page as Markdown. Pass a `topic` from list_doc_topics (e.g. `dns`, `domain`, `webhooks`, `ssl`, `pricing`, `account`, `marketplace`). Special values: `overview` (the llms.txt orientation), `full` (the entire flat reference — every endpoint), or `index` (the topic list). Returns the page's full Markdown, including endpoint signatures, parameters, and curl examples.",
+  inputSchema: {
+    topic: z
+      .string()
+      .min(1)
+      .describe("Doc topic, e.g. `dns`, `webhooks`, `domain`; or `overview` / `full` / `index`."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const topic = String(args.topic);
+    const path = docPathForTopic(topic);
+    try {
+      const content = await fetchDoc(config, path);
+      return { topic, url: `${config.docsBaseUrl}${path}`, content };
+    } catch (e) {
+      throw new Error(
+        `Couldn't read docs topic "${topic}" (${path}). Call list_doc_topics to see valid topics. (${(e as Error).message})`
+      );
+    }
+  },
+};
+
+const search_docs: Tool = {
+  name: "search_docs",
+  description:
+    "Keyword-search the full Porkbun API reference and return the most relevant sections (endpoints/topics) as Markdown. Use for 'how do I…' questions — e.g. 'verify a webhook signature', 'register a domain with dry run', 'set a TXT record'. Returns the best-matching sections with their headings; follow up with read_doc for a full topic page. Searches Porkbun's own docs only.",
+  inputSchema: {
+    query: z.string().min(2).describe("What you're looking for, e.g. `dry run register` or `webhook signature`."),
+    limit: z
+      .number()
+      .int()
+      .min(1)
+      .max(15)
+      .optional()
+      .describe("Max sections to return (default 6)."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const query = String(args.query);
+    const limit = typeof args.limit === "number" ? args.limit : 6;
+    const full = await fetchDoc(config, "/llms-full.txt");
+
+    // Split the flat reference into sections at Markdown H2 boundaries
+    // (each endpoint / heading starts with "## ").
+    const sections = full.split(/\n(?=## )/);
+    const terms = query
+      .toLowerCase()
+      .split(/\s+/)
+      .map((w) => w.replace(/[^a-z0-9.\/_-]/g, ""))
+      .filter((w) => w.length > 1);
+
+    const scored = sections
+      .map((body) => {
+        const hay = body.toLowerCase();
+        let score = 0;
+        for (const term of terms) if (hay.includes(term)) score++;
+        // Small boost when a term appears in the heading line.
+        const heading = body.slice(0, body.indexOf("\n") + 1).toLowerCase();
+        for (const term of terms) if (heading.includes(term)) score++;
+        return { body, score };
+      })
+      .filter((s) => s.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+
+    if (scored.length === 0) {
+      return {
+        query,
+        matches: 0,
+        message: "No matching sections. Try list_doc_topics, or read_doc with topic 'full' for the entire reference.",
+      };
+    }
+
+    const PER_SECTION_CAP = 1800;
+    const results = scored.map((s) =>
+      s.body.length > PER_SECTION_CAP ? s.body.slice(0, PER_SECTION_CAP) + "\n…(truncated — use read_doc for the full topic)" : s.body
+    );
+
+    return { query, matches: scored.length, content: results.join("\n\n---\n\n") };
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -975,6 +1086,10 @@ export const tools: Tool[] = [
   create_glue_record,
   update_glue_record,
   delete_glue_record,
+  // read — documentation (ground the agent in Porkbun's own docs)
+  list_doc_topics,
+  read_doc,
+  search_docs,
   // read — webhooks
   get_webhook_event_types,
   list_webhooks,
