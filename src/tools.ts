@@ -54,6 +54,22 @@ const check_domain: Tool = {
   },
 };
 
+const get_registration_requirements: Tool = {
+  name: "get_registration_requirements",
+  description:
+    "Get a TLD's registration requirements as JSON Schema. Returns whether the TLD is registerable via the API (`apiRegisterable`), the `register_domain` request body as a JSON Schema (with the fixed term, cost, agreeToTerms), WHOIS-privacy / validated-address / registrant-only flags, and — for TLDs with registry eligibility rules (e.g. .us nexus, .ca legal type) — a second schema (`registryRequirements`) listing those fields with allowed values and labels. Call this BEFORE register_domain to confirm a TLD can be registered and to build a valid payload, instead of discovering requirements from a failed registration.",
+  inputSchema: {
+    tld: z.string().min(2).describe("TLD without a leading dot, e.g. `com`, `us`, `ca`."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const tld = String(args.tld).toLowerCase().replace(/^\.+/, "");
+    return await call(config, `/domain/getRegistrationRequirements/${encodeURIComponent(tld)}`, {
+      method: "GET",
+    });
+  },
+};
+
 const list_domains: Tool = {
   name: "list_domains",
   description:
@@ -1050,6 +1066,7 @@ export const tools: Tool[] = [
   // read — global / account
   ping,
   check_domain,
+  get_registration_requirements,
   get_pricing,
   list_marketplace,
   list_domains,
