@@ -556,6 +556,10 @@ const create_dns_record: Tool = {
       .min(0)
       .optional()
       .describe("Priority — required for MX and SRV records, ignored otherwise."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate only — returns wouldSucceed without creating the record."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
@@ -567,6 +571,7 @@ const create_dns_record: Tool = {
     if (args.name !== undefined) body.name = args.name;
     if (args.ttl !== undefined) body.ttl = String(args.ttl);
     if (args.prio !== undefined) body.prio = String(args.prio);
+    if (args.dry_run) body.dryRun = true;
 
     return await call(config, `/dns/create/${encodeURIComponent(domain)}`, {
       method: "POST",
@@ -591,6 +596,10 @@ const update_dns_record: Tool = {
     name: z.string().optional().describe("New subdomain prefix (empty string = apex)."),
     ttl: z.number().int().min(60).optional().describe("New TTL in seconds."),
     prio: z.number().int().min(0).optional().describe("New priority (MX/SRV only)."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate only — confirms the record exists and is editable, returns wouldSucceed without changing it."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
@@ -602,6 +611,7 @@ const update_dns_record: Tool = {
     if (args.name !== undefined) body.name = args.name;
     if (args.ttl !== undefined) body.ttl = String(args.ttl);
     if (args.prio !== undefined) body.prio = String(args.prio);
+    if (args.dry_run) body.dryRun = true;
 
     return await call(
       config,
@@ -618,6 +628,10 @@ const delete_dns_record: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Domain the record belongs to, e.g. `example.com`"),
     record_id: z.string().min(1).describe("Numeric record ID (as a string)."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate only — confirms the record exists and is deletable, returns wouldSucceed without deleting it."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
@@ -626,7 +640,7 @@ const delete_dns_record: Tool = {
     return await call(
       config,
       `/dns/delete/${encodeURIComponent(domain)}/${encodeURIComponent(recordId)}`,
-      { method: "POST", idempotent: true }
+      { method: "POST", idempotent: true, body: args.dry_run ? { dryRun: true } : undefined }
     );
   },
 };
@@ -771,14 +785,20 @@ const update_nameservers: Tool = {
       .min(2)
       .max(13)
       .describe("Full list of nameservers (e.g. `['ns1.example.com', 'ns2.example.com']`). Minimum 2, maximum 13."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate only — returns wouldSucceed without changing the nameservers."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { ns: args.nameservers };
+    if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/updateNs/${encodeURIComponent(domain)}`, {
       method: "POST",
       idempotent: true,
-      body: { ns: args.nameservers },
+      body,
     });
   },
 };
