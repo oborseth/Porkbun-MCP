@@ -19,13 +19,10 @@ export function loadConfig(): PorkbunConfig {
   const docsBaseUrl = (process.env.PORKBUN_DOCS_BASE?.trim() || DEFAULT_DOCS_BASE_URL).replace(/\/$/, "");
   const userAgent = `porkbun-mcp/${process.env.npm_package_version ?? "0.1.0"}`;
 
-  if (!apiKey || !secretApiKey) {
-    throw new Error(
-      "Missing credentials. Set PORKBUN_API_KEY and PORKBUN_SECRET_API_KEY environment variables. " +
-        "Create keys at https://porkbun.com/account/api"
-    );
-  }
-
+  // Credentials are intentionally optional here: the documentation tools
+  // (search_docs / read_doc / list_doc_topics) work with no setup, so the
+  // server must start without keys. Tools that hit the authenticated API
+  // enforce credentials at call time (see call()).
   return { apiKey, secretApiKey, baseUrl, docsBaseUrl, userAgent };
 }
 
@@ -67,6 +64,16 @@ export async function call<T = unknown>(
   path: string,
   opts: CallOptions = {}
 ): Promise<T> {
+  // Authenticated endpoints require credentials; the documentation tools don't
+  // go through here. Fail with a clear, actionable message rather than a 401.
+  if (!config.apiKey || !config.secretApiKey) {
+    throw new Error(
+      "This tool needs Porkbun API credentials. Set PORKBUN_API_KEY and PORKBUN_SECRET_API_KEY " +
+        "(create keys at https://porkbun.com/account/api). The documentation tools — search_docs, " +
+        "read_doc, list_doc_topics — work without credentials."
+    );
+  }
+
   const method = opts.method ?? "POST";
   const url = `${config.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
 

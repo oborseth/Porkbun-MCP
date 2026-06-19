@@ -6,7 +6,7 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.9.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.10.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
 ## What's included (46 tools)
 
@@ -40,7 +40,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `read_doc` | Read a doc page as Markdown (`dns`, `webhooks`, … or `overview`/`full`) |
 | `search_docs` | Keyword-search the full reference; returns the most relevant sections |
 
-The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground itself in Porkbun's own documentation (the `/llms` Markdown surface) mid-conversation — no web browsing required.
+The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground itself in Porkbun's own documentation (the `/llms` Markdown surface) mid-conversation — no web browsing required, and **no API credentials needed**. You can add the server purely to research the API, then supply keys when you're ready for live operations.
 
 **Domain lifecycle writes (spend account credit)**
 
@@ -118,6 +118,8 @@ Add this to `~/Library/Application Support/Claude/claude_desktop_config.json` (m
 
 Restart Claude Desktop. Porkbun tools should appear in the tool picker.
 
+> **Docs-only, no keys:** the documentation tools (`search_docs`, `read_doc`, `list_doc_topics`) work without credentials, so you can omit the `env` block entirely to use the server just for API research. The authenticated tools return a clear "set PORKBUN_API_KEY" message until you add keys.
+
 ### Cursor / Cline / Continue
 
 Most MCP-aware editors use a similar `mcpServers` config block. See your client's documentation for the exact location.
@@ -147,8 +149,8 @@ The blast radius of an accidentally-leaked key drops to "operations on these dom
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `PORKBUN_API_KEY` | yes | Your Porkbun public API key |
-| `PORKBUN_SECRET_API_KEY` | yes | Your Porkbun secret API key |
+| `PORKBUN_API_KEY` | for live ops | Your Porkbun public API key. Omit to use only the credential-free documentation tools. |
+| `PORKBUN_SECRET_API_KEY` | for live ops | Your Porkbun secret API key. Omit to use only the credential-free documentation tools. |
 | `PORKBUN_BASE_URL` | no | Override the API base URL (e.g. for testing against `api-betamax.porkbun.com/api/json/v3`) |
 | `PORKBUN_DOCS_BASE` | no | Override the docs host used by the `*_doc(s)` tools (default `https://porkbun.com`) |
 
