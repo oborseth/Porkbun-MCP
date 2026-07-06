@@ -195,7 +195,7 @@ const get_nameservers: Tool = {
 const list_url_forwards: Tool = {
   name: "list_url_forwards",
   description:
-    "List all URL forwarding rules configured for a domain. Each entry includes its `id` (used by `delete_url_forward`), the source subdomain, the destination URL, the redirect type (permanent/temporary), and whether the request path and wildcards are forwarded.",
+    "List all URL forwarding rules configured for a domain. Each entry includes its `id` (used by `delete_url_forward`), the source subdomain, the destination URL, the redirect `type` (permanent/temporary/masked), the exact `redirectType` code (301/302/307/masked — distinguishes 302 from 307), and whether the request path and wildcards are forwarded.",
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
@@ -718,8 +718,12 @@ const create_url_forward: Tool = {
       .url()
       .describe("Destination URL to forward visitors to, e.g. `https://newsite.example.com`"),
     type: z
-      .enum(["permanent", "temporary"])
-      .describe("`permanent` sends HTTP 301 (browsers cache); `temporary` is the configurable default redirect."),
+      .enum(["permanent", "temporary", "masked"])
+      .describe("`permanent` = HTTP 301; `temporary` = HTTP 302 (default); `masked` = loads the destination in a frame (URL masking). For a precise code — including a 307 temporary redirect — use `redirect_type`."),
+    redirect_type: z
+      .enum(["301", "302", "307", "masked"])
+      .optional()
+      .describe("Optional exact redirect type; takes precedence over `type`. 301 = permanent, 302 or 307 = temporary (pass 307 here to get a 307), masked = URL masking. Omit to derive from `type` (temporary→302, permanent→301)."),
     includePath: z
       .enum(["yes", "no"])
       .describe("`yes` appends the request URI path to the forward target; `no` always sends to the bare destination."),
@@ -741,6 +745,7 @@ const create_url_forward: Tool = {
       wildcard: args.wildcard,
     };
     if (args.subdomain !== undefined) body.subdomain = args.subdomain;
+    if (args.redirect_type !== undefined) body.redirectType = args.redirect_type;
     return await call(config, `/domain/addUrlForward/${encodeURIComponent(domain)}`, {
       method: "POST",
       idempotent: true,
