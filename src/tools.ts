@@ -887,14 +887,28 @@ const update_contacts: Tool = {
 
 // ─── Static site hosting ─────────────────────────────────────────────────────
 
+const list_hosting_plans: Tool = {
+  name: "list_hosting_plans",
+  description:
+    "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Currently Secure Static Hosting; more products are added over time.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/hosting/plans", { method: "GET" });
+  },
+};
+
 const create_hosting: Tool = {
   name: "create_hosting",
   description:
     "Provision Secure Static Hosting for a domain in the account. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
-    plan: z.enum(["monthly", "yearly"]).describe("`monthly` ($3.00/mo) or `yearly` ($30.00/yr)."),
-    acknowledged_cost: z.number().int().describe("Plan price in cents: 300 (monthly) or 3000 (yearly). Must match, or the call is rejected — this confirms the human was told the cost."),
+    product: z
+      .enum(["secureStaticHosting"])
+      .describe("Hosting product to provision. Discover the products + their plans/prices via list_hosting_plans. Currently only `secureStaticHosting`."),
+    plan: z.enum(["monthly", "yearly"]).describe("Plan within the product — `monthly` ($3.00/mo) or `yearly` ($30.00/yr) for secureStaticHosting. See list_hosting_plans."),
+    acknowledged_cost: z.number().int().describe("Plan price in cents (from list_hosting_plans: 300 monthly / 3000 yearly). Must match, or the call is rejected — this confirms the human was told the cost."),
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
     dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
@@ -902,7 +916,7 @@ const create_hosting: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    const body: Record<string, unknown> = { plan: args.plan, acknowledgedCost: args.acknowledged_cost, agreeToTerms: args.agree_to_terms };
+    const body: Record<string, unknown> = { product: args.product, plan: args.plan, acknowledgedCost: args.acknowledged_cost, agreeToTerms: args.agree_to_terms };
     if (args.agree_to_nameserver_change) body.agreeToNameserverChange = true;
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/hosting/create/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
@@ -1295,6 +1309,7 @@ export const tools: Tool[] = [
   update_nameservers,
   update_contacts,
   // hosting (Secure Static Hosting)
+  list_hosting_plans,
   create_hosting,
   get_hosting,
   deploy_site,
