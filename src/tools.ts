@@ -808,6 +808,78 @@ const update_nameservers: Tool = {
   },
 };
 
+// ─── Domain contacts ─────────────────────────────────────────────────────────
+
+const contactShape = {
+  firstName: z.string().describe("Given name. Required for a provided role."),
+  lastName: z.string().optional().describe("Family name."),
+  organization: z.string().optional().describe("Company/organization name."),
+  address1: z.string().describe("Street address line 1. Required."),
+  address2: z.string().optional(),
+  address3: z.string().optional(),
+  city: z.string().describe("City. Required."),
+  state: z.string().optional().describe("State/province; leave empty where not applicable."),
+  postalCode: z.string().describe("Postal/ZIP code. Required."),
+  country: z.string().length(2).describe("ISO 3166-1 alpha-2 country code, e.g. `US`, `GB`. Required."),
+  phone: z.string().describe("National phone number, digits only. Required."),
+  phoneCountryCode: z.string().describe("Numeric international calling code, e.g. `1`, `44`. Required."),
+  fax: z.string().optional(),
+  email: z.string().email().describe("Contact email. Required."),
+};
+const contactObject = z.object(contactShape);
+
+const get_contacts: Tool = {
+  name: "get_contacts",
+  description:
+    "Get the four contacts (registrant, admin, tech, billing) for a domain in the authenticated account, with their current field values (name, organization, address, phone, email). Read-only.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/domain/getContacts/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const update_contacts: Tool = {
+  name: "update_contacts",
+  description:
+    "Edit a domain's contacts. Provide `contacts` keyed by role with ANY subset of registrant/admin/tech/billing (unspecified roles keep their current values), or a single `contact` applied to all four. Mirrors the website: pushes to the registry on thick TLDs, and a registrant change (name/organization/email) fires the same new-owner notice/verification email — no 60-day transfer lock. Supports `dry_run`. Note: a registrant name/organization change on a .au domain, or any registrant change on an address-validation TLD (.de/.nrw), is rejected with REGISTRANT_CHANGE_NOT_SUPPORTED — do those at porkbun.com; admin/tech/billing edits still work.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to edit, e.g. `example.com`"),
+    contacts: z
+      .object({
+        registrant: contactObject.optional(),
+        admin: contactObject.optional(),
+        tech: contactObject.optional(),
+        billing: contactObject.optional(),
+      })
+      .optional()
+      .describe("Per-role contacts; include only the roles you want to change."),
+    contact: contactObject
+      .optional()
+      .describe("A single contact applied to all four roles. Use this OR `contacts`, not both."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, validate only — returns wouldSucceed without applying the change."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {};
+    if (args.contacts !== undefined) body.contacts = args.contacts;
+    if (args.contact !== undefined) body.contact = args.contact;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/domain/updateContacts/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      idempotent: true,
+      body,
+    });
+  },
+};
+
 // ─── Webhooks ───────────────────────────────────────────────────────────────
 
 const get_webhook_event_types: Tool = {
@@ -1107,6 +1179,7 @@ export const tools: Tool[] = [
   list_transfers,
   get_transfer_status,
   get_ssl_bundle,
+  get_contacts,
   // write — domain lifecycle (spend account credit)
   register_domain,
   renew_domain,
@@ -1114,6 +1187,7 @@ export const tools: Tool[] = [
   // write — domain settings
   update_auto_renew,
   update_nameservers,
+  update_contacts,
   // write — DNS
   create_dns_record,
   update_dns_record,
