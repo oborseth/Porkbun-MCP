@@ -864,6 +864,10 @@ const update_contacts: Tool = {
       .boolean()
       .optional()
       .describe("If true, validate only — returns wouldSucceed without applying the change."),
+    address_validation_choice: z
+      .enum(["accept_suggestion", "use_as_entered"])
+      .optional()
+      .describe("For a registrant change on an address-validated TLD (.de/.nrw/.uk/.us/.ca/.nyc/.au/.eu/.in/.nz families) after an ADDRESS_VALIDATION_REQUIRED response: 'accept_suggestion' saves the standardized suggestedAddress returned there; 'use_as_entered' keeps the submitted address (rejected if a real correction was offered)."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
@@ -872,6 +876,7 @@ const update_contacts: Tool = {
     if (args.contacts !== undefined) body.contacts = args.contacts;
     if (args.contact !== undefined) body.contact = args.contact;
     if (args.dry_run) body.dryRun = true;
+    if (args.address_validation_choice !== undefined) body.addressValidationChoice = args.address_validation_choice;
     return await call(config, `/domain/updateContacts/${encodeURIComponent(domain)}`, {
       method: "POST",
       idempotent: true,
