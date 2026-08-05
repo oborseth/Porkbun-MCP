@@ -8,7 +8,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.12.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (46 tools)
+## What's included (48 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -31,6 +31,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `list_transfers` | List in-progress and recent inbound transfers |
 | `get_transfer_status` | Get status of a specific inbound transfer |
 | `get_ssl_bundle` | Retrieve the free Porkbun-issued SSL bundle for a domain |
+| `get_contacts` | Get a domain's four contacts (registrant/admin/tech/billing) with current values |
 | `get_webhook_event_types` | List the event types a webhook endpoint can subscribe to |
 | `list_webhooks` | List webhook endpoints (URL, events, status, delivery health, secret) |
 | `get_webhook` | Get a single webhook endpoint by id |
@@ -56,6 +57,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 |---|---|
 | `update_auto_renew` | Turn auto-renewal on or off |
 | `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
+| `update_contacts` | Edit domain contacts — any subset of registrant/admin/tech/billing; a registrant change fires the new-owner notice email (`.au`/`.de`/`.nrw` registrant changes → website) |
 
 **DNS / DNSSEC / URL-forwarding / glue writes (free)**
 
