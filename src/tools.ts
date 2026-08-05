@@ -885,6 +885,107 @@ const update_contacts: Tool = {
   },
 };
 
+// ─── Static site hosting ─────────────────────────────────────────────────────
+
+const create_hosting: Tool = {
+  name: "create_hosting",
+  description:
+    "Provision Secure Static Hosting for a domain in the account. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
+    plan: z.enum(["monthly", "yearly"]).describe("`monthly` ($3.00/mo) or `yearly` ($30.00/yr)."),
+    acknowledged_cost: z.number().int().describe("Plan price in cents: 300 (monthly) or 3000 (yearly). Must match, or the call is rejected — this confirms the human was told the cost."),
+    agree_to_terms: z.literal("yes").describe('Must be "yes".'),
+    agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
+    dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { plan: args.plan, acknowledgedCost: args.acknowledged_cost, agreeToTerms: args.agree_to_terms };
+    if (args.agree_to_nameserver_change) body.agreeToNameserverChange = true;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/hosting/create/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const get_hosting: Tool = {
+  name: "get_hosting",
+  description:
+    "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting.",
+  inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/hosting/get/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const deploy_site: Tool = {
+  name: "deploy_site",
+  description:
+    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first).",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
+    files: z
+      .array(
+        z.object({
+          path: z.string().describe("Destination path, e.g. `index.html` or `assets/app.css`."),
+          content: z.string().describe("File contents, base64-encoded."),
+        })
+      )
+      .min(1)
+      .describe("Files to upload."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/hosting/deploy/${encodeURIComponent(domain)}`, { method: "POST", body: { files: args.files } });
+  },
+};
+
+const list_hosting_files: Tool = {
+  name: "list_hosting_files",
+  description: "List file/directory names under an optional `path` in a domain's Secure Static Hosting space.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose hosting files to list."),
+    path: z.string().optional().describe("Subdirectory to list (default: root)."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {};
+    if (args.path !== undefined) body.path = args.path;
+    return await call(config, `/hosting/files/${encodeURIComponent(domain)}`, { method: "POST", body });
+  },
+};
+
+const delete_hosting_file: Tool = {
+  name: "delete_hosting_file",
+  description: "Delete a file (or empty directory) at `path` in a domain's Secure Static Hosting space.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose hosting file to delete."),
+    path: z.string().min(1).describe("Path to delete, e.g. `old/page.html`."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/hosting/deleteFile/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
+  },
+};
+
+const delete_hosting: Tool = {
+  name: "delete_hosting",
+  description:
+    "Deprovision (cancel) Secure Static Hosting for a domain; teardown is scheduled by Porkbun. Note: the domain has already used its one free trial, so provisioning it again later will be charged (no second free trial).",
+  inputSchema: { domain: z.string().min(3).describe("Domain to deprovision hosting for.") },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/hosting/delete/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true });
+  },
+};
+
 // ─── Webhooks ───────────────────────────────────────────────────────────────
 
 const get_webhook_event_types: Tool = {
@@ -1193,6 +1294,13 @@ export const tools: Tool[] = [
   update_auto_renew,
   update_nameservers,
   update_contacts,
+  // hosting (Secure Static Hosting)
+  create_hosting,
+  get_hosting,
+  deploy_site,
+  list_hosting_files,
+  delete_hosting_file,
+  delete_hosting,
   // write — DNS
   create_dns_record,
   update_dns_record,

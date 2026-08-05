@@ -8,7 +8,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.12.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks. All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (48 tools)
+## What's included (54 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -73,6 +73,17 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `create_glue_record` | Create a glue record (host-to-IP mapping at the registry) |
 | `update_glue_record` | Replace the IP list for a glue record |
 | `delete_glue_record` | Delete a glue record by host |
+
+**Secure Static Hosting**
+
+| Tool | Description |
+|---|---|
+| `create_hosting` | Provision Secure Static Hosting — first provision per domain is a 15-day free trial that auto-renews at the plan price; re-provision after deprovision is charged to account credit (one free trial per domain). Switches the domain to Porkbun NS (gated by `agree_to_nameserver_change`); requires `acknowledged_cost`. `dry_run` supported |
+| `get_hosting` | Get hosting status for a domain (plan, trial, expiry, auto-renew) |
+| `deploy_site` | Upload static files (base64, ≤10MB/call) to a domain's hosting |
+| `list_hosting_files` | List files under a path in a domain's hosting |
+| `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
+| `delete_hosting` | Deprovision (cancel) hosting for a domain |
 
 **Webhook writes (free)**
 
