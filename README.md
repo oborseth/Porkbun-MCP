@@ -57,7 +57,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 |---|---|
 | `update_auto_renew` | Turn auto-renewal on or off |
 | `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
-| `update_contacts` | Edit domain contacts — any subset of registrant/admin/tech/billing; a registrant change fires the new-owner notice email (`.au`/`.de`/`.nrw` registrant changes → website) |
+| `update_contacts` | Edit domain contacts — any subset of registrant/admin/tech/billing; a registrant change fires the new-owner notice email. On address-validated TLDs (`.de`/`.nrw`/`.uk`/`.us`/`.ca`/`.au`/`.eu`/`.in`/`.nz` families) it validates the registrant address — resolve with `address_validation_choice`. A `.au` registrant name/org change is a website-only ownership trade. |
 
 **DNS / DNSSEC / URL-forwarding / glue writes (free)**
 
