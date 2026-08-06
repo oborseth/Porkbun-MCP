@@ -904,10 +904,9 @@ const create_hosting: Tool = {
     "Provision Secure Static Hosting for a domain in the account. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
-    product: z
-      .enum(["secureStaticHosting"])
-      .describe("Hosting product to provision. Discover the products + their plans/prices via list_hosting_plans. Currently only `secureStaticHosting`."),
-    plan: z.enum(["monthly", "yearly"]).describe("Plan within the product — `monthly` ($3.00/mo) or `yearly` ($30.00/yr) for secureStaticHosting. See list_hosting_plans."),
+    sku: z
+      .string()
+      .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Currently Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) or `PIXIESECURESTATICY2` ($30.00/yr)."),
     acknowledged_cost: z.number().int().describe("Plan price in cents (from list_hosting_plans: 300 monthly / 3000 yearly). Must match, or the call is rejected — this confirms the human was told the cost."),
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
@@ -916,7 +915,7 @@ const create_hosting: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    const body: Record<string, unknown> = { product: args.product, plan: args.plan, acknowledgedCost: args.acknowledged_cost, agreeToTerms: args.agree_to_terms };
+    const body: Record<string, unknown> = { sku: args.sku, acknowledgedCost: args.acknowledged_cost, agreeToTerms: args.agree_to_terms };
     if (args.agree_to_nameserver_change) body.agreeToNameserverChange = true;
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/hosting/create/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
@@ -938,7 +937,7 @@ const get_hosting: Tool = {
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
-    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first).",
+    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first).",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
     files: z
@@ -985,6 +984,21 @@ const delete_hosting_file: Tool = {
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/deleteFile/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
+  },
+};
+
+const make_hosting_dir: Tool = {
+  name: "make_hosting_dir",
+  description:
+    "Create a directory (and any missing parent directories) at `path` in a domain's Secure Static Hosting space. deploy_site already auto-creates the directories in a file's path, so use this only to stand up an empty directory explicitly.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose hosting to create the directory in."),
+    path: z.string().min(1).describe("Directory path to create, e.g. `assets/img`."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/hosting/makeDir/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
   },
 };
 
@@ -1315,6 +1329,7 @@ export const tools: Tool[] = [
   deploy_site,
   list_hosting_files,
   delete_hosting_file,
+  make_hosting_dir,
   delete_hosting,
   // write — DNS
   create_dns_record,

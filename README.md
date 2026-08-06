@@ -6,9 +6,9 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.14.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks and Secure Static Hosting (provision + deploy static sites). All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.15.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks and Secure Static Hosting (provision + deploy static sites). All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
 
-## What's included (55 tools)
+## What's included (56 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -79,11 +79,12 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | Tool | Description |
 |---|---|
 | `list_hosting_plans` | List API-provisionable hosting products + plans, with price (cents), interval, trial length, features |
-| `create_hosting` | Provision Secure Static Hosting — first provision per domain is a 15-day free trial that auto-renews at the plan price; re-provision after deprovision is charged to account credit (one free trial per domain). Switches the domain to Porkbun NS (gated by `agree_to_nameserver_change`); requires `acknowledged_cost`. `dry_run` supported |
+| `create_hosting` | Provision hosting for a domain by `sku` (from `list_hosting_plans`) — first provision per domain is a 15-day free trial that auto-renews at the plan price; re-provision after deprovision is charged to account credit (one free trial per domain). Switches the domain to Porkbun NS (gated by `agree_to_nameserver_change`); requires `acknowledged_cost`. `dry_run` supported |
 | `get_hosting` | Get hosting status for a domain (plan, trial, expiry, auto-renew) |
 | `deploy_site` | Upload static files (base64, ≤10MB/call) to a domain's hosting |
 | `list_hosting_files` | List files under a path in a domain's hosting |
 | `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
+| `make_hosting_dir` | Create a directory (and missing parents) in a domain's hosting (deploy auto-creates dirs in a file path) |
 | `delete_hosting` | Deprovision (cancel) hosting for a domain |
 
 **Webhook writes (free)**
