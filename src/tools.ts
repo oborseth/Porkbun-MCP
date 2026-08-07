@@ -176,6 +176,52 @@ const sandbox_reset: Tool = {
   },
 };
 
+const sandbox_trigger_webhook: Tool = {
+  name: "sandbox_trigger_webhook",
+  description:
+    "SANDBOX ONLY. Fire a sample signed webhook event to your registered endpoints so you can test your handler and HMAC signature verification for ANY event type on demand — including cron-driven events like `domain.expiring` that don't result from a single API call. Register an endpoint first with the webhook tools. Requires a sandbox API key (`pk1_sb_…`).",
+  inputSchema: {
+    eventType: z
+      .enum([
+        "domain.registered",
+        "domain.renewed",
+        "domain.transfer.completed",
+        "domain.expiring",
+        "dns.record.created",
+        "dns.record.updated",
+        "dns.record.deleted",
+      ])
+      .describe("The webhook event type to emit."),
+    domain: z.string().optional().describe("Domain used in the sample payload (default example.com)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { eventType: args.eventType };
+    if (args.domain) body.domain = args.domain;
+    return await call(config, "/sandbox/triggerWebhook", { method: "POST", body });
+  },
+};
+
+const mock_call: Tool = {
+  name: "mock_call",
+  description:
+    "Get a schema-accurate EXAMPLE response for any API endpoint with NO credentials — nothing to set up. Mirrors the real path under /mock (e.g. path `domain/listAll` or `dns/create/example.com`). Touches no datastore and returns the exact shape the live API would. Set `error: true` to see the error-response shape instead. Use it to learn/verify response shapes before wiring up real or sandbox keys. Omit `path` (or pass empty) to list every mockable endpoint.",
+  inputSchema: {
+    path: z
+      .string()
+      .optional()
+      .describe("The real endpoint path to mock, without leading slash — e.g. `domain/listAll`. Omit to list all mockable endpoints."),
+    error: z.boolean().optional().describe("Return the error-response shape instead of success."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    let path = "/mock";
+    if (args.path) path += "/" + String(args.path).replace(/^\/+/, "");
+    if (args.error) path += (path.includes("?") ? "&" : "?") + "status=error";
+    return await callPublic(config, path);
+  },
+};
+
 const get_pricing: Tool = {
   name: "get_pricing",
   description:
@@ -1377,6 +1423,8 @@ export const tools: Tool[] = [
   create_sandbox_key,
   sandbox_topup,
   sandbox_reset,
+  sandbox_trigger_webhook,
+  mock_call,
   // write — DNS
   create_dns_record,
   update_dns_record,

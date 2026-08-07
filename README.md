@@ -6,9 +6,9 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.16.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks) plus an isolated sandbox/test mode: use a `pk1_sb_` key and every tool runs against a simulated environment with fake credit — no real registry actions, DNS changes, or charges.
+> **Status:** v0.17.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks) plus an isolated sandbox/test mode: use a `pk1_sb_` key and every tool runs against a simulated environment with fake credit — no real registry actions, DNS changes, or charges. Sandbox delivers signed webhooks too, and a credential-free mock server returns schema-accurate example responses for any endpoint.
 
-## What's included (59 tools)
+## What's included (61 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -96,6 +96,15 @@ Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and 
 | `create_sandbox_key` | **No credentials needed** — instantly mint a throwaway sandbox key pair (`pk1_sb_`/`sk1_sb_`, $1000 fake credit) so an agent can start testing before it has any keys |
 | `sandbox_topup` | Sandbox only — grant fake account credit (default $1000) so paid ops can keep being exercised after funds run out |
 | `sandbox_reset` | Sandbox only — wipe the sandbox account's domains/DNS/orders/credit and re-grant $1000, for a clean slate between test runs |
+| `sandbox_trigger_webhook` | Sandbox only — fire a sample signed webhook event of any type (incl. cron-driven `domain.expiring`) to your registered endpoints, to test your handler + signature verification on demand |
+
+**Mock server (no credentials)**
+
+`mock_call` returns a schema-accurate example response for any endpoint with **no key required** — nothing to set up. Pass a `path` like `domain/listAll` or `dns/create/example.com` (omit it to list every mockable endpoint), or set `error: true` for the error shape. Responses touch no datastore and match the live API's shape exactly, so you can build and test client code before you have any credentials.
+
+| Tool | Description |
+|---|---|
+| `mock_call` | **No credentials needed** — schema-accurate example response for any endpoint (`path` mirrors the real route; `error: true` for the error shape; omit `path` to list all mockable endpoints) |
 
 **Webhook writes (free)**
 
