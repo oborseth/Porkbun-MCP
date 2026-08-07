@@ -6,9 +6,9 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.15.0 — covers everything you can do in the Porkbun web UI, plus outbound webhooks and Secure Static Hosting (provision + deploy static sites). All write operations attach an `Idempotency-Key` automatically, so retries within 24 hours don't double-charge.
+> **Status:** v0.16.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks) plus an isolated sandbox/test mode: use a `pk1_sb_` key and every tool runs against a simulated environment with fake credit — no real registry actions, DNS changes, or charges.
 
-## What's included (56 tools)
+## What's included (59 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -86,6 +86,16 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
 | `make_hosting_dir` | Create a directory (and missing parents) in a domain's hosting (deploy auto-creates dirs in a file path) |
 | `delete_hosting` | Deprovision (cancel) hosting for a domain |
+
+**Sandbox / test mode**
+
+Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and *every* tool above runs against an isolated test environment — same server, you just swap the key. Registrations, renewals, transfers, DNS, contacts, glue, and DNSSEC are all simulated against a separate sandbox datastore: **no real registry actions, no DNS changes, no certificates, and no charges**. Your sandbox account starts with fake account credit, availability/pricing reflect the real catalog, and every response includes `"sandbox": true`. Create a sandbox key on [porkbun.com/account/api](https://porkbun.com/account/api). Or mint one instantly with **`create_sandbox_key`** — no signup, no credentials. (Hosting and email endpoints aren't simulated and return `SANDBOX_UNSUPPORTED` with a sandbox key.)
+
+| Tool | Description |
+|---|---|
+| `create_sandbox_key` | **No credentials needed** — instantly mint a throwaway sandbox key pair (`pk1_sb_`/`sk1_sb_`, $1000 fake credit) so an agent can start testing before it has any keys |
+| `sandbox_topup` | Sandbox only — grant fake account credit (default $1000) so paid ops can keep being exercised after funds run out |
+| `sandbox_reset` | Sandbox only — wipe the sandbox account's domains/DNS/orders/credit and re-grant $1000, for a clean slate between test runs |
 
 **Webhook writes (free)**
 

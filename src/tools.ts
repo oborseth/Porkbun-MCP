@@ -1,5 +1,5 @@
 import { z, type ZodRawShape } from "zod";
-import { call, fetchDoc, type PorkbunConfig } from "./api.js";
+import { call, callPublic, fetchDoc, type PorkbunConfig } from "./api.js";
 
 export interface ToolAnnotations {
   /** Human-readable title (sometimes shown in MCP client UIs). */
@@ -130,6 +130,49 @@ const get_balance: Tool = {
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
     return await call(config, "/account/balance", { method: "GET" });
+  },
+};
+
+// ─── Sandbox controls (only usable with a sandbox key, pk1_sb_…) ──────────────
+
+const create_sandbox_key: Tool = {
+  name: "create_sandbox_key",
+  description:
+    "Instantly create a free SANDBOX API key — NO credentials or approval needed (works before you have any keys). Returns a `pk1_sb_` / `sk1_sb_` pair for a throwaway test account seeded with $1000 fake credit. Set the returned keys as PORKBUN_API_KEY / PORKBUN_SECRET_API_KEY (or pass them to any tool) and the whole API runs against an isolated sandbox: no real registry actions, DNS changes, certificates, or charges. Ideal for rehearsing register → DNS → renew end-to-end before using a live key. Optional `name` labels the key.",
+  inputSchema: {
+    name: z.string().max(255).optional().describe("Optional label/title for the sandbox key."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { sandbox: true };
+    if (args.name) body.name = args.name;
+    return await callPublic(config, "/apikey/request", body);
+  },
+};
+
+const sandbox_topup: Tool = {
+  name: "sandbox_topup",
+  description:
+    "SANDBOX ONLY. Grant fake account credit to the sandbox account so paid operations (register/renew/transfer) can keep being exercised after funds run out. Requires a sandbox API key (`pk1_sb_…`). Optional `amount` in US cents (default 100000 = $1000; capped 1,000,000). Returns the new balance. With a live key this endpoint is not available.",
+  inputSchema: {
+    amount: z.number().int().positive().optional().describe("Fake credit to add, in US cents (default 100000 = $1000; max 1000000)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.amount !== undefined) body.amount = args.amount;
+    return await call(config, "/sandbox/topup", { method: "POST", body });
+  },
+};
+
+const sandbox_reset: Tool = {
+  name: "sandbox_reset",
+  description:
+    "SANDBOX ONLY. Wipe the sandbox account's simulated state (domains, DNS, orders, credit) and re-grant $1000 fake credit — a clean slate between test runs. Requires a sandbox API key (`pk1_sb_…`). With a live key this endpoint is not available.",
+  inputSchema: {},
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/sandbox/reset", { method: "POST" });
   },
 };
 
@@ -1331,6 +1374,9 @@ export const tools: Tool[] = [
   delete_hosting_file,
   make_hosting_dir,
   delete_hosting,
+  create_sandbox_key,
+  sandbox_topup,
+  sandbox_reset,
   // write — DNS
   create_dns_record,
   update_dns_record,

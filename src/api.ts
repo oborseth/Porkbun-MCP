@@ -45,6 +45,25 @@ export async function fetchDoc(config: PorkbunConfig, path: string): Promise<str
   return text;
 }
 
+/**
+ * POST an UNAUTHENTICATED v3 endpoint (no credentials attached) — used for
+ * agentic onboarding like minting a sandbox key via /apikey/request.
+ */
+export async function callPublic<T = unknown>(config: PorkbunConfig, path: string, body: Record<string, unknown> = {}): Promise<T> {
+  const url = `${config.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "User-Agent": config.userAgent, Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  try {
+    return (text ? JSON.parse(text) : {}) as T;
+  } catch {
+    throw new Error(`Porkbun API returned non-JSON response (HTTP ${res.status}): ${text.slice(0, 300)}`);
+  }
+}
+
 export interface CallOptions {
   /** HTTP method. Defaults to POST (most v3 endpoints). */
   method?: "GET" | "POST";
