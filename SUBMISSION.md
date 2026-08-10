@@ -53,7 +53,12 @@ Prompts 1–2 exercise authenticated tools (provide a test key, see below).
 
 - **Icon** — done: `icon.png` (512×512, the Porkbun pig mark) is at the repo
   root and referenced in `manifest.json`.
-- **Bundle** — build then pack so dependencies are included:
-  `npm ci --omit=dev && npm run build && npx @anthropic-ai/mcpb pack`
-  (verify with `npx @anthropic-ai/mcpb validate manifest.json` first).
+- **Bundle** — validate, then build *with* dev deps, prune to runtime deps, and pack
+  (build needs `typescript`, a devDependency, so don't `--omit=dev` before building):
+  ```
+  npx @anthropic-ai/mcpb validate manifest.json
+  npm ci && npm run build && npm prune --omit=dev && npx @anthropic-ai/mcpb pack
+  npm ci   # restore dev deps afterward so the repo stays buildable
+  ```
+  Produces `porkbun-mcp.mcpb` (~3.4 MB; bundles dist + the runtime deps @modelcontextprotocol/sdk and zod).
 - **Submit** — desktop extension form: https://clau.de/desktop-extention-submission

@@ -3,3 +3,6 @@ dist/
 *.log
 .env
 .DS_Store
+
+# MCPB build artifact (release, uploaded manually)
+*.mcpb
