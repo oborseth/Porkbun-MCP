@@ -210,7 +210,18 @@ The server speaks JSON-RPC 2.0 over stdio. Smoke test from a shell:
 
 ## Reliability
 
-All write operations (when added in future releases) will automatically attach a per-call `Idempotency-Key` header. Retried calls within 24 hours return the cached response — your agent can safely retry on network errors without double-charging.
+Write operations automatically attach a per-call `Idempotency-Key` header. Retried calls within 24 hours return the cached response, so your agent can safely retry on network errors without double-charging or double-registering.
+
+## Privacy
+
+This MCP server is a thin client that runs **locally** (on your machine, or wherever you host it) and relays your requests directly to the Porkbun API over HTTPS. It does not add any data collection of its own:
+
+- **What it sends, and to whom.** Your API key/secret and the arguments of each tool call are sent only to `https://api.porkbun.com` (and, for the credential-free documentation and mock tools, to `https://porkbun.com`). Nothing is sent anywhere else.
+- **Storage.** The server keeps your credentials in memory for the lifetime of the process (read from environment variables); it does not write them to disk, log them, or cache your data.
+- **No telemetry.** There is no analytics, tracking, or third-party sharing performed by this connector.
+- **Data you access through it** (domains, DNS, contacts, billing, etc.) is your Porkbun account data, handled by Porkbun under its policy.
+
+Full data-handling, retention, third-party, and contact details are in Porkbun's privacy policy: **https://porkbun.com/legal/agreement/privacy_policy**
 
 ## License
 
@@ -219,5 +230,6 @@ MIT
 ## Links
 
 - [Porkbun API documentation](https://porkbun.com/api/json/v3/documentation)
+- [Privacy policy](https://porkbun.com/legal/agreement/privacy_policy)
 - [Model Context Protocol](https://modelcontextprotocol.io)
 - [Issues / contributions](https://github.com/oborseth/Porkbun-MCP/issues)

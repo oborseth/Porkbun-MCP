@@ -1,0 +1,324 @@
+{
+  "manifest_version": "0.3",
+  "name": "porkbun-mcp",
+  "display_name": "Porkbun",
+  "version": "0.17.0",
+  "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
+  "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL forwarding, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
+  "author": {
+    "name": "Porkbun LLC",
+    "email": "support@porkbun.com",
+    "url": "https://porkbun.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/oborseth/Porkbun-MCP.git"
+  },
+  "homepage": "https://porkbun.com/api/json/v3/documentation",
+  "documentation": "https://porkbun.com/api/json/v3/documentation",
+  "support": "https://github.com/oborseth/Porkbun-MCP/issues",
+  "icon": "icon.png",
+  "license": "MIT",
+  "keywords": [
+    "domains",
+    "dns",
+    "dnssec",
+    "ssl",
+    "registrar",
+    "porkbun",
+    "hosting",
+    "webhooks",
+    "whois",
+    "api"
+  ],
+  "privacy_policies": [
+    "https://porkbun.com/legal/agreement/privacy_policy"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/index.js"
+      ],
+      "env": {
+        "PORKBUN_API_KEY": "${user_config.api_key}",
+        "PORKBUN_SECRET_API_KEY": "${user_config.secret_api_key}"
+      }
+    }
+  },
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Porkbun API Key",
+      "description": "Your Porkbun API key (starts with pk1_). Optional \u2014 the documentation, mock, and sandbox-key tools work without it; add it to manage real domains. Create one at https://porkbun.com/account/api.",
+      "sensitive": true,
+      "required": false
+    },
+    "secret_api_key": {
+      "type": "string",
+      "title": "Porkbun Secret API Key",
+      "description": "Your Porkbun secret API key (starts with sk1_). Required together with the API key for authenticated operations.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "tools": [
+    {
+      "name": "ping",
+      "description": "Verify the Porkbun API connection and credentials."
+    },
+    {
+      "name": "check_domain",
+      "description": "Check whether a single domain is available for registration and what it costs."
+    },
+    {
+      "name": "get_registration_requirements",
+      "description": "Get a TLD's registration requirements as JSON Schema."
+    },
+    {
+      "name": "get_pricing",
+      "description": "Get current Porkbun pricing for all supported TLDs."
+    },
+    {
+      "name": "list_marketplace",
+      "description": "Browse domains for sale on the Porkbun marketplace (aftermarket \u2014 domains owned by other users, not new registrations)."
+    },
+    {
+      "name": "list_domains",
+      "description": "List domains in the authenticated Porkbun account."
+    },
+    {
+      "name": "get_domain",
+      "description": "Get the metadata for a single domain in the authenticated account: status, TLD, create date, expire date, security lock, WHOIS privacy, auto-renew, API access opt-in, and (optionally) labels."
+    },
+    {
+      "name": "get_balance",
+      "description": "Get the available account credit balance for the authenticated Porkbun account."
+    },
+    {
+      "name": "get_api_settings",
+      "description": "Get the authenticated account's API spend control configuration: monthly spend limit, low-balance alert threshold, auto top-up settings, and current month's API spend total."
+    },
+    {
+      "name": "get_nameservers",
+      "description": "Get the current nameservers configured for a domain in the authenticated account."
+    },
+    {
+      "name": "list_dns_records",
+      "description": "List all DNS records for a domain in the authenticated account."
+    },
+    {
+      "name": "list_dnssec_records",
+      "description": "List the DNSSEC DS records currently submitted to the registry for a domain."
+    },
+    {
+      "name": "list_url_forwards",
+      "description": "List all URL forwarding rules configured for a domain."
+    },
+    {
+      "name": "list_glue_records",
+      "description": "List glue records for a domain."
+    },
+    {
+      "name": "list_transfers",
+      "description": "List all in-progress and recent inbound domain transfers for the authenticated account."
+    },
+    {
+      "name": "get_transfer_status",
+      "description": "Get the status of a specific inbound transfer for a domain."
+    },
+    {
+      "name": "get_ssl_bundle",
+      "description": "Retrieve the free Porkbun-issued SSL certificate bundle for a domain."
+    },
+    {
+      "name": "get_contacts",
+      "description": "Get the four contacts (registrant, admin, tech, billing) for a domain in the authenticated account, with their current field values (name, organization, address, phone, email)."
+    },
+    {
+      "name": "register_domain",
+      "description": "**Spends account credit.** Registers a new domain on the authenticated Porkbun account."
+    },
+    {
+      "name": "renew_domain",
+      "description": "**Spends account credit.** Renews an existing domain in the authenticated account."
+    },
+    {
+      "name": "transfer_domain",
+      "description": "**Spends account credit.** Initiates a transfer of an external domain into Porkbun."
+    },
+    {
+      "name": "update_auto_renew",
+      "description": "Turn auto-renewal on or off for a domain in the authenticated account."
+    },
+    {
+      "name": "update_nameservers",
+      "description": "Replace the nameservers for a domain in the authenticated account."
+    },
+    {
+      "name": "update_contacts",
+      "description": "Edit a domain's contacts."
+    },
+    {
+      "name": "list_hosting_plans",
+      "description": "List the hosting plans provisionable via the API, with price (cents \u2014 pass as `acknowledged_cost` to create_hosting), interval, trial length, and features."
+    },
+    {
+      "name": "create_hosting",
+      "description": "Provision Secure Static Hosting for a domain in the account."
+    },
+    {
+      "name": "get_hosting",
+      "description": "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting."
+    },
+    {
+      "name": "deploy_site",
+      "description": "Upload static files to a domain's Secure Static Hosting."
+    },
+    {
+      "name": "list_hosting_files",
+      "description": "List file/directory names under an optional `path` in a domain's Secure Static Hosting space."
+    },
+    {
+      "name": "delete_hosting_file",
+      "description": "Delete a file (or empty directory) at `path` in a domain's Secure Static Hosting space."
+    },
+    {
+      "name": "make_hosting_dir",
+      "description": "Create a directory (and any missing parent directories) at `path` in a domain's Secure Static Hosting space."
+    },
+    {
+      "name": "delete_hosting",
+      "description": "Deprovision (cancel) Secure Static Hosting for a domain; teardown is scheduled by Porkbun."
+    },
+    {
+      "name": "create_sandbox_key",
+      "description": "Instantly create a free SANDBOX API key \u2014 NO credentials or approval needed (works before you have any keys)."
+    },
+    {
+      "name": "sandbox_topup",
+      "description": "SANDBOX ONLY."
+    },
+    {
+      "name": "sandbox_reset",
+      "description": "SANDBOX ONLY."
+    },
+    {
+      "name": "sandbox_trigger_webhook",
+      "description": "SANDBOX ONLY."
+    },
+    {
+      "name": "mock_call",
+      "description": "Get a schema-accurate EXAMPLE response for any API endpoint with NO credentials \u2014 nothing to set up."
+    },
+    {
+      "name": "create_dns_record",
+      "description": "Create a DNS record on a domain in the authenticated account."
+    },
+    {
+      "name": "update_dns_record",
+      "description": "Update an existing DNS record by its numeric `record_id` (obtained from `list_dns_records`)."
+    },
+    {
+      "name": "delete_dns_record",
+      "description": "Delete a single DNS record by its numeric `record_id` (obtained from `list_dns_records`)."
+    },
+    {
+      "name": "create_dnssec_record",
+      "description": "Submit a DNSSEC DS record to the registry for a domain."
+    },
+    {
+      "name": "delete_dnssec_record",
+      "description": "Remove a DNSSEC DS record from the registry for a domain, identified by key tag."
+    },
+    {
+      "name": "create_url_forward",
+      "description": "Add a URL forwarding rule for a domain."
+    },
+    {
+      "name": "delete_url_forward",
+      "description": "Delete a URL forwarding rule by its `id` (obtained from `list_url_forwards`)."
+    },
+    {
+      "name": "create_glue_record",
+      "description": "Create a glue record for a host on a domain."
+    },
+    {
+      "name": "update_glue_record",
+      "description": "Update the IP addresses associated with an existing glue record."
+    },
+    {
+      "name": "delete_glue_record",
+      "description": "Delete a glue record by host on a domain."
+    },
+    {
+      "name": "list_doc_topics",
+      "description": "List the available Porkbun API documentation topics."
+    },
+    {
+      "name": "read_doc",
+      "description": "Read a Porkbun documentation page as Markdown."
+    },
+    {
+      "name": "search_docs",
+      "description": "Keyword-search the full Porkbun API reference and return the most relevant sections (endpoints/topics) as Markdown."
+    },
+    {
+      "name": "get_webhook_event_types",
+      "description": "List the event types you can subscribe a webhook endpoint to."
+    },
+    {
+      "name": "list_webhooks",
+      "description": "List the webhook endpoints registered on the authenticated account."
+    },
+    {
+      "name": "get_webhook",
+      "description": "Fetch a single webhook endpoint by its numeric id, including its signing secret and delivery health (consecutive failures, last success/failure)."
+    },
+    {
+      "name": "list_webhook_deliveries",
+      "description": "List recent webhook delivery attempts (newest first), across all endpoints or filtered to one."
+    },
+    {
+      "name": "get_webhook_delivery",
+      "description": "Fetch a single webhook delivery by id, including the full JSON payload that was (or will be) sent and its delivery status."
+    },
+    {
+      "name": "create_webhook",
+      "description": "Register a webhook endpoint."
+    },
+    {
+      "name": "update_webhook",
+      "description": "Update a webhook endpoint."
+    },
+    {
+      "name": "rotate_webhook_secret",
+      "description": "Generate a new signing secret for a webhook endpoint and return the endpoint with the new secret."
+    },
+    {
+      "name": "test_webhook",
+      "description": "Send a `webhook.test` event to an endpoint to confirm it's reachable and that signature verification works."
+    },
+    {
+      "name": "resend_webhook",
+      "description": "Re-queue a past webhook delivery to its endpoint."
+    },
+    {
+      "name": "delete_webhook",
+      "description": "Delete a webhook endpoint by id."
+    }
+  ],
+  "tools_generated": false,
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=18.0.0"
+    }
+  }
+}

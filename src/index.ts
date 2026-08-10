@@ -17,13 +17,30 @@ function getConfig(): PorkbunConfig {
   return cachedConfig;
 }
 
+// Human-readable display title for each tool, derived from its snake_case name
+// (domain acronyms kept upper-case). Every tool in the Connectors Directory must
+// carry a title alongside its read-only/destructive hint; deriving it here means
+// new tools get one automatically. A tool can still override via annotations.title.
+const TITLE_ACRONYMS: Record<string, string> = {
+  dns: "DNS", dnssec: "DNSSEC", ssl: "SSL", url: "URL", api: "API",
+  tld: "TLD", ip: "IP", ns: "NS", id: "ID", mcp: "MCP",
+};
+function deriveTitle(name: string): string {
+  return name
+    .split("_")
+    .map((w) => TITLE_ACRONYMS[w] ?? w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
 for (const tool of tools) {
+  const title = tool.annotations?.title ?? deriveTitle(tool.name);
   server.registerTool(
     tool.name,
     {
+      title,
       description: tool.description,
       inputSchema: tool.inputSchema,
-      ...(tool.annotations ? { annotations: tool.annotations } : {}),
+      annotations: { ...(tool.annotations ?? {}), title },
     },
     async (args) => {
       try {
