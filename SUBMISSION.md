@@ -42,9 +42,15 @@ Prompts 1–2 exercise authenticated tools (provide a test key, see below).
   documentation, mock, and sandbox-key tools require no API key. This is the
   fastest way to see the server end to end.
 - **Authenticated path (prompts 1–2):** set `PORKBUN_API_KEY` /
-  `PORKBUN_SECRET_API_KEY` (or the bundle's config fields) to a Porkbun key
-  created at https://porkbun.com/account/api. Porkbun supplies a populated test
-  account key in the submission form's test-credentials field.
+  `PORKBUN_SECRET_API_KEY` (or the bundle's config fields) to the key provided
+  in the submission form's test-credentials field. **We supply a sandbox key
+  (`pk1_sb_…`)** so the reviewer can exercise the full domain/DNS/SSL lifecycle
+  safely — no real charges, no real registry actions. Notes:
+    - Responses carry `"sandbox": true` (expected).
+    - `hosting/*` and `email/*` tools return `SANDBOX_UNSUPPORTED` in sandbox by
+      design; a live key is available on request to validate those paths.
+    - A reviewer can also mint their own sandbox key with `create_sandbox_key`
+      (no credentials), so the provided key is a convenience, not a requirement.
 - **Recommended scoping:** for agent use, restrict the key to specific domains
   and/or a source IP at porkbun.com/account/api (out-of-scope calls return
   `DOMAIN_NOT_ALLOWED` / `IP_NOT_ALLOWED`).
