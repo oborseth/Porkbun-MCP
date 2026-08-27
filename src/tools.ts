@@ -990,12 +990,12 @@ const list_hosting_plans: Tool = {
 const create_hosting: Tool = {
   name: "create_hosting",
   description:
-    "Provision Secure Static Hosting for a domain in the account. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying.",
+    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
     sku: z
       .string()
-      .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Currently Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) or `PIXIESECURESTATICY2` ($30.00/yr)."),
+      .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) / `PIXIESECURESTATICY2` ($30.00/yr). Cloud for WordPress: `CLOUDWORDPRESSM1` ($12.00/mo) / `CLOUDWORDPRESSY1` ($120.00/yr) and the Pro/Business tiers."),
     acknowledged_cost: z.number().int().describe("Plan price in cents (from list_hosting_plans: 300 monthly / 3000 yearly). Must match, or the call is rejected — this confirms the human was told the cost."),
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
@@ -1088,6 +1088,68 @@ const make_hosting_dir: Tool = {
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/makeDir/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
+  },
+};
+
+const create_wp_credentials: Tool = {
+  name: "create_wp_credentials",
+  description:
+    "CLOUD FOR WORDPRESS ONLY. Mint a WordPress Application Password for a domain's managed WordPress site so you can drive it over the WP REST API at https://<domain>/wp-json/ using HTTP Basic auth. The password is returned ONCE (WordPress stores only a hash) — save it immediately. Defaults to a dedicated least-privilege `porkbun-agent` user with the `editor` role (created on first use), which can manage content but cannot install code. `role: \"administrator\"` grants FULL site control including plugin installation (i.e. arbitrary code execution on the site) and therefore requires `acknowledge_full_access: true` — only request it if the user explicitly asked for admin-level access. The site must be provisioned and ACTIVE (poll get_hosting). Revoke any time with delete_wp_credentials.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose WordPress site to mint credentials for."),
+    role: z.enum(["editor", "administrator"]).optional().describe("`editor` (default) = content only, recommended for agents. `administrator` = full control incl. plugin install; requires acknowledge_full_access."),
+    acknowledge_full_access: z.boolean().optional().describe("Required when role=administrator: confirms the user understands the credential can run arbitrary code on the site."),
+    name: z.string().max(40).optional().describe("Label shown in wp-admin (letters, digits, dashes), e.g. `Acme-Agent`."),
+    dry_run: z.boolean().optional().describe("Validate without creating anything."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {};
+    if (args.role) body.role = args.role;
+    if (args.acknowledge_full_access) body.acknowledgeFullAccess = true;
+    if (args.name) body.name = args.name;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/hosting/createWpCredentials/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const list_wp_credentials: Tool = {
+  name: "list_wp_credentials",
+  description:
+    "CLOUD FOR WORDPRESS ONLY. List the WordPress application passwords on a domain's site (uuid, name, created, last used) so you can audit them or pick one to revoke. Metadata only — the passwords themselves can never be re-read.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose WordPress site to inspect."),
+    wp_user: z.string().optional().describe("WordPress username (defaults to the dedicated `porkbun-agent` user)."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const qs = args.wp_user ? `?wpUser=${encodeURIComponent(String(args.wp_user))}` : "";
+    return await call(config, `/hosting/getWpCredentials/${encodeURIComponent(domain)}${qs}`, { method: "GET" });
+  },
+};
+
+const delete_wp_credentials: Tool = {
+  name: "delete_wp_credentials",
+  description:
+    "CLOUD FOR WORDPRESS ONLY. Revoke a WordPress application password by `uuid` (from list_wp_credentials), or every one for the user with `all: true`. Anything using that credential stops authenticating immediately.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose WordPress site to revoke on."),
+    uuid: z.string().optional().describe("The application password uuid to revoke."),
+    all: z.boolean().optional().describe("Revoke every application password for the user."),
+    wp_user: z.string().optional().describe("WordPress username (defaults to `porkbun-agent`)."),
+    dry_run: z.boolean().optional().describe("Validate without revoking."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {};
+    if (args.uuid) body.uuid = args.uuid;
+    if (args.all) body.all = true;
+    if (args.wp_user) body.wpUser = args.wp_user;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/hosting/deleteWpCredentials/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
   },
 };
 
@@ -1419,6 +1481,9 @@ export const tools: Tool[] = [
   list_hosting_files,
   delete_hosting_file,
   make_hosting_dir,
+  create_wp_credentials,
+  list_wp_credentials,
+  delete_wp_credentials,
   delete_hosting,
   create_sandbox_key,
   sandbox_topup,

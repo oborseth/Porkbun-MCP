@@ -6,7 +6,7 @@ import { tools } from "./tools.js";
 
 const server = new McpServer({
   name: "porkbun-mcp",
-  version: "0.17.1",
+  version: "0.18.0",
 });
 
 // Defer config loading until the first tool call. tools/list works without
@@ -22,7 +22,7 @@ function getConfig(): PorkbunConfig {
 // carry a title alongside its read-only/destructive hint; deriving it here means
 // new tools get one automatically. A tool can still override via annotations.title.
 const TITLE_ACRONYMS: Record<string, string> = {
-  dns: "DNS", dnssec: "DNSSEC", ssl: "SSL", url: "URL", api: "API",
+  dns: "DNS", dnssec: "DNSSEC", ssl: "SSL", url: "URL", api: "API", wp: "WP",
   tld: "TLD", ip: "IP", ns: "NS", id: "ID", mcp: "MCP",
 };
 function deriveTitle(name: string): string {

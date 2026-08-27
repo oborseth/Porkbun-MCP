@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.17.1",
+  "version": "0.18.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL forwarding, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -167,7 +167,7 @@
     },
     {
       "name": "create_hosting",
-      "description": "Provision Secure Static Hosting for a domain in the account."
+      "description": "Provision hosting for a domain in the account \u2014 Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`."
     },
     {
       "name": "get_hosting",
@@ -188,6 +188,18 @@
     {
       "name": "make_hosting_dir",
       "description": "Create a directory (and any missing parent directories) at `path` in a domain's Secure Static Hosting space."
+    },
+    {
+      "name": "create_wp_credentials",
+      "description": "CLOUD FOR WORDPRESS ONLY."
+    },
+    {
+      "name": "list_wp_credentials",
+      "description": "CLOUD FOR WORDPRESS ONLY."
+    },
+    {
+      "name": "delete_wp_credentials",
+      "description": "CLOUD FOR WORDPRESS ONLY."
     },
     {
       "name": "delete_hosting",

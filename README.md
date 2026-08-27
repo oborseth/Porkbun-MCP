@@ -6,9 +6,9 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.17.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks) plus an isolated sandbox/test mode: use a `pk1_sb_` key and every tool runs against a simulated environment with fake credit — no real registry actions, DNS changes, or charges. Sandbox delivers signed webhooks too, and a credential-free mock server returns schema-accurate example responses for any endpoint.
+> **Status:** v0.18.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks) plus an isolated sandbox/test mode: use a `pk1_sb_` key and every tool runs against a simulated environment with fake credit — no real registry actions, DNS changes, or charges. Sandbox delivers signed webhooks too, and a credential-free mock server returns schema-accurate example responses for any endpoint. Also provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created.
 
-## What's included (61 tools)
+## What's included (64 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -86,6 +86,16 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
 | `make_hosting_dir` | Create a directory (and missing parents) in a domain's hosting (deploy auto-creates dirs in a file path) |
 | `delete_hosting` | Deprovision (cancel) hosting for a domain |
+
+**Cloud for WordPress**
+
+`create_hosting` with a `CLOUDWORDPRESS…` sku provisions a managed WordPress site instead of static hosting (the file tools don't apply — manage it through WordPress).
+
+| Tool | Description |
+|---|---|
+| `create_wp_credentials` | Mint a WordPress **Application Password** (returned once) so an agent can drive the site via `/wp-json/` with HTTP Basic. Defaults to a dedicated least-privilege `editor` user; `administrator` requires an explicit acknowledgement (it can install plugins = run code) |
+| `list_wp_credentials` | List application passwords on the site (metadata only — passwords can't be re-read) |
+| `delete_wp_credentials` | Revoke an application password by uuid, or all of them |
 
 **Sandbox / test mode**
 
