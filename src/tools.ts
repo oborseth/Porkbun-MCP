@@ -996,7 +996,7 @@ const create_hosting: Tool = {
     sku: z
       .string()
       .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) / `PIXIESECURESTATICY2` ($30.00/yr). Cloud for WordPress: `CLOUDWORDPRESSM1` ($12.00/mo) / `CLOUDWORDPRESSY1` ($120.00/yr) and the Pro/Business tiers."),
-    acknowledged_cost: z.number().int().describe("Plan price in cents (from list_hosting_plans: 300 monthly / 3000 yearly). Must match, or the call is rejected — this confirms the human was told the cost."),
+    acknowledged_cost: z.number().int().describe("The chosen plan's price in cents — take the `price` field of the SAME row you took `sku` from in list_hosting_plans (e.g. 300 static monthly, 3000 static yearly, 1200 WordPress Starter monthly, 12000 WordPress Starter yearly). Must match exactly or the call is rejected — this confirms the human was told the cost."),
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
     dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
