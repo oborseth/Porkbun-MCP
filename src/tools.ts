@@ -1546,14 +1546,14 @@ const disconnect_cloudflare: Tool = {
   },
 };
 
-const get_cloudflare_proxy: Tool = {
-  name: "get_cloudflare_proxy",
+const get_cloudflare_records: Tool = {
+  name: "get_cloudflare_records",
   description:
-    "List the Cloudflare proxy (orange cloud) state of every DNS record in a domain's Cloudflare zone: which are `proxied` and which are `proxiable` at all. Requires the move to have finished — returns ZONE_NOT_READY if the zone doesn't exist yet.",
+    "List a domain's LIVE DNS records as Cloudflare holds them, each with its orange-cloud (`proxied`) state and whether it is `proxiable` at all. Once a domain has moved to Cloudflare THIS is the authoritative record set — list_dns_records reads the Porkbun zone, which is no longer answering queries for it. Returns ZONE_NOT_READY if the zone does not exist yet.",
   inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
-    await call(config, `/cloudflare/getProxy/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+    await call(config, `/cloudflare/getRecords/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
 
 const set_cloudflare_proxy: Tool = {
@@ -1573,6 +1573,26 @@ const set_cloudflare_proxy: Tool = {
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/cloudflare/setProxy/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", idempotent: true, body });
   },
+};
+
+const preview_cloudflare_move: Tool = {
+  name: "preview_cloudflare_move",
+  description:
+    "Show exactly which DNS records would be copied into Cloudflare for a domain, and which would be dropped, WITHOUT queueing anything. Use this to tell a user what a move will do to their DNS before committing. Records are always created DNS-only (grey cloud); proxying is a separate step via set_cloudflare_proxy.",
+  inputSchema: { domain: z.string().min(3).describe("Domain to preview.") },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/cloudflare/preview/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const get_cloudflare_zone: Tool = {
+  name: "get_cloudflare_zone",
+  description:
+    "Get what CLOUDFLARE currently says about a domain's zone (status, paused, its nameservers, activation date) rather than what Porkbun's queue row remembers. These drift: if someone repoints the nameservers elsewhere after the move, the Porkbun row still says done while Cloudflare has stopped serving the domain. The response includes the live public nameservers and a `nameserversDrifted` boolean so you don't have to diff them yourself.",
+  inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/cloudflare/getZone/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
 
 export const tools: Tool[] = [
@@ -1660,6 +1680,8 @@ export const tools: Tool[] = [
   retry_cloudflare_domain,
   rollback_cloudflare_domain,
   disconnect_cloudflare,
-  get_cloudflare_proxy,
+  get_cloudflare_records,
   set_cloudflare_proxy,
+  preview_cloudflare_move,
+  get_cloudflare_zone,
 ];

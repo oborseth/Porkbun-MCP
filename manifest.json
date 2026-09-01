@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL forwarding, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -354,12 +354,20 @@
       "description": "Remove this account's stored Cloudflare connection."
     },
     {
-      "name": "get_cloudflare_proxy",
-      "description": "List the Cloudflare proxy (orange cloud) state of every DNS record in a domain's Cloudflare zone: which are `proxied` and which are `proxiable` at all."
+      "name": "get_cloudflare_records",
+      "description": "List a domain's LIVE DNS records as Cloudflare holds them, each with its orange-cloud (`proxied`) state and whether it is `proxiable` at all."
     },
     {
       "name": "set_cloudflare_proxy",
       "description": "Turn the Cloudflare proxy (orange cloud) on or off for a domain's DNS records."
+    },
+    {
+      "name": "preview_cloudflare_move",
+      "description": "Show exactly which DNS records would be copied into Cloudflare for a domain, and which would be dropped, WITHOUT queueing anything."
+    },
+    {
+      "name": "get_cloudflare_zone",
+      "description": "Get what CLOUDFLARE currently says about a domain's zone (status, paused, its nameservers, activation date) rather than what Porkbun's queue row remembers."
     }
   ],
   "tools_generated": false,
