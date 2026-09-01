@@ -1546,6 +1546,35 @@ const disconnect_cloudflare: Tool = {
   },
 };
 
+const get_cloudflare_proxy: Tool = {
+  name: "get_cloudflare_proxy",
+  description:
+    "List the Cloudflare proxy (orange cloud) state of every DNS record in a domain's Cloudflare zone: which are `proxied` and which are `proxiable` at all. Requires the move to have finished — returns ZONE_NOT_READY if the zone doesn't exist yet.",
+  inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/cloudflare/getProxy/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const set_cloudflare_proxy: Tool = {
+  name: "set_cloudflare_proxy",
+  description:
+    "Turn the Cloudflare proxy (orange cloud) on or off for a domain's DNS records. NOTE: connecting a domain deliberately imports every record DNS-only (grey cloud), because changing how traffic is served at the same time as changing who serves DNS makes failures hard to diagnose — so proxying is a separate, explicit step, best done AFTER confirming the site still works. Defaults to every proxiable record; pass `records` to target specific names (\"@\" = apex, bare labels like \"www\" are expanded). Only A/AAAA/CNAME can be proxied; anything else comes back under `skipped` with a reason rather than failing. Proxying hides the origin IP, so if MX points at a name you're proxying, mail to it breaks — that comes back in `warnings`. Reversible: call again with enabled=false. Use dry_run to preview.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose Cloudflare records to change."),
+    enabled: z.boolean().describe("true = proxy through Cloudflare (orange cloud); false = DNS-only (grey cloud)."),
+    records: z.array(z.string()).optional().describe('Optional: limit to these names. "@" = apex; bare labels are expanded (e.g. ["@","www"]).'),
+    dry_run: z.boolean().optional().describe("Preview which records would change, without changing them."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { enabled: !!args.enabled };
+    if (args.records) body.records = args.records;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/setProxy/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", idempotent: true, body });
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -1631,4 +1660,6 @@ export const tools: Tool[] = [
   retry_cloudflare_domain,
   rollback_cloudflare_domain,
   disconnect_cloudflare,
+  get_cloudflare_proxy,
+  set_cloudflare_proxy,
 ];

@@ -352,6 +352,14 @@
     {
       "name": "disconnect_cloudflare",
       "description": "Remove this account's stored Cloudflare connection."
+    },
+    {
+      "name": "get_cloudflare_proxy",
+      "description": "List the Cloudflare proxy (orange cloud) state of every DNS record in a domain's Cloudflare zone: which are `proxied` and which are `proxiable` at all."
+    },
+    {
+      "name": "set_cloudflare_proxy",
+      "description": "Turn the Cloudflare proxy (orange cloud) on or off for a domain's DNS records."
     }
   ],
   "tools_generated": false,
