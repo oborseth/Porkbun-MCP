@@ -1630,6 +1630,74 @@ const set_cloudflare_zone_settings: Tool = {
   },
 };
 
+const create_cloudflare_record: Tool = {
+  name: "create_cloudflare_record",
+  description:
+    "Create a DNS record in a domain's Cloudflare zone. IMPORTANT: for a domain that has been moved to Cloudflare this is the tool that changes what actually resolves — create_dns_record writes Porkbun's zone, which no longer answers for it. `name` accepts \"@\" for the apex or a bare label like \"www\". `ttl: 1` means Cloudflare-automatic. MX requires `priority`. `proxied` (orange cloud) applies to A/AAAA/CNAME only. Record types Cloudflare models as structured objects (SRV, CAA, …) need a `data` object instead of `content`. Supports dry_run.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose Cloudflare zone to write to."),
+    type: z.string().describe("A, AAAA, CNAME, TXT, MX, NS, PTR or SPF for a plain value; structured types need `data`."),
+    name: z.string().optional().describe('"@" for the apex, a bare label like "www", or a full hostname. Defaults to the apex.'),
+    content: z.string().optional().describe("The value the record points at. Required unless `data` is given."),
+    ttl: z.number().int().optional().describe("1 = automatic (default), otherwise 60-86400."),
+    priority: z.number().int().optional().describe("Required for MX; lower is preferred."),
+    proxied: z.boolean().optional().describe("Route through Cloudflare's proxy. A/AAAA/CNAME only."),
+    comment: z.string().optional().describe("Note stored on the record."),
+    data: z.record(z.string(), z.any()).optional().describe("Structured value for SRV/CAA/etc, shaped as Cloudflare documents it."),
+    dry_run: z.boolean().optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const { domain, dry_run, ...rest } = args as Record<string, unknown>;
+    const body: Record<string, unknown> = { ...rest };
+    if (dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/createRecord/${encodeURIComponent(String(domain).toLowerCase())}`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const edit_cloudflare_record: Tool = {
+  name: "edit_cloudflare_record",
+  description:
+    "Update a DNS record in a domain's Cloudflare zone. Partial: fields you omit keep their current value. Get `record_id` from get_cloudflare_records. The response includes both the new record and the previous one, so you can tell the user exactly what changed. Supports dry_run.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose Cloudflare zone to write to."),
+    record_id: z.string().describe("Cloudflare record id from get_cloudflare_records."),
+    type: z.string().optional(),
+    name: z.string().optional().describe('"@" for the apex, or a bare label.'),
+    content: z.string().optional(),
+    ttl: z.number().int().optional().describe("1 = automatic, otherwise 60-86400."),
+    priority: z.number().int().optional(),
+    proxied: z.boolean().optional().describe("A/AAAA/CNAME only."),
+    comment: z.string().optional(),
+    data: z.record(z.string(), z.any()).optional(),
+    dry_run: z.boolean().optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const { domain, record_id, dry_run, ...rest } = args as Record<string, unknown>;
+    const body: Record<string, unknown> = { ...rest };
+    if (dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/editRecord/${encodeURIComponent(String(domain).toLowerCase())}/${encodeURIComponent(String(record_id))}`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const delete_cloudflare_record: Tool = {
+  name: "delete_cloudflare_record",
+  description:
+    "Delete a DNS record from a domain's Cloudflare zone. This changes live DNS for a domain Cloudflare is authoritative for, so confirm with the user first — deleting the wrong record can take a site or its mail offline. Get `record_id` from get_cloudflare_records. The record is read before deletion, so the response reports exactly what was removed. Supports dry_run.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose Cloudflare zone to write to."),
+    record_id: z.string().describe("Cloudflare record id from get_cloudflare_records."),
+    dry_run: z.boolean().optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/deleteRecord/${encodeURIComponent(String(args.domain).toLowerCase())}/${encodeURIComponent(String(args.record_id))}`, { method: "POST", idempotent: true, body });
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -1721,4 +1789,7 @@ export const tools: Tool[] = [
   get_cloudflare_zone,
   get_cloudflare_zone_settings,
   set_cloudflare_zone_settings,
+  create_cloudflare_record,
+  edit_cloudflare_record,
+  delete_cloudflare_record,
 ];
