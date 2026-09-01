@@ -1595,6 +1595,41 @@ const get_cloudflare_zone: Tool = {
     await call(config, `/cloudflare/getZone/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
 
+const get_cloudflare_zone_settings: Tool = {
+  name: "get_cloudflare_zone_settings",
+  description:
+    "Read the Cloudflare zone settings that matter after a move: ssl mode, always_use_https, automatic_https_rewrites, min_tls_version, development_mode, cache_level. Warns when SSL mode is `off` or `flexible`, which means Cloudflare fetches the origin over plain HTTP while visitors still see a padlock. If this returns CLOUDFLARE_REAUTHORIZE_REQUIRED the customer's Cloudflare connection predates this permission — show them the connectUrl and ask them to reconnect (one click; domains already moved are unaffected).",
+  inputSchema: { domain: z.string().min(3).describe("Domain whose zone settings to read.") },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/cloudflare/getZoneSettings/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const set_cloudflare_zone_settings: Tool = {
+  name: "set_cloudflare_zone_settings",
+  description:
+    "Change Cloudflare zone settings for a moved domain. Only an allowlist is editable (ssl, always_use_https, automatic_https_rewrites, min_tls_version, development_mode, cache_level) — WAF/firewall/security controls are deliberately not exposed. Prefer ssl `full` over `flexible`: `flexible` makes Cloudflare fetch the origin over plain HTTP, a downgrade the visitor cannot see. CLOUDFLARE_REAUTHORIZE_REQUIRED means the stored authorization lacks this permission — surface the connectUrl and ask the customer to reconnect. Supports dry_run.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose zone settings to change."),
+    ssl: z.enum(["off", "flexible", "full", "strict"]).optional().describe("TLS mode between Cloudflare and the origin. `full` is the safe default."),
+    always_use_https: z.enum(["on", "off"]).optional(),
+    automatic_https_rewrites: z.enum(["on", "off"]).optional(),
+    min_tls_version: z.enum(["1.0", "1.1", "1.2", "1.3"]).optional(),
+    development_mode: z.enum(["on", "off"]).optional().describe("Temporarily bypass Cloudflare's cache."),
+    cache_level: z.enum(["aggressive", "basic", "simplified"]).optional(),
+    dry_run: z.boolean().optional(),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    for (const k of ["ssl", "always_use_https", "automatic_https_rewrites", "min_tls_version", "development_mode", "cache_level"]) {
+      if (args[k] !== undefined) body[k] = args[k];
+    }
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/setZoneSettings/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", idempotent: true, body });
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -1684,4 +1719,6 @@ export const tools: Tool[] = [
   set_cloudflare_proxy,
   preview_cloudflare_move,
   get_cloudflare_zone,
+  get_cloudflare_zone_settings,
+  set_cloudflare_zone_settings,
 ];

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.20.0",
+  "version": "0.21.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL forwarding, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -368,6 +368,14 @@
     {
       "name": "get_cloudflare_zone",
       "description": "Get what CLOUDFLARE currently says about a domain's zone (status, paused, its nameservers, activation date) rather than what Porkbun's queue row remembers."
+    },
+    {
+      "name": "get_cloudflare_zone_settings",
+      "description": "Read the Cloudflare zone settings that matter after a move: ssl mode, always_use_https, automatic_https_rewrites, min_tls_version, development_mode, cache_level."
+    },
+    {
+      "name": "set_cloudflare_zone_settings",
+      "description": "Change Cloudflare zone settings for a moved domain."
     }
   ],
   "tools_generated": false,
