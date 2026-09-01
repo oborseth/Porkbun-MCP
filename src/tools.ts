@@ -1444,6 +1444,108 @@ const search_docs: Tool = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Cloudflare connect — move domains into the customer's OWN Cloudflare account
+// ---------------------------------------------------------------------------
+
+const get_cloudflare_connection: Tool = {
+  name: "get_cloudflare_connection",
+  description:
+    "Check whether this Porkbun account is connected to a Cloudflare account, and which one. THIS IS THE POLL TARGET for the connect flow. Connecting is a HUMAN action: Cloudflare's consent screen must be completed in a browser and the authorization is bound to the Porkbun web session that starts it, so it cannot be driven over the API. When `connected` is false the response includes a `connectUrl` — show that URL to the user, ask them to authorize, then call this tool again every few seconds until `connected` is true. Everything else in the Cloudflare flow is fully automatable once this is true.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => await call(config, `/cloudflare/getConnection`, { method: "GET" }),
+};
+
+const list_cloudflare_inventory: Tool = {
+  name: "list_cloudflare_inventory",
+  description:
+    "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers, uses Porkbun hosting, etc). Read this BEFORE queueing so you can tell the user what will move and what won't. Works even when the Cloudflare account isn't connected yet, so you can plan while the user authorizes.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => await call(config, `/cloudflare/inventory`, { method: "GET" }),
+};
+
+const connect_domains_to_cloudflare: Tool = {
+  name: "connect_domains_to_cloudflare",
+  description:
+    "Queue domains to move into the customer's own Cloudflare account: Porkbun creates the zone there, copies over the DNS records it holds, and repoints the registry nameservers at Cloudflare. ASYNCHRONOUS — a successful call means QUEUED, never connected; the work runs in the background over the next few minutes, so poll get_cloudflare_queue afterwards. Results are PER DOMAIN: each name comes back under `queued`, `skipped` or `alreadyQueued` with its own reason. A non-empty `skipped` is a NORMAL outcome (DNSSEC live, custom nameservers, already connected), NOT a failed call — report the reasons rather than calling the whole thing an error. Eligibility is re-checked right before each domain is acted on, so a queued domain can still be skipped later. Requires the Cloudflare account to be connected first (see get_cloudflare_connection). Use dry_run to preview verdicts without queueing. Max 500 domains per call.",
+  inputSchema: {
+    domains: z.array(z.string()).min(1).max(500).describe("Domain names to move into the customer's Cloudflare account."),
+    dry_run: z.boolean().optional().describe("Preview the per-domain verdicts without queueing anything."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { domains: (args.domains as string[]).map((d) => String(d).toLowerCase()) };
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/connect`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const get_cloudflare_queue: Tool = {
+  name: "get_cloudflare_queue",
+  description:
+    "List every Cloudflare move this account has requested, with per-domain status and message. Use this to poll progress after connect_domains_to_cloudflare. Queue rows are never deleted, so this is also the audit trail of past moves.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => await call(config, `/cloudflare/getQueue`, { method: "GET" }),
+};
+
+const get_cloudflare_domain_status: Tool = {
+  name: "get_cloudflare_domain_status",
+  description:
+    "Get the Cloudflare move status for ONE domain, including the Cloudflare zone id once created and the nameservers Porkbun replaced (kept so the move can be undone). Returns NOT_QUEUED if the domain has never been queued.",
+  inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/cloudflare/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const retry_cloudflare_domain: Tool = {
+  name: "retry_cloudflare_domain",
+  description:
+    "Re-queue a domain whose Cloudflare move failed or was skipped. Fails if it is already connected, already in progress, or no longer in the account — the message says which. Fix the underlying reason first (e.g. disable DNSSEC) or the retry will be skipped again.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to re-queue."),
+    dry_run: z.boolean().optional().describe("Validate without re-queueing."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/retry/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const rollback_cloudflare_domain: Tool = {
+  name: "rollback_cloudflare_domain",
+  description:
+    "UNDO a completed Cloudflare move: point the domain's nameservers back at Porkbun, restoring the DNS Porkbun still holds. This changes authoritative DNS for a live domain, so confirm with the user first. The Cloudflare zone is deliberately LEFT IN PLACE — deleting a zone inside the customer's own Cloudflare account is their call. Fails if Porkbun never moved the domain, it is already back on Porkbun nameservers, or it is being worked on right now.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose move should be undone."),
+    dry_run: z.boolean().optional().describe("Validate without changing nameservers."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/rollback/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", idempotent: true, body });
+  },
+};
+
+const disconnect_cloudflare: Tool = {
+  name: "disconnect_cloudflare",
+  description:
+    "Remove this account's stored Cloudflare connection. Domains already moved stay on Cloudflare and keep resolving — this only stops Porkbun making further changes on the customer's behalf. Reconnecting requires the human browser authorization again, so confirm before calling.",
+  inputSchema: { dry_run: z.boolean().optional().describe("Validate without disconnecting.") },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/cloudflare/disconnect`, { method: "POST", idempotent: true, body });
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -1521,4 +1623,12 @@ export const tools: Tool[] = [
   test_webhook,
   resend_webhook,
   delete_webhook,
+  get_cloudflare_connection,
+  list_cloudflare_inventory,
+  connect_domains_to_cloudflare,
+  get_cloudflare_queue,
+  get_cloudflare_domain_status,
+  retry_cloudflare_domain,
+  rollback_cloudflare_domain,
+  disconnect_cloudflare,
 ];

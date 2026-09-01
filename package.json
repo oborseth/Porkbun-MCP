@@ -1,7 +1,7 @@
 {
   "name": "@porkbunllc/mcp-server",
-  "version": "0.18.0",
-  "description": "Porkbun MCP server — exposes the Porkbun v3 API as tools for AI agents (Claude Desktop, Cursor, etc.)",
+  "version": "0.19.0",
+  "description": "Porkbun MCP server \u2014 exposes the Porkbun v3 API as tools for AI agents (Claude Desktop, Cursor, etc.)",
   "type": "module",
   "bin": {
     "porkbun-mcp": "dist/index.js"
