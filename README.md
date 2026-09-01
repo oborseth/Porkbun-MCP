@@ -6,9 +6,11 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
-> **Status:** v0.18.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks) plus an isolated sandbox/test mode: use a `pk1_sb_` key and every tool runs against a simulated environment with fake credit — no real registry actions, DNS changes, or charges. Sandbox delivers signed webhooks too, and a credential-free mock server returns schema-accurate example responses for any endpoint. Also provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created.
+**Setup guide, client configs and the full tool list: [porkbun.com/mcp](https://porkbun.com/mcp)**
 
-## What's included (64 tools)
+> **Status:** v0.22.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
+
+## What's included (81 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -96,6 +98,22 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `create_wp_credentials` | Mint a WordPress **Application Password** (returned once) so an agent can drive the site via `/wp-json/` with HTTP Basic. Defaults to a dedicated least-privilege `editor` user; `administrator` requires an explicit acknowledgement (it can install plugins = run code) |
 | `list_wp_credentials` | List application passwords on the site (metadata only — passwords can't be re-read) |
 | `delete_wp_credentials` | Revoke an application password by uuid, or all of them |
+
+**Cloudflare connect** (move domains to the customer's own Cloudflare account)
+
+Connecting the Cloudflare account itself is a **human** step — Cloudflare's consent screen has to be completed in a browser — so `get_cloudflare_connection` hands you a URL to show your user, then acts as the poll target. Everything after that is automated.
+
+- `get_cloudflare_connection` — connected or not, and where to send the human if not (poll this)
+- `list_cloudflare_inventory` — every domain with its eligibility and a plain-English reason
+- `preview_cloudflare_move` — exactly which records a move would copy or drop, queueing nothing
+- `connect_domains_to_cloudflare` — queue one or many (async: returns *queued*, never *connected*)
+- `get_cloudflare_queue` / `get_cloudflare_domain_status` — progress, and the audit trail
+- `retry_cloudflare_domain` / `rollback_cloudflare_domain` — re-queue a failure, or restore Porkbun nameservers
+- `get_cloudflare_records` / `create_cloudflare_record` / `edit_cloudflare_record` / `delete_cloudflare_record` — manage DNS in the zone that actually answers once a domain has moved
+- `set_cloudflare_proxy` — turn the orange cloud on or off, per record (a move always imports DNS-only, on purpose)
+- `get_cloudflare_zone` — Cloudflare's own zone state, plus nameserver-drift detection
+- `get_cloudflare_zone_settings` / `set_cloudflare_zone_settings` — SSL mode and friends
+- `disconnect_cloudflare` — forget the grant (domains already moved keep working)
 
 **Sandbox / test mode**
 
@@ -239,6 +257,7 @@ MIT
 
 ## Links
 
+- [Setup guide and tool list](https://porkbun.com/mcp)
 - [Porkbun API documentation](https://porkbun.com/api/json/v3/documentation)
 - [Privacy policy](https://porkbun.com/legal/agreement/privacy_policy)
 - [Model Context Protocol](https://modelcontextprotocol.io)
