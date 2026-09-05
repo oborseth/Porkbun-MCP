@@ -1205,9 +1205,14 @@ const get_webhook: Tool = {
 const create_webhook: Tool = {
   name: "create_webhook",
   description:
-    "Register a webhook endpoint. Porkbun will POST a signed JSON payload to `url` whenever a subscribed event occurs. Returns the new endpoint including its `secret` — store it securely; it's used to verify the `X-Porkbun-Signature` header (HMAC-SHA256 over `{timestamp}.{rawBody}`). `url` must be HTTPS. Omit `events` (or pass `['*']`) to subscribe to all event types; you can also pass prefix wildcards like `dns.*`.",
+    "Register a webhook endpoint. Porkbun will POST a signed JSON payload to `url` whenever a subscribed event occurs. Returns the new endpoint including its `secret` — store it securely; it's used to verify the `X-Porkbun-Signature` header (HMAC-SHA256 over `{timestamp}.{rawBody}`). `url` must be a publicly reachable HTTPS endpoint: `https://` on port 443, no credentials embedded in the URL, and a hostname that resolves to a public internet address. Private, loopback (including tricks like `127.0.0.1.sslip.io`), link-local, CGNAT and reserved addresses are rejected with `INVALID_WEBHOOK_URL` — do not try to point this at localhost or an internal host. For local development use a public HTTPS tunnel (ngrok, Cloudflare Tunnel) or a sandbox key with sandbox_trigger_webhook. A hostname that does not resolve yet is accepted so you can register before the receiver is deployed, but the rules are re-checked before every delivery. Omit `events` (or pass `['*']`) to subscribe to all event types; you can also pass prefix wildcards like `dns.*`.",
   inputSchema: {
-    url: z.string().url().describe("HTTPS URL Porkbun will POST event payloads to."),
+    url: z
+      .string()
+      .url()
+      .describe(
+        "Publicly reachable HTTPS URL Porkbun will POST event payloads to. Port 443 only; the hostname must resolve to a public internet address (private/loopback/reserved targets are rejected)."
+      ),
     events: z
       .array(z.string())
       .optional()
@@ -1226,10 +1231,10 @@ const create_webhook: Tool = {
 const update_webhook: Tool = {
   name: "update_webhook",
   description:
-    "Update a webhook endpoint. Only the supplied fields change. Set `status` to `DISABLED` to pause deliveries or `ACTIVE` to resume (resuming also clears the consecutive-failure counter). Idempotent.",
+    "Update a webhook endpoint. Only the supplied fields change. Set `status` to `DISABLED` to pause deliveries or `ACTIVE` to resume (resuming also clears the consecutive-failure counter). A replacement `url` must satisfy the same public-HTTPS rules as create_webhook. Idempotent.",
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id."),
-    url: z.string().url().optional().describe("New HTTPS URL."),
+    url: z.string().url().optional().describe("New HTTPS URL. Same rules as create_webhook: port 443, publicly resolvable hostname, no embedded credentials."),
     events: z.array(z.string()).optional().describe("Replacement event subscription list (or `['*']` for all)."),
     status: z.enum(["ACTIVE", "DISABLED"]).optional().describe("Enable or pause the endpoint."),
   },
