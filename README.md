@@ -10,7 +10,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.22.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
-## What's included (83 tools)
+## What's included (88 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -54,6 +54,11 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `register_domain` | Register a new domain — call `check_domain` first to confirm price |
 | `renew_domain` | Renew an existing domain |
 | `transfer_domain` | Initiate an inbound transfer (returns transferId; takes 5-7 days) |
+| `get_transfer_setup` | Where a held inbound transfer is and what it is waiting on |
+| `prepare_transfer` | Create the DNS zone for a held transfer, before the domain moves |
+| `start_transfer` | Release a held transfer to the registry (refuses on an empty zone) |
+| `cancel_transfer` | Cancel a pending inbound transfer and refund it |
+| `update_transfer_auth_code` | Replace the auth code on a stalled transfer and re-queue it |
 
 **Domain settings writes (free)**
 

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL forwarding, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -156,6 +156,26 @@
     {
       "name": "transfer_domain",
       "description": "**Spends account credit.** Initiates a transfer of an external domain into Porkbun."
+    },
+    {
+      "name": "get_transfer_setup",
+      "description": "Report where a held inbound transfer is and what it is waiting on."
+    },
+    {
+      "name": "prepare_transfer",
+      "description": "Create the DNS zone for a held inbound transfer, before the domain moves."
+    },
+    {
+      "name": "start_transfer",
+      "description": "Release a held inbound transfer to the registry."
+    },
+    {
+      "name": "cancel_transfer",
+      "description": "Cancel a pending inbound transfer and refund the order."
+    },
+    {
+      "name": "update_transfer_auth_code",
+      "description": "Replace the auth code on a stalled inbound transfer and re-queue it."
     },
     {
       "name": "update_auto_renew",

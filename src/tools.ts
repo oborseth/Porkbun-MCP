@@ -301,6 +301,75 @@ const import_dns_records: Tool = {
   },
 };
 
+const get_transfer_setup: Tool = {
+  name: "get_transfer_setup",
+  description:
+    "Report where a held inbound transfer is and what it is waiting on: whether it is held at PENDINGDNS, whether its DNS zone exists, how many records it holds, what the domain currently delegates to, and the next step. Use this to resume a no-downtime transfer instead of tracking that state yourself.",
+  inputSchema: { domain: z.string().min(3).describe("Domain with a pending inbound transfer, e.g. `example.com`") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/domain/getTransferSetup/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const prepare_transfer: Tool = {
+  name: "prepare_transfer",
+  description:
+    "Create the Porkbun DNS zone for a domain whose inbound transfer is held, so records can be added before the domain moves. Step 2 of the no-downtime sequence (transfer_domain with hold_for_dns_setup, prepare_transfer, import_dns_records, start_transfer). Returns the Porkbun nameservers. The zone is created deliberately, not as a side effect of the first record write, which is why this call exists.",
+  inputSchema: { domain: z.string().min(3).describe("Domain with a held inbound transfer.") },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/domain/prepareTransfer/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body: {}, idempotent: true }),
+};
+
+const start_transfer: Tool = {
+  name: "start_transfer",
+  description:
+    "Release a held inbound transfer to the registry. Final step of the no-downtime sequence, and the only thing that releases a hold \u2014 nothing does it on a timer, so a held transfer waits indefinitely until you call this. Refuses with TRANSFER_ZONE_EMPTY if the zone has no records, which is the outage the hold exists to prevent; only pass force when the domain genuinely needs no DNS at Porkbun.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain with a held inbound transfer."),
+    force: z.boolean().optional().describe("Release even though the Porkbun zone is empty. Only for domains that need no DNS here."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.force) body.force = true;
+    return await call(config, `/domain/startTransfer/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body, idempotent: true });
+  },
+};
+
+const cancel_transfer: Tool = {
+  name: "cancel_transfer",
+  description:
+    "**Cancels a paid inbound transfer and refunds the order.** Confirm with the user first. The order is deliberate: mark cancelled locally, withdraw at the registry, verify the registry accepted the withdrawal, then refund. If the registry state cannot be confirmed it restores the transfer and returns TRANSFER_STATE_UNCONFIRMED rather than refunding something that may still be live \u2014 escalate to support in that case rather than retrying. The response reports withdrawnAtRegistry, registryResultCode, refunded and refundAmount.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose pending inbound transfer should be cancelled."),
+    dry_run: z.boolean().optional().describe("Preview what would happen without cancelling or refunding."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/domain/cancelTransfer/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body, idempotent: !args.dry_run });
+  },
+};
+
+const update_transfer_auth_code: Tool = {
+  name: "update_transfer_auth_code",
+  description:
+    "Replace the authorization code on an inbound transfer that stalled because the code was wrong, and re-queue it \u2014 instead of cancelling, refunding and resubmitting. The new code is validated against the registry before being stored, so a bad one is rejected here rather than failing again days later. Only repairable transfers qualify; others return TRANSFER_NOT_REPAIRABLE. Note that a losing registrar's refusal also surfaces as a bad-auth-code status, so check for a denial notice before assuming the code is the problem.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain with the stalled inbound transfer."),
+    auth_code: z.string().min(1).describe("Replacement authorization (EPP) code from the losing registrar."),
+    dry_run: z.boolean().optional().describe("Validate the code without storing it or re-queueing."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { authCode: String(args.auth_code) };
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/domain/updateTransferAuthCode/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body, idempotent: true });
+  },
+};
+
 const get_ssl_bundle: Tool = {
   name: "get_ssl_bundle",
   description:
@@ -614,7 +683,7 @@ const renew_domain: Tool = {
 const transfer_domain: Tool = {
   name: "transfer_domain",
   description:
-    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Returns immediately with a `transferId`; the actual registry transfer takes 5-7 days for most TLDs. Use `get_transfer_status` to poll. Requires the auth/EPP code from the losing registrar. The `cost` must match the current transfer price from `check_domain`. .uk domains and a few TLDs do not support inbound API transfers. Idempotency-safe.",
+    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to transfer in, e.g. `example.com`"),
     cost: z
@@ -626,6 +695,10 @@ const transfer_domain: Tool = {
       .string()
       .min(1)
       .describe("Authorization (EPP) code from the losing registrar."),
+    hold_for_dns_setup: z
+      .boolean()
+      .optional()
+      .describe("Charge the transfer but hold it at PENDINGDNS instead of releasing it, so DNS can be set up before the domain moves. Not supported for .uk/Handshake (returns TRANSFER_HOLD_NOT_AVAILABLE and charges nothing)."),
     dry_run: z
       .boolean()
       .optional()
@@ -635,6 +708,7 @@ const transfer_domain: Tool = {
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: Number(args.cost), authCode: String(args.auth_code) };
+    if (args.hold_for_dns_setup) body.holdForDnsSetup = true;
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/transfer/${encodeURIComponent(domain)}`, {
       method: "POST",
@@ -1768,6 +1842,11 @@ export const tools: Tool[] = [
   // read — per-domain
   get_nameservers,
   list_dns_records,
+  get_transfer_setup,
+  prepare_transfer,
+  start_transfer,
+  cancel_transfer,
+  update_transfer_auth_code,
   scan_dns_records,
   import_dns_records,
   list_dnssec_records,
