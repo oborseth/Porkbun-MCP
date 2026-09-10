@@ -270,7 +270,7 @@ const get_ssl_bundle: Tool = {
 const get_nameservers: Tool = {
   name: "get_nameservers",
   description:
-    "Get the current nameservers configured for a domain in the authenticated account. Returns an array of nameserver hostnames. Read-only complement to `update_nameservers`.",
+    "Get the current nameservers configured for a domain in the authenticated account. Returns an array of nameserver hostnames, read live from the registry. Read-only complement to `update_nameservers`. **Treat the result as an unordered set** — registries return nameservers in whatever order they like, so this will often not match the order passed to `update_nameservers`. Order is meaningless in DNS; never report a reordering as a change.",
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
@@ -619,7 +619,7 @@ const update_auto_renew: Tool = {
 const create_dns_record: Tool = {
   name: "create_dns_record",
   description:
-    "Create a DNS record on a domain in the authenticated account. Returns the new record's `id` so it can be referenced by `update_dns_record` and `delete_dns_record`. For the `name` field: omit or pass empty string for the apex/root, otherwise pass the subdomain prefix only (e.g. `www`, not `www.example.com`). For MX and SRV records, set `prio` (priority). Free, doesn't spend account credit.",
+    "Create a DNS record on a domain in the authenticated account. Returns the new record's `id` so it can be referenced by `update_dns_record` and `delete_dns_record`. For the `name` field: omit or pass empty string for the apex/root, otherwise pass the subdomain prefix only (e.g. `www`, not `www.example.com`). For MX and SRV records, set `prio` (priority). Free, doesn't spend account credit. If a record with this exact name, type and content already exists the call fails with `DUPLICATE_RECORD` and returns that record's id in `existingId` — use it rather than retrying or creating a variant. If a CNAME would share a name with another record type (forbidden by RFC 1034) the call fails with `RECORD_CONFLICT` and lists the blocking rows in `conflictingRecords`; delete those or pick another name.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to add the record to, e.g. `example.com`"),
     type: z
@@ -871,7 +871,7 @@ const delete_url_forward: Tool = {
 const update_nameservers: Tool = {
   name: "update_nameservers",
   description:
-    "Replace the nameservers for a domain in the authenticated account. **This is a full replacement, not an append** — the supplied list becomes the complete set of nameservers. Most TLDs require 2-13 entries. Setting custom nameservers disables Porkbun's free DNS hosting for the domain. Idempotent: applying the same NS list twice is a no-op.",
+    "Replace the nameservers for a domain in the authenticated account. **This is a full replacement, not an append** — the supplied list becomes the complete set of nameservers. Most TLDs require 2-13 entries. Setting custom nameservers disables Porkbun's free DNS hosting for the domain. Idempotent: applying the same NS list twice is a no-op. The list is applied as a set — the registry may return it in a different order, so do not expect `get_nameservers` to echo your ordering back, and do not treat a reordering as drift.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to update, e.g. `example.com`"),
     nameservers: z
