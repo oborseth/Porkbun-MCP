@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.22.3",
+  "version": "0.23.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL forwarding, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -108,6 +108,14 @@
     {
       "name": "list_dns_records",
       "description": "List all DNS records for a domain in the authenticated account."
+    },
+    {
+      "name": "scan_dns_records",
+      "description": "Discover the DNS records a domain currently publishes, by querying its live nameservers."
+    },
+    {
+      "name": "import_dns_records",
+      "description": "Bulk-create DNS records on a domain, from a supplied list or a live scan."
     },
     {
       "name": "list_dnssec_records",

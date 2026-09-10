@@ -250,6 +250,57 @@ const list_dns_records: Tool = {
   },
 };
 
+const scan_dns_records: Tool = {
+  name: "scan_dns_records",
+  description:
+    "Discover the DNS records a domain currently publishes by querying its live authoritative nameservers. Writes nothing. " +
+    "Use this before moving a domain to Porkbun: a registrar transfer carries only the delegation, never the zone contents, so the old registrar's records become permanently unreadable the moment it stops answering for the domain \u2014 and a domain whose records were never recreated goes dark right then (website down, mail bouncing). " +
+    "Scan first, review, then call import_dns_records, and only then change nameservers. " +
+    "The scan probes a wide list of well-known names (apex, common subdomains, MX, DKIM selectors, provider verification hosts) but cannot enumerate a zone \u2014 DNS has no listing operation \u2014 so treat it as thorough, not exhaustive, and tell the user that. " +
+    "If the losing registrar has its own API, reading the zone from there is authoritative: do that with the user's own credentials (they must never be sent to Porkbun) and pass the records to import_dns_records instead. " +
+    "Limited to 20 calls per hour per account, since each call is roughly 90 DNS lookups.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to inspect, e.g. `example.com`. Does not need to be registered at Porkbun yet."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/dns/scan/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const import_dns_records: Tool = {
+  name: "import_dns_records",
+  description:
+    "Create many DNS records on a Porkbun domain in one call \u2014 the companion to scan_dns_records for keeping a transferred domain working. " +
+    "Pass `records` to import an exact list (preferred when you read the zone from the old registrar's API), or omit it entirely to import whatever a live scan of the domain discovers. " +
+    "Idempotent: a record that already exists is reported in `skipped`, not `failed`, so this is safe to re-run and safe as a converge step. Individual failures are listed in `failures` while everything else still imports. " +
+    "NS and SOA entries are ignored on purpose \u2014 they describe the delegation, not the zone. " +
+    "Important: imported records have no effect until the domain actually points at Porkbun's nameservers, so check get_nameservers afterwards and use update_nameservers when the user is ready to cut over. Maximum 500 records per call.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Porkbun domain to create the records on, e.g. `example.com`"),
+    records: z
+      .array(
+        z.object({
+          name: z.string().describe("Subdomain prefix only, or empty string for the apex. `@` and a fully-qualified name are both accepted."),
+          type: z.string().describe("Record type, e.g. `A`, `CNAME`, `MX`, `TXT`."),
+          content: z.string().describe("Record value."),
+          ttl: z.number().int().optional().describe("Seconds. Raised to the API minimum if lower."),
+          prio: z.number().int().nullable().optional().describe("Priority, for MX and SRV."),
+        })
+      )
+      .optional()
+      .describe("Exact records to create. Omit to import what a live scan of the domain finds."),
+  },
+  annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = {};
+    if (Array.isArray(args.records)) body.records = args.records;
+    return await call(config, `/dns/import/${encodeURIComponent(domain)}`, { method: "POST", body, idempotent: true });
+  },
+};
+
 const get_ssl_bundle: Tool = {
   name: "get_ssl_bundle",
   description:
@@ -1717,6 +1768,8 @@ export const tools: Tool[] = [
   // read — per-domain
   get_nameservers,
   list_dns_records,
+  scan_dns_records,
+  import_dns_records,
   list_dnssec_records,
   list_url_forwards,
   list_glue_records,

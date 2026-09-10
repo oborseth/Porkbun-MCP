@@ -10,7 +10,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.22.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
-## What's included (81 tools)
+## What's included (83 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -27,6 +27,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `get_api_settings` | Get monthly spend limit, low-balance alert, auto top-up config, MTD spend |
 | `get_nameservers` | Get current nameservers for a domain |
 | `list_dns_records` | List DNS records for a domain |
+| `scan_dns_records` | Discover what a domain publishes now, from its live nameservers (use before a transfer — a transfer carries no zone data) |
+| `import_dns_records` | Bulk-create records from a supplied list or a live scan; idempotent, already-present records are skipped |
 | `list_dnssec_records` | List DNSSEC DS records published at the registry |
 | `list_url_forwards` | List URL forwarding rules for a domain (incl. exact `redirectType`: 301/302/307/masked) |
 | `list_glue_records` | List glue records (host-to-IP mappings) for a domain |
