@@ -358,7 +358,7 @@ const buy_closeout: Tool = {
     "`cost` must equal `totalPrice` from get_closeout exactly \u2014 any other value is refused, so you cannot accidentally charge a price the user did not agree to. Use dry_run with cost 0 to quote without charging. " +
     "**The domain is reserved, not delivered.** The provider releases it over the following days, so do not tell the user it is in their account: poll list_domains or watch the domain.registered webhook. " +
     "Every post-charge failure refunds automatically and reports refunded:true. Losing the race to another buyer (CLOSEOUT_UNAVAILABLE) is not worth retrying on the same name \u2014 closeouts are first-come at a fixed price. " +
-    "CLOSEOUT_NOT_ELIGIBLE means the account cannot buy aftermarket names at all (needs verified email and phone, 30+ days old, a prior qualifying order, no billing or auction-terms hold) \u2014 do not retry, tell the user to contact support.",
+    "CLOSEOUT_NOT_ELIGIBLE means support has blocked this account from auctions and closeouts over past-due invoices or an auction terms violation \u2014 do not retry, tell the user to contact support. There is no account-age or order-history requirement: eligibility is the same as registering a domain, plus verified email and phone.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to buy, e.g. `example.com`"),
     cost: z.number().int().nonnegative().describe("Exact totalPrice in cents from get_closeout. Use 0 only with dry_run."),
