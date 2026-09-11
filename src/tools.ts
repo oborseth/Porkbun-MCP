@@ -301,6 +301,79 @@ const import_dns_records: Tool = {
   },
 };
 
+const search_closeouts: Tool = {
+  name: "search_closeouts",
+  description:
+    "Search expired-domain closeouts: names that did not sell at auction and are now offered at a fixed price that descends on a schedule. No bidding \u2014 the first buyer at the current price takes the name. " +
+    "Filter by keyword, TLD, exact name length, age range and price range; sort by domain, end time, price, revenue, visitors, inbound links or registration_date. " +
+    "**Every row carries `age` and `registrationDate`, and both are sortable** \u2014 use sort_name=registrationDate with sort_direction=asc to surface the oldest names, which is the single most requested thing here and is not possible on the website. " +
+    "`price` is the closeout price ALONE. Do not quote a user a total from these results: the binding amount adds the renewal or transfer year and comes from get_closeout. " +
+    "Page with start/limit until start >= totalAvailable.",
+  inputSchema: {
+    query: z.string().optional().describe("Keyword match on the domain name."),
+    tld: z.string().optional().describe("Single TLD, with or without the leading dot. Omit to search all."),
+    name_length: z.number().int().positive().optional().describe("Exact SLD character count."),
+    age_min: z.number().int().nonnegative().optional().describe("Minimum domain age in years."),
+    age_max: z.number().int().nonnegative().optional().describe("Maximum domain age in years."),
+    price_min: z.number().int().nonnegative().optional().describe("Minimum closeout price in cents."),
+    price_max: z.number().int().nonnegative().optional().describe("Maximum closeout price in cents."),
+    sort_name: z
+      .enum(["domain", "endTime", "price", "revenue", "visitors", "inboundLinks", "registrationDate"])
+      .optional()
+      .describe("Field to sort by."),
+    sort_direction: z.enum(["asc", "desc"]).optional().describe("Sort direction."),
+    start: z.number().int().nonnegative().optional().describe("Paging offset. Default 0."),
+    limit: z.number().int().positive().max(500).optional().describe("Rows per page, max 500. Default 100."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const qs = new URLSearchParams();
+    const map: Record<string, string> = {
+      query: "query", tld: "tld", name_length: "nameLength", age_min: "ageMin", age_max: "ageMax",
+      price_min: "priceMin", price_max: "priceMax", sort_name: "sortName", sort_direction: "sortDirection",
+      start: "start", limit: "limit",
+    };
+    for (const [k, v] of Object.entries(map)) if (args[k] !== undefined) qs.set(v, String(args[k]));
+    const q = qs.toString();
+    return await call(config, `/closeout/search${q ? "?" + q : ""}`, { method: "GET" });
+  },
+};
+
+const get_closeout: Tool = {
+  name: "get_closeout",
+  description:
+    "Get one closeout plus `totalPrice` \u2014 the binding amount, which is the closeout price plus the registration year that comes with it. " +
+    "Always call this before buy_closeout: totalPrice is what you must pass as `cost`, and it cannot be derived from search results because a name already at Porkbun is renewed while anything else is transferred in, and those price differently. " +
+    "`available: false` means somebody already claimed it. Quote the user totalPrice, never the search `price`.",
+  inputSchema: { domain: z.string().min(3).describe("Domain offered as a closeout, e.g. `example.com`") },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    await call(config, `/closeout/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const buy_closeout: Tool = {
+  name: "buy_closeout",
+  description:
+    "**Spends account credit.** Buys a closeout at its current price and claims the name. Confirm the total with the user first. " +
+    "`cost` must equal `totalPrice` from get_closeout exactly \u2014 any other value is refused, so you cannot accidentally charge a price the user did not agree to. Use dry_run with cost 0 to quote without charging. " +
+    "**The domain is reserved, not delivered.** The provider releases it over the following days, so do not tell the user it is in their account: poll list_domains or watch the domain.registered webhook. " +
+    "Every post-charge failure refunds automatically and reports refunded:true. Losing the race to another buyer (CLOSEOUT_UNAVAILABLE) is not worth retrying on the same name \u2014 closeouts are first-come at a fixed price. " +
+    "CLOSEOUT_NOT_ELIGIBLE means the account cannot buy aftermarket names at all (needs verified email and phone, 30+ days old, a prior qualifying order, no billing or auction-terms hold) \u2014 do not retry, tell the user to contact support.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to buy, e.g. `example.com`"),
+    cost: z.number().int().nonnegative().describe("Exact totalPrice in cents from get_closeout. Use 0 only with dry_run."),
+    dry_run: z.boolean().optional().describe("Validate and price without charging or claiming."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { cost: Number(args.cost) };
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/closeout/buy/${encodeURIComponent(String(args.domain).toLowerCase())}`, {
+      method: "POST", body, idempotent: !args.dry_run,
+    });
+  },
+};
+
 const get_transfer_setup: Tool = {
   name: "get_transfer_setup",
   description:
@@ -1842,6 +1915,9 @@ export const tools: Tool[] = [
   // read — per-domain
   get_nameservers,
   list_dns_records,
+  search_closeouts,
+  get_closeout,
+  buy_closeout,
   get_transfer_setup,
   prepare_transfer,
   start_transfer,

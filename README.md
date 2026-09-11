@@ -10,7 +10,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.22.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
-## What's included (88 tools)
+## What's included (91 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -21,6 +21,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `get_registration_requirements` | TLD registration requirements as JSON Schema — is it API-registerable, the create payload, and registry eligibility fields (.us nexus, .ca legal type, …) |
 | `get_pricing` | Get registration/renewal/transfer pricing for all TLDs (no auth needed) |
 | `list_marketplace` | Browse the Porkbun aftermarket — filter by TLD, max price, name substring |
+| `search_closeouts` | Search expired-domain closeouts; filter by age, price, TLD, name length; sort by registration date |
+| `get_closeout` | One closeout plus its binding total (closeout price + the renewal/transfer year) |
+| `buy_closeout` | Buy a closeout outright. **Spends account credit** |
 | `list_domains` | Paginate through domains; filter by tld, expiry, auto-renew, API access |
 | `get_domain` | Get metadata for a single domain in the account |
 | `get_balance` | Get account credit balance |
