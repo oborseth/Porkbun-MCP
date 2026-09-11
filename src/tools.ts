@@ -306,7 +306,8 @@ const search_closeouts: Tool = {
   description:
     "Search expired-domain closeouts: names that did not sell at auction and are now offered at a fixed price that descends on a schedule. No bidding \u2014 the first buyer at the current price takes the name. " +
     "Filter by keyword, TLD, exact name length, age range and price range; sort by domain, end time, price, revenue, visitors, inbound links or registration_date. " +
-    "**Every row carries `age` and `registrationDate`, and both are sortable** \u2014 use sort_name=registrationDate with sort_direction=asc to surface the oldest names, which is the single most requested thing here and is not possible on the website. " +
+    "**Every row carries `age` and `registrationDate`, and both are sortable** \u2014 sort_name=registrationDate with sort_direction=asc gives the OLDEST registrations first, which is the single most requested thing here and is not possible on the website. " +
+    "Note sort_direction=asc on revenue, visitors or inboundLinks lists the domains with no recorded figure first (they come back null); use desc on those. " +
     "`price` is the closeout price ALONE. Do not quote a user a total from these results: the binding amount adds the renewal or transfer year and comes from get_closeout. " +
     "Page with start/limit until start >= totalAvailable.",
   inputSchema: {
