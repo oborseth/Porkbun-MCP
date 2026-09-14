@@ -38,7 +38,7 @@ const ping: Tool = {
 const check_domain: Tool = {
   name: "check_domain",
   description:
-    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost` doesn't match the current quote.",
+    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
   inputSchema: {
     domain: z
       .string()
@@ -50,6 +50,27 @@ const check_domain: Tool = {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/checkDomain/${encodeURIComponent(domain)}`, {
       method: "POST",
+    });
+  },
+};
+
+const check_domains: Tool = {
+  name: "check_domains",
+  description:
+    "Check up to 25 domains for availability and price in ONE call. Prefer this over calling `check_domain` in a loop whenever you have more than one name: Porkbun chunks availability checks per registry, so a batch is materially less work than the same names individually, and it draws on a separate budget of 200 domains per 60 seconds (counted per domain, not per call) rather than the single check's 10 per 10 seconds.\n\n**Read all three result lists — they mean different things.** `domains` is keyed by domain name and each value has the same shape as `check_domain`'s response. `invalid` holds entries that are not checkable at all (not a domain, unsupported TLD); one bad entry does NOT fail the call, so the other names still come back answered. `unresolved` holds domains the registry did not answer for — these are **neither available nor taken**, and reporting them as unavailable would be wrong. Retry those.\n\nDuplicates are removed before the budget is charged. More than 25 names returns BULK_CHECK_TOO_MANY and checks nothing, rather than silently truncating, so split longer lists yourself.",
+  inputSchema: {
+    domains: z
+      .array(z.string().min(3))
+      .min(1)
+      .max(25)
+      .describe("Fully qualified domain names to check, e.g. [`example.com`, `example.net`]. Max 25; duplicates are ignored."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domains = (args.domains as string[]).map((d) => String(d).toLowerCase());
+    return await call(config, "/domain/checkDomain", {
+      method: "POST",
+      body: { domains },
     });
   },
 };
@@ -938,14 +959,14 @@ const delete_dns_record: Tool = {
 const create_dnssec_record: Tool = {
   name: "create_dnssec_record",
   description:
-    "Submit a DNSSEC DS record to the registry for a domain. Use when you sign DNS yourself (custom nameservers running BIND/Knot/PowerDNS/etc.) and need to publish the chain-of-trust at the parent zone. Required: keyTag, algorithm, digestType, digest. Optional key-data fields for registries that require full DNSKEY (rare).",
+    "Submit a DNSSEC DS record to the registry for a domain. Use when you sign DNS yourself (custom nameservers running BIND/Knot/PowerDNS/etc.) and need to publish the chain-of-trust at the parent zone. Required: keyTag, algorithm, digestType, digest. Optional key-data fields for registries that require full DNSKEY (rare). Algorithms and digest types are validated per registry, not globally: registries are retiring the values deprecated by RFC 9904/9905/9906 on their own schedules, so a value one registry has already dropped may still be accepted by another. A refused value returns DNSSEC_ALGORITHM_DEPRECATED naming a replacement, and retrying the same values will not help. Use alg 8 (RSA/SHA-256) or 13 (ECDSA/SHA-256) with digestType 2 (SHA-256) to be accepted everywhere. A SUCCESS response may carry a warnings array when a value still works but is being retired: the record WAS created. Deprecation never affects list_dnssec_records or delete_dnssec_record.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to add the DS record to."),
     keyTag: z.string().describe("DNSSEC key tag (16-bit identifier of the key)."),
     alg: z
       .string()
-      .describe("Algorithm number, e.g. `13` for ECDSA P-256 SHA-256, `8` for RSA SHA-256."),
-    digestType: z.string().describe("Digest type, e.g. `2` for SHA-256, `4` for SHA-384."),
+      .describe("Algorithm number, e.g. `13` for ECDSA P-256 SHA-256, `8` for RSA SHA-256. Algorithms 1, 3, 5, 6, 7 and 12 are deprecated (RFC 9904/9905/9906) and are already refused by some registries."),
+    digestType: z.string().describe("Digest type, e.g. `2` for SHA-256, `4` for SHA-384. Digest types 1 (SHA-1) and 3 (GOST R 34.11-94) are deprecated and are being refused registry by registry; 2 is accepted everywhere."),
     digest: z.string().describe("Hex-encoded DS digest value."),
     maxSigLife: z.string().optional().describe("Maximum signature lifetime in seconds (registry-specific, optional)."),
     keyDataFlags: z.string().optional().describe("DNSKEY flags (optional — typically 256 or 257)."),
@@ -1906,6 +1927,7 @@ export const tools: Tool[] = [
   // read — global / account
   ping,
   check_domain,
+  check_domains,
   get_registration_requirements,
   get_pricing,
   list_marketplace,
