@@ -6,7 +6,7 @@ import { tools } from "./tools.js";
 
 const server = new McpServer({
   name: "porkbun-mcp",
-  version: "0.26.0",
+  version: "0.27.0",
 });
 
 // Defer config loading until the first tool call. tools/list works without

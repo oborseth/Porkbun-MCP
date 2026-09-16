@@ -836,6 +836,71 @@ const update_auto_renew: Tool = {
 
 // ─── DNS writes ─────────────────────────────────────────────────────────────
 
+const list_dns_restore_points: Tool = {
+  name: "list_dns_restore_points",
+  description:
+    "List the saved versions of a domain's DNS zone, newest first. **DNS is the one layer with no undo built in, and this is it** — if a record was deleted or edited by mistake you do not need to know what it used to say, you can look.\n\nRestore points are captured automatically before the first write to a zone in each hour (so a run of edits costs one point, not one per record), before any bulk import or zone wipe, and before any restore.\n\nRead two fields carefully. `recordCount` is the size of the zone AS IT WAS at that moment, not now — a drop between consecutive points is where records were lost. `matchesLive` marks the point the zone currently sits on, which is where you are, not where you want to go. Up to 50 are returned.\n\nRestore points only cover the zone as Porkbun held it; a domain on someone else's nameservers has nothing here.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose zone history to list, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/dns/history/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const diff_dns_restore_point: Tool = {
+  name: "diff_dns_restore_point",
+  description:
+    "Compare a DNS restore point with the live zone before changing anything. Always do this before `restore_dns_zone` — it is free and it is the difference between fixing a zone and finding out afterwards.\n\n`missing` is in the restore point but not live: these are the records a restore would ADD BACK. `extra` is live but not in the restore point: a restore LEAVES THESE ALONE unless you pass prune. `inSync` is true when both lists are empty.\n\nRecords are matched on name, type, content and priority rather than id, because an id means nothing across a delete and re-create. SOA and NS are excluded — the zone's own delegation is not what anyone means by their DNS records. For masked records (parking, ALIAS, HTTPS) the value shown is the one that was configured, not the internal host it resolves to.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain, e.g. `example.com`"),
+    snapshot_id: z
+      .number()
+      .int()
+      .describe("Restore point id from `list_dns_restore_points`."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(
+      config,
+      `/dns/diff/${encodeURIComponent(domain)}/${encodeURIComponent(String(args.snapshot_id))}`,
+      { method: "GET" }
+    );
+  },
+};
+
+const restore_dns_zone: Tool = {
+  name: "restore_dns_zone",
+  description:
+    "Put a domain's DNS zone back to a saved restore point. Call `diff_dns_restore_point` first and show the user what will change.\n\n**By default this only ADDS BACK what is missing.** It does not remove records added since — pass prune: true for that, and only after reading the `extra` list, because 'restore my records' usually means 'put back what I lost', not 'delete everything I have done since'.\n\n**The restore is itself reversible.** The zone's state from immediately before is saved and returned as `previousStateSavedAs`; restore that id to undo. Use dry_run: true to rehearse — it reports exactly what would change and changes nothing.\n\n**Read `failed` in the response.** Parking records and other masked types (ALIAS, HTTPS) are managed by another part of the platform and cannot be recreated this way; they appear in `failed` rather than being counted, so `restored` is always a true number. If a parking record is what is missing, the domain needs re-parking on the website instead. SOA and NS are never touched.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to restore, e.g. `example.com`"),
+    snapshot_id: z
+      .number()
+      .int()
+      .describe("Restore point id from `list_dns_restore_points`."),
+    prune: z
+      .boolean()
+      .optional()
+      .describe("Also DELETE live records that are not in the restore point. Default false. Destructive — confirm with the user first."),
+    dry_run: z
+      .boolean()
+      .optional()
+      .describe("If true, report what would change without changing anything."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { snapshotId: args.snapshot_id };
+    if (args.prune !== undefined) body.prune = args.prune;
+    if (args.dry_run !== undefined) body.dryRun = args.dry_run;
+    return await call(config, `/dns/restore/${encodeURIComponent(domain)}`, { method: "POST", body });
+  },
+};
+
 const create_dns_record: Tool = {
   name: "create_dns_record",
   description:
@@ -1982,6 +2047,9 @@ export const tools: Tool[] = [
   mock_call,
   // write — DNS
   create_dns_record,
+  list_dns_restore_points,
+  diff_dns_restore_point,
+  restore_dns_zone,
   update_dns_record,
   delete_dns_record,
   // write — DNSSEC
