@@ -836,6 +836,25 @@ const update_auto_renew: Tool = {
 
 // ─── DNS writes ─────────────────────────────────────────────────────────────
 
+const preflight_domain: Tool = {
+  name: "preflight_domain",
+  description:
+    "Ask whether a change is about to break a domain, BEFORE making it. Read-only, free, and the right thing to call before changing nameservers, transferring a domain out, or enabling DNSSEC.\n\nEvery check comes from a real incident, so these are the failures where a zone looks fine and stops working anyway. Read `blockers` first — those will break something. `warnings` will not break outright but are usually what the user notices next. `safe` is true only when both are empty. Each check names the rule it comes from and carries a `next_action`, so you can explain the finding rather than just report it.\n\nThe two an agent should treat as hard stops:\n- `dnssec-active` — DS records are published at the registry, so new nameservers will serve answers that do not match them and validating resolvers will refuse the WHOLE zone. The domain goes dark rather than degrading. DNSSEC has to be removed and the DS TTL waited out BEFORE the nameservers change. Never move delegation past this one.\n- `spf-duplicate` / `spf-lookups` — RFC 7208 permerrors that make SPF fail for every sender, so the domain's mail is already being degraded whether or not the user has noticed.\n\nThe one worth explaining because nobody expects it: `wildcard-shadowed`. Under RFC 4592 a wildcard answers only names that do NOT exist in the zone, so a name holding just an MX or TXT record stops inheriting the wildcard's address and stops resolving — with nothing in the zone looking wrong.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain to check, e.g. `example.com`"),
+    intent: z
+      .enum(["general", "move-nameservers", "transfer-out", "enable-dnssec"])
+      .optional()
+      .describe("What you are about to do; scopes the checks. Defaults to general, which runs everything applicable."),
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const intent = args.intent ? `?intent=${encodeURIComponent(String(args.intent))}` : "";
+    return await call(config, `/dns/preflight/${encodeURIComponent(domain)}${intent}`, { method: "GET" });
+  },
+};
+
 const list_dns_restore_points: Tool = {
   name: "list_dns_restore_points",
   description:
@@ -2047,6 +2066,7 @@ export const tools: Tool[] = [
   mock_call,
   // write — DNS
   create_dns_record,
+  preflight_domain,
   list_dns_restore_points,
   diff_dns_restore_point,
   restore_dns_zone,
