@@ -10,7 +10,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 > **Status:** v0.22.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
-## What's included (96 tools)
+## What's included (99 tools)
 
 **Read tools (free, no spend, no state changes)**
 
@@ -27,6 +27,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `list_domains` | Paginate through domains; filter by tld, expiry, auto-renew, API access |
 | `get_domain` | Get metadata for a single domain in the account |
 | `get_balance` | Get account credit balance |
+| `get_auto_topup` | Read auto top-up settings, whether a card is on file, and what a top-up would charge |
 | `get_api_settings` | Get monthly spend limit, low-balance alert, auto top-up config, MTD spend |
 | `get_nameservers` | Get current nameservers for a domain |
 | `list_dns_records` | List DNS records for a domain |
@@ -49,6 +50,13 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `search_docs` | Keyword-search the full reference; returns the most relevant sections |
 
 The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground itself in Porkbun's own documentation (the `/llms` Markdown surface) mid-conversation — no web browsing required, and **no API credentials needed**. You can add the server purely to research the API, then supply keys when you're ready for live operations.
+
+**Account funding (charges a saved card, not credit)**
+
+| Tool | What it does |
+|------|--------------|
+| `configure_auto_topup` | Turn auto top-up on/off: below `threshold`, add `amount` from the saved payment method. Amounts set via the API are capped at $500 |
+| `top_up_account_credit` | **Charges the saved card now** and adds the credit. The amount is the account's configured one (or $50 default) — the caller does not choose it. 5/day, 20/month |
 
 **Domain lifecycle writes (spend account credit)**
 

@@ -154,6 +154,65 @@ const get_balance: Tool = {
   },
 };
 
+const get_auto_topup: Tool = {
+  name: "get_auto_topup",
+  description:
+    "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount added, whether a payment method is actually on file, and `effectiveAmount` \u2014 what `top_up_account_credit` would charge right now. If `paymentMethodOnFile` is false the settings are inert: nothing can be charged and auto top-up will never fire, and a card can only be saved on porkbun.com, never through the API.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/account/autoTopup", { method: "GET" });
+  },
+};
+
+const configure_auto_topup: Tool = {
+  name: "configure_auto_topup",
+  description:
+    "Turn auto top-up on or off. When on, an order that drops the account credit below `threshold` charges the saved payment method for `amount` and adds it \u2014 the way to stop an unattended workflow dead-ending on INSUFFICIENT_FUNDS. Both values are integer US cents.\n\nConfirm the numbers with the user before calling: this authorises future charges to their card. `amount` set through the API is capped at $500 (50000) with a $5 floor; a larger figure has to be set by the account holder at https://porkbun.com/account/api. Disabling takes `enabled: false` alone.\n\nNo card is added or changed here, and none can be added over the API. Supports dry_run.",
+  inputSchema: {
+    enabled: z.boolean().describe("True to switch auto top-up on (threshold and amount required), false to switch it off."),
+    threshold: z
+      .number()
+      .int()
+      .min(1)
+      .optional()
+      .describe("Balance in integer US cents below which a top-up fires. Required when enabling. E.g. 2000 = $20."),
+    amount: z
+      .number()
+      .int()
+      .min(500)
+      .max(50000)
+      .optional()
+      .describe("Amount to add, in integer US cents, 500-50000 when set via the API. Required when enabling. E.g. 10000 = $100."),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { enabled: args.enabled };
+    if (args.threshold !== undefined) body.threshold = args.threshold;
+    if (args.amount !== undefined) body.amount = args.amount;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, "/account/autoTopup", { method: "POST", body });
+  },
+};
+
+const top_up_account_credit: Tool = {
+  name: "top_up_account_credit",
+  description:
+    "**Charges the user's saved payment method** and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling. This spends real money off a card, not credit they already bought.** You do not choose the amount and cannot: it charges whatever auto top-up amount the account has configured, or $50 if none was ever set \u2014 `used_default_amount` in the response says which. To change it, use `configure_auto_topup`. Tell the user the figure from `get_auto_topup`'s `effectiveAmount` before you call.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` past 5 top-ups a day or 20 a month. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
+  inputSchema: {
+    dry_run: z.boolean().optional().describe("If true, report what would be charged without charging it."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/account/topup", {
+      method: "POST",
+      idempotent: true,
+      body: args.dry_run ? { dryRun: true } : undefined,
+    });
+  },
+};
+
 // ─── Sandbox controls (only usable with a sandbox key, pk1_sb_…) ──────────────
 
 const create_sandbox_key: Tool = {
@@ -2018,6 +2077,9 @@ export const tools: Tool[] = [
   list_domains,
   get_domain,
   get_balance,
+  get_auto_topup,
+  configure_auto_topup,
+  top_up_account_credit,
   get_api_settings,
   // read — per-domain
   get_nameservers,
