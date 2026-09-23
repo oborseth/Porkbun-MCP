@@ -168,9 +168,12 @@ const get_auto_topup: Tool = {
 const configure_auto_topup: Tool = {
   name: "configure_auto_topup",
   description:
-    "Turn auto top-up on or off. When on, an order that drops the account credit below `threshold` charges the saved payment method for `amount` and adds it \u2014 the way to stop an unattended workflow dead-ending on INSUFFICIENT_FUNDS. Both values are integer US cents.\n\nConfirm the numbers with the user before calling: this authorises future charges to their card. `amount` set through the API is capped at $500 (50000) with a $5 floor; a larger figure has to be set by the account holder at https://porkbun.com/account/api. Disabling takes `enabled: false` alone.\n\nNo card is added or changed here, and none can be added over the API. Supports dry_run.",
+    "Set the top-up amount, and/or turn auto top-up on or off.\n\n`amount` (integer US cents) is what a top-up adds, and it stands on its own: `top_up_account_credit` charges this same figure on demand, so setting it without enabling automation is a normal thing to do. Capped at $500 (50000) with a $5 floor when set through the API; a larger figure has to be set by the account holder at https://porkbun.com/account/api and is honoured as-is.\n\n`enabled: true` (with `threshold`) additionally makes it fire by itself: an order that drops the balance below `threshold` charges the saved payment method for the amount and adds it \u2014 the way to stop an unattended workflow dead-ending on INSUFFICIENT_FUNDS. `enabled: false` stops it firing on a threshold but KEEPS the amount on file.\n\nConfirm the numbers with the user before calling: this authorises charges to their card. No card is added or changed here, and none can be added over the API. Supports dry_run.",
   inputSchema: {
-    enabled: z.boolean().describe("True to switch auto top-up on (threshold and amount required), false to switch it off."),
+    enabled: z
+      .boolean()
+      .optional()
+      .describe("True to switch auto top-up on (threshold required, plus an amount either here or already on file), false to switch it off. Omit it to change only the amount."),
     threshold: z
       .number()
       .int()
@@ -183,12 +186,13 @@ const configure_auto_topup: Tool = {
       .min(500)
       .max(50000)
       .optional()
-      .describe("Amount to add, in integer US cents, 500-50000 when set via the API. Required when enabling. E.g. 10000 = $100."),
+      .describe("What a top-up adds, in integer US cents, 500-50000 when set via the API. Can be sent on its own. E.g. 10000 = $100."),
     dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
-    const body: Record<string, unknown> = { enabled: args.enabled };
+    const body: Record<string, unknown> = {};
+    if (args.enabled !== undefined) body.enabled = args.enabled;
     if (args.threshold !== undefined) body.threshold = args.threshold;
     if (args.amount !== undefined) body.amount = args.amount;
     if (args.dry_run) body.dryRun = true;
@@ -199,7 +203,7 @@ const configure_auto_topup: Tool = {
 const top_up_account_credit: Tool = {
   name: "top_up_account_credit",
   description:
-    "**Charges the user's saved payment method** and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling. This spends real money off a card, not credit they already bought.** You do not choose the amount and cannot: it charges whatever auto top-up amount the account has configured, or $50 if none was ever set \u2014 `used_default_amount` in the response says which. To change it, use `configure_auto_topup`. Tell the user the figure from `get_auto_topup`'s `effectiveAmount` before you call.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` past 5 top-ups a day or 20 a month. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
+    "**Charges the user's saved payment method** and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling. This spends real money off a card, not credit they already bought.** You do not choose the amount and cannot: it charges whatever auto top-up amount the account has configured, or $50 if none was ever set \u2014 `used_default_amount` in the response says which. To change it, use `configure_auto_topup`. Tell the user the figure from `get_auto_topup`'s `effectiveAmount` before you call.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` when the month's dollars or the frequency run out \u2014 the account's monthly spend limit caps top-up dollars as well as domain spend, an account with no limit set gets $100/month, and there are 5/day and 20/month count caps. `get_auto_topup` reports `monthlyCeiling`, `ceilingSource` and `toppedUpThisMonth`, so check there before promising a user a top-up will go through. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
   inputSchema: {
     dry_run: z.boolean().optional().describe("If true, report what would be charged without charging it."),
   },
