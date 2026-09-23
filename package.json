@@ -1,6 +1,6 @@
 {
   "name": "@porkbunllc/mcp-server",
-  "version": "0.29.2",
+  "version": "0.30.0",
   "description": "Porkbun MCP server \u2014 exposes the Porkbun v3 API as tools for AI agents (Claude Desktop, Cursor, etc.)",
   "type": "module",
   "bin": {
@@ -16,7 +16,8 @@
     "start": "node dist/index.js",
     "dev": "tsc --watch",
     "smoke": "node scripts/smoke.mjs",
-    "prepublishOnly": "rm -rf dist && tsc"
+    "prepublishOnly": "rm -rf dist && tsc",
+    "start:http": "node dist/http.js"
   },
   "keywords": [
     "mcp",

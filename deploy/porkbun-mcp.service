@@ -1,0 +1,55 @@
+[Unit]
+Description=Porkbun hosted MCP connector (mcp.porkbun.com)
+Documentation=https://porkbun.com/mcp
+After=network-online.target
+Wants=network-online.target
+# A crash loop should not spin forever: after 10 failures in a minute systemd
+# stops restarting and the ALB health check takes the instance out. These are
+# [Unit] options — in [Service] systemd ignores them with only a warning.
+StartLimitIntervalSec=60
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=porkbun-mcp
+Group=porkbun-mcp
+WorkingDirectory=/opt/porkbun-mcp/app
+EnvironmentFile=/etc/porkbun-mcp.env
+ExecStart=/usr/bin/node-22 /opt/porkbun-mcp/app/dist/http.js
+
+Restart=always
+RestartSec=2
+
+# It is stateless and holds no data, so it gets almost nothing: no writable
+# filesystem, no home directory, no new privileges, no way to see other
+# processes. It needs outbound HTTPS and a listening socket, and that is all.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectClock=true
+ProtectHostname=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+RestrictNamespaces=true
+LockPersonality=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+SystemCallArchitectures=native
+
+MemoryMax=768M
+TasksMax=512
+LimitNOFILE=65536
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=porkbun-mcp
+
+[Install]
+WantedBy=multi-user.target

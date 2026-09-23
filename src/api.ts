@@ -10,6 +10,12 @@ export interface PorkbunConfig {
   /** Website host serving the public docs (/llms, /llms/<topic>, /llms-full.txt). */
   docsBaseUrl: string;
   userAgent: string;
+  /**
+   * OAuth access token (pbo_at_…) for the hosted connector. When set it is sent
+   * as `Authorization: Bearer` and takes the place of the key pair — the API
+   * resolves it to the connection's own key.
+   */
+  bearerToken?: string;
 }
 
 export function loadConfig(): PorkbunConfig {
@@ -85,7 +91,7 @@ export async function call<T = unknown>(
 ): Promise<T> {
   // Authenticated endpoints require credentials; the documentation tools don't
   // go through here. Fail with a clear, actionable message rather than a 401.
-  if (!config.apiKey || !config.secretApiKey) {
+  if (!config.bearerToken && (!config.apiKey || !config.secretApiKey)) {
     throw new Error(
       "This tool needs Porkbun API credentials. Set PORKBUN_API_KEY and PORKBUN_SECRET_API_KEY " +
         "(create keys at https://porkbun.com/account/api). The documentation tools — search_docs, " +
@@ -103,16 +109,24 @@ export async function call<T = unknown>(
 
   let body: string | undefined;
 
+  if (config.bearerToken) {
+    // Hosted connector: the token IS the credential. Nothing goes in the body —
+    // the API only honours header auth when the body carries no key or token.
+    headers["Authorization"] = `Bearer ${config.bearerToken}`;
+  }
+
   if (method === "GET") {
-    headers["X-API-Key"] = config.apiKey;
-    headers["X-Secret-API-Key"] = config.secretApiKey;
+    if (!config.bearerToken) {
+      headers["X-API-Key"] = config.apiKey;
+      headers["X-Secret-API-Key"] = config.secretApiKey;
+    }
   } else {
     headers["Content-Type"] = "application/json";
-    body = JSON.stringify({
-      ...(opts.body ?? {}),
-      apikey: config.apiKey,
-      secretapikey: config.secretApiKey,
-    });
+    body = JSON.stringify(
+      config.bearerToken
+        ? { ...(opts.body ?? {}) }
+        : { ...(opts.body ?? {}), apikey: config.apiKey, secretapikey: config.secretApiKey }
+    );
     if (opts.idempotent) {
       headers["Idempotency-Key"] = randomUUID();
     }
