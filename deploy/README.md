@@ -30,7 +30,8 @@ API's per-IP rate limits (below). Behind a NAT gateway the source would be the
 NAT's IP, and exempting that would exempt everything behind it.
 
 **ALB:** HTTPS 443 → target group HTTP 8787 **with protocol version HTTP1**,
-health check `GET /health` → 200,
+health check HTTP on the **traffic port** (8787, not the default 80), path
+**`/health`** (not the default `/`, which is a 404 here) → 200,
 idle timeout ~120 s (some tool calls wait on slow registry or provisioning work),
 deregistration delay ~30 s. No WAF rule may block Anthropic (`160.79.104.0/21`)
 or OpenAI's connector ranges — both fetch the discovery documents from there, and
