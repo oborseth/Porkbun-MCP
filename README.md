@@ -8,6 +8,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 **Setup guide, client configs and the full tool list: [porkbun.com/mcp](https://porkbun.com/mcp)**
 
+**No install: use the hosted connector.** Porkbun runs this server at `https://mcp.porkbun.com/mcp`. Add that URL as a custom connector in ChatGPT or Claude (or `claude mcp add --transport http porkbun https://mcp.porkbun.com/mcp` in Claude Code), sign in to Porkbun and approve. No API key to copy. Steps per client: [Connect ChatGPT or Claude](https://porkbun.com/llms/guides/connect-chatgpt-or-claude). How it is deployed: [`deploy/README.md`](deploy/README.md).
+
 > **Status:** v0.22.0 — full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
 ## What's included (99 tools)
@@ -264,6 +266,7 @@ This MCP server is a thin client that runs **locally** (on your machine, or wher
 
 - **What it sends, and to whom.** Your API key/secret and the arguments of each tool call are sent only to `https://api.porkbun.com` (and, for the credential-free documentation and mock tools, to `https://porkbun.com`). Nothing is sent anywhere else.
 - **Storage.** The server keeps your credentials in memory for the lifetime of the process (read from environment variables); it does not write them to disk, log them, or cache your data.
+- **Hosted connector.** At `mcp.porkbun.com` the same code runs on Porkbun's infrastructure. It holds no API keys: each request carries the user's OAuth access token, which is forwarded to the Porkbun API and kept in memory only briefly (a 30-second validity cache). Request logs record method, path, status and timing, never tokens or request bodies.
 - **No telemetry.** There is no analytics, tracking, or third-party sharing performed by this connector.
 - **Data you access through it** (domains, DNS, contacts, billing, etc.) is your Porkbun account data, handled by Porkbun under its policy.
 
