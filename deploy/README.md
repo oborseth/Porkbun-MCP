@@ -29,11 +29,21 @@ caller's own token. The instance role needs only `AmazonSSMManagedInstanceCore`
 API's per-IP rate limits (below). Behind a NAT gateway the source would be the
 NAT's IP, and exempting that would exempt everything behind it.
 
-**ALB:** HTTPS 443 → target group HTTP 8787, health check `GET /health` → 200,
+**ALB:** HTTPS 443 → target group HTTP 8787 **with protocol version HTTP1**,
+health check `GET /health` → 200,
 idle timeout ~120 s (some tool calls wait on slow registry or provisioning work),
 deregistration delay ~30 s. No WAF rule may block Anthropic (`160.79.104.0/21`)
 or OpenAI's connector ranges — both fetch the discovery documents from there, and
 a block fails the connection with no useful error on our side.
+
+> **Target group protocol version must be HTTP1.** With HTTP2 the ALB opens every
+> connection with the h2c preface (`PRI * HTTP/2.0`), Node's HTTP/1.1 server
+> rejects it at the parser with a 400 *before the app sees it*, and the target fails
+> health checks with nothing at all in the journal — it looks exactly like a
+> security-group problem, but the TCP handshake is fine. The protocol version
+> cannot be changed on an existing target group; create a new one. Clients still
+> get HTTP/2 to the ALB; only the ALB→instance hop is HTTP/1.1. (Found the hard way
+> on first install, with a packet capture.)
 
 ## First install
 
