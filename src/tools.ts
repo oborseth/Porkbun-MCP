@@ -203,16 +203,26 @@ const configure_auto_topup: Tool = {
 const top_up_account_credit: Tool = {
   name: "top_up_account_credit",
   description:
-    "**Charges the user's saved payment method** and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling. This spends real money off a card, not credit they already bought.** You do not choose the amount and cannot: it charges whatever auto top-up amount the account has configured, or $50 if none was ever set \u2014 `used_default_amount` in the response says which. To change it, use `configure_auto_topup`. Tell the user the figure from `get_auto_topup`'s `effectiveAmount` before you call.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` when the month's dollars or the frequency run out \u2014 the account's monthly spend limit caps top-up dollars as well as domain spend, an account with no limit set gets $100/month, and there are 5/day and 20/month count caps. `get_auto_topup` reports `monthlyCeiling`, `ceilingSource` and `toppedUpThisMonth`, so check there before promising a user a top-up will go through. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
+    "**Charges the user's saved payment method** and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling, with the figure. This spends real money off a card, not credit they already bought.** Omit `amount` and it charges what the account has configured (or $50 if it never has) \u2014 that is the right default, and `amount_source` in the response says which was used. Pass `amount` only when the user wants a specific one-off figure, e.g. enough to cover a particular purchase; it does NOT change their saved setting, so prefer it over calling `configure_auto_topup` for a single charge.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` when the month's dollars or the frequency run out \u2014 the account's monthly spend limit caps top-up dollars as well as domain spend, an account with no limit set gets $100/month, and there are 5/day and 20/month count caps. `get_auto_topup` reports `monthlyCeiling`, `ceilingSource` and `toppedUpThisMonth`, so check there before promising a user a top-up will go through. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
   inputSchema: {
+    amount: z
+      .number()
+      .int()
+      .min(500)
+      .max(50000)
+      .optional()
+      .describe("One-off amount to charge, in integer US cents (500-50000). Omit to charge the account's configured top-up amount. Does not change any saved setting."),
     dry_run: z.boolean().optional().describe("If true, report what would be charged without charging it."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.amount !== undefined) body.amount = args.amount;
+    if (args.dry_run) body.dryRun = true;
     return await call(config, "/account/topup", {
       method: "POST",
       idempotent: true,
-      body: args.dry_run ? { dryRun: true } : undefined,
+      body: Object.keys(body).length ? body : undefined,
     });
   },
 };
