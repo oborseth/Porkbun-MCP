@@ -19,10 +19,23 @@
  * inside a tool call, which would surface as an error message instead of a
  * silent refresh.
  */
+import dns from "node:dns";
 import http from "node:http";
+import net from "node:net";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig, type PorkbunConfig } from "./api.js";
 import { buildServer } from "./server.js";
+
+// Reach the API over IPv4 only. Every connector call leaves from this instance,
+// and the API exempts exactly one address from its per-IP rate limits: the
+// instance's Elastic IP. api.porkbun.com also has AAAA records and the instance
+// has an IPv6 address, so by default Node connects over IPv6, the exemption never
+// matches, and all ChatGPT and Claude users share one 2 req/s bucket (seen as
+// nginx 503s inside tool calls). ipv4first puts the A record first, and turning
+// off family autoselection (happy eyeballs) stops a slow v4 attempt from
+// quietly falling back to v6.
+dns.setDefaultResultOrder("ipv4first");
+net.setDefaultAutoSelectFamily(false);
 
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";

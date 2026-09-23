@@ -29,6 +29,12 @@ caller's own token. The instance role needs only `AmazonSSMManagedInstanceCore`
 API's per-IP rate limits (below). Behind a NAT gateway the source would be the
 NAT's IP, and exempting that would exempt everything behind it.
 
+> **IPv4 only, on purpose.** `api.porkbun.com` has AAAA records, and if the
+> subnet gives the instance an IPv6 address Node will happily use it, which
+> bypasses the EIP and therefore the exemption. `src/http.ts` pins outbound
+> connections to IPv4 for exactly this reason. To check which address the API
+> sees, call the `ping` tool through the connector: `yourIp` must be the EIP.
+
 **ALB:** HTTPS 443 → target group HTTP 8787 **with protocol version HTTP1**,
 health check HTTP on the **traffic port** (8787, not the default 80), path
 **`/health`** (not the default `/`, which is a 404 here) → 200,
