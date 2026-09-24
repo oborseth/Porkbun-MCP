@@ -10,13 +10,13 @@ email arrives with a Case ID; quote it in any follow-up.
 
 ## Before you start (account side)
 
-- [ ] **Verified publisher identity.** Business verification for Porkbun, LLC in
+- [x] **Verified publisher identity.** Business verification for Porkbun, LLC in
       the OpenAI Platform organization settings, then pick it in the form's
       "Developer Identity" field. Reviewers reject unverified or mismatched
       identities.
 - [ ] **Role.** The submitter needs "Apps Management: Write" in the Platform org.
 - [x] **Reviewer account** (details under "Test credentials" below; owner still sets its password via Forgot password).
-- [ ] **Hosted connector on 0.33.0 or later** (the tool annotations below are
+- [x] **Hosted connector on 0.33.0 or later** (the tool annotations below are
       what the review checks).
 
 ## Listing
