@@ -19,8 +19,28 @@ export interface Tool<S extends ZodRawShape = ZodRawShape> {
   description: string;
   inputSchema: S;
   annotations?: ToolAnnotations;
+  /**
+   * Description for the hosted connector (mcp.porkbun.com), when it must differ:
+   * the hosted server leaves out the tools that charge a card, so text that
+   * points at them would send the assistant after a tool that is not there.
+   */
+  hostedDescription?: string;
   handler: (config: PorkbunConfig, args: Record<string, unknown>) => Promise<unknown>;
 }
+
+// How a purchase is funded, in the two flavours of this server. Shared by every
+// tool that spends credit so the wording cannot drift between them.
+//
+// The hosted connector (ChatGPT, Claude) has no card-charging tools at all:
+// Anthropic's directory policy bars software that moves money on a user's
+// behalf, and the Claude apps refuse to charge a card even when asked. Buying
+// with credit the user already has is fine there, so a shortfall is handed back
+// to the user to fund themselves.
+const FUNDING_LOCAL =
+  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time.";
+
+const FUNDING_HOSTED =
+  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). Adding money is the account holder's step, not yours: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. For next time, auto top-up in their API settings (https://porkbun.com/account/api) refills the balance from their saved card on its own.";
 
 // ─── Read-only tools ────────────────────────────────────────────────────────
 
@@ -147,6 +167,8 @@ const get_balance: Tool = {
   name: "get_balance",
   description:
     "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Call it before offering to buy anything: a purchase is paid from this prepaid balance, not charged to a card, so this number decides whether a registration, renewal or transfer goes through as-is. If it is short and the account has a saved card, `top_up_account_credit` adds credit in one call (ask the user first, with the amount); `get_auto_topup` reports whether a card is on file. Without a card, credit is added at https://porkbun.com/account/credit.",
+  hostedDescription:
+    "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Call it before offering to buy anything: a purchase is paid from this prepaid balance, not charged to a card, so this number decides whether a registration, renewal or transfer goes through. If it is short, tell the user by how much; adding money is their step, with **buy account credit** at https://porkbun.com/account/credit (or auto top-up, set in their API settings, for next time).",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
@@ -158,6 +180,8 @@ const get_auto_topup: Tool = {
   name: "get_auto_topup",
   description:
     "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount added, whether a payment method is actually on file, and `effectiveAmount` \u2014 what `top_up_account_credit` would charge right now. If `paymentMethodOnFile` is false the settings are inert: nothing can be charged and auto top-up will never fire, and a card can only be saved on porkbun.com, never through the API.",
+  hostedDescription:
+    "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount it adds, and whether a payment method is actually on file (`paymentMethodOnFile`). Read-only. Auto top-up is a standing rule the account holder sets in their API settings (https://porkbun.com/account/api); when it is on, an order that leaves the balance under the threshold refills it from their saved card. If `paymentMethodOnFile` is false, it can never fire. Changing these settings, or charging a card, is not available through this connector.",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
@@ -786,7 +810,7 @@ const DNS_RECORD_TYPES = [
 const register_domain: Tool = {
   name: "register_domain",
   description:
-    "**Spends account credit.** Registers a new domain on the authenticated Porkbun account. The `cost` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time.",
+    "**Spends account credit.** Registers a new domain on the authenticated Porkbun account. The `cost` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL,
   inputSchema: {
     domain: z
       .string()
@@ -822,7 +846,7 @@ const register_domain: Tool = {
 const renew_domain: Tool = {
   name: "renew_domain",
   description:
-    "**Spends account credit.** Renews an existing domain in the authenticated account. The `cost` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time.",
+    "**Spends account credit.** Renews an existing domain in the authenticated account. The `cost` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL,
   inputSchema: {
     domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
     cost: z
@@ -851,7 +875,7 @@ const renew_domain: Tool = {
 const transfer_domain: Tool = {
   name: "transfer_domain",
   description:
-    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time.",
+    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to transfer in, e.g. `example.com`"),
     cost: z
@@ -2193,3 +2217,21 @@ export const tools: Tool[] = [
   edit_cloudflare_record,
   delete_cloudflare_record,
 ];
+
+// Tools that spend credit share FUNDING_LOCAL; their hosted text swaps in
+// FUNDING_HOSTED, so nothing hosted points at a card-charging tool.
+for (const t of tools) {
+  if (!t.hostedDescription && t.description.includes(FUNDING_LOCAL)) {
+    t.hostedDescription = t.description.replace(FUNDING_LOCAL, FUNDING_HOSTED);
+  }
+}
+
+// Hosted connections are always live keys, so the sandbox route does not exist there.
+const createWebhook = tools.find((t) => t.name === "create_webhook");
+if (createWebhook && !createWebhook.hostedDescription) {
+  createWebhook.hostedDescription = createWebhook.description.replace(
+    " or a sandbox key with sandbox_trigger_webhook.",
+    ", or the local npm package with a sandbox key, which can fire test events on demand."
+  );
+}
+

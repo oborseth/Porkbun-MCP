@@ -50,11 +50,20 @@ const TOKEN_CACHE_MS = 30_000;
 // Tools that only make sense with a sandbox key, or that hand out keys. A hosted
 // connection is always a live bearer token, so these would either fail or mint
 // credentials into a chat transcript for no purpose.
+//
+// And no tool that charges a card. Anthropic's directory policy (section 4.A)
+// bars software that "transfers money ... or executes financial transactions on
+// behalf of users", and the Claude apps refuse to charge a card to fund an
+// account even when the user asks. Buying with credit already on the account is
+// unaffected. Funding stays with the account holder (the website, or auto
+// top-up they configure there); tool text says so via hostedDescription.
 const HOSTED_EXCLUDE = new Set([
   "create_sandbox_key",
   "sandbox_topup",
   "sandbox_reset",
   "sandbox_trigger_webhook",
+  "top_up_account_credit",
+  "configure_auto_topup",
 ]);
 
 const baseConfig: PorkbunConfig = { ...loadConfig(), apiKey: "", secretApiKey: "" };
@@ -216,7 +225,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, (e as Error).message === "too_large" ? 413 : 400, { error: (e as Error).message });
     }
 
-    const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), { exclude: HOSTED_EXCLUDE });
+    const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), { exclude: HOSTED_EXCLUDE, hosted: true });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
 
     res.on("close", () => {

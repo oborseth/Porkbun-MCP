@@ -3,7 +3,7 @@ import type { PorkbunConfig } from "./api.js";
 import { tools } from "./tools.js";
 
 export const SERVER_NAME = "porkbun-mcp";
-export const SERVER_VERSION = "0.30.1";
+export const SERVER_VERSION = "0.30.2";
 
 // Human-readable display title for each tool, derived from its snake_case name
 // (domain acronyms kept upper-case). Every tool in the Connectors Directory must
@@ -24,6 +24,8 @@ function deriveTitle(name: string): string {
 export interface BuildOptions {
   /** Tool names to leave out of this server (e.g. sandbox-only tools when hosted). */
   exclude?: Set<string>;
+  /** Hosted connector: use each tool's hostedDescription where it has one. */
+  hosted?: boolean;
 }
 
 /**
@@ -44,7 +46,7 @@ export function buildServer(getConfig: () => PorkbunConfig, opts: BuildOptions =
       tool.name,
       {
         title,
-        description: tool.description,
+        description: (opts.hosted && tool.hostedDescription) || tool.description,
         inputSchema: tool.inputSchema,
         annotations: { ...(tool.annotations ?? {}), title },
       },
