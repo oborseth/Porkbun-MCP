@@ -49,6 +49,11 @@ const prmUrlFor = (p: Profile) => (p.path === "/mcp" ? PRM_BASE : `${PRM_BASE}${
 const SCOPES = ["api", "offline_access"];
 const MAX_BODY = 1024 * 1024;
 const TOKEN_CACHE_MS = 30_000;
+// OpenAI's app-directory domain verification: the portal issues a token that
+// must be served, alone and verbatim, at /.well-known/openai-apps-challenge on
+// the MCP host. Kept in the env file so a new token is a config change plus a
+// restart, not a code change.
+const OPENAI_APPS_CHALLENGE = (process.env.OPENAI_APPS_CHALLENGE || "").trim();
 
 // Which tools each URL path offers (full set, or minus what a directory listing
 // forbids) lives in profiles.ts. Every path shares the same OAuth server, tokens
@@ -182,6 +187,11 @@ const server = http.createServer(async (req, res) => {
       const p = PROFILE_BY_PATH.get(suffix);
       if (!p) return send(res, 404, { error: "not_found" });
       return send(res, 200, protectedResourceMetadata(p), { "Cache-Control": "public, max-age=3600" });
+    }
+
+    if (req.method === "GET" && path === "/.well-known/openai-apps-challenge") {
+      if (!OPENAI_APPS_CHALLENGE) return send(res, 404, "not configured");
+      return send(res, 200, OPENAI_APPS_CHALLENGE);
     }
 
     if (req.method === "GET" && path === "/health") {

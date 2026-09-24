@@ -10,7 +10,13 @@ export interface ToolAnnotations {
   destructiveHint?: boolean;
   /** True if calling the tool repeatedly with the same args has the same effect as calling once. */
   idempotentHint?: boolean;
-  /** True if the tool interacts with state outside the MCP server (the real world / network). */
+  /**
+   * OpenAI's reading, which its app review checks: true only when the tool
+   * reaches the public internet or open-ended external entities (an arbitrary
+   * domain, a URL the user supplies, a third party's inventory or registrar);
+   * false when it is bounded to the user's own account, even though the data
+   * lives on Porkbun's servers.
+   */
   openWorldHint?: boolean;
 }
 
@@ -76,7 +82,7 @@ const ping: Tool = {
   description:
     "Verify the Porkbun API connection and credentials. Returns the caller's public IP and whether the API key is valid. Use this as a first sanity check before making other calls.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/ping", { method: "POST" });
   },
@@ -129,7 +135,7 @@ const get_registration_requirements: Tool = {
   inputSchema: {
     tld: z.string().min(2).describe("TLD without a leading dot, e.g. `com`, `us`, `ca`."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const tld = String(args.tld).toLowerCase().replace(/^\.+/, "");
     return await call(config, `/domain/getRegistrationRequirements/${encodeURIComponent(tld)}`, {
@@ -154,7 +160,7 @@ const list_domains: Tool = {
     start: z.number().int().min(0).optional().describe("Pagination offset. Default 0."),
     include_labels: z.boolean().optional().describe("Include user-defined domain labels in the response."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const params = new URLSearchParams();
     if (args.domain) params.set("domain", String(args.domain));
@@ -182,7 +188,7 @@ const get_domain: Tool = {
     domain: z.string().min(3).describe("Fully qualified domain name in the account, e.g. `example.com`"),
     include_labels: z.boolean().optional().describe("Include user-defined domain labels in the response."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const qs = args.include_labels ? "?includeLabels=yes" : "";
@@ -195,7 +201,7 @@ const get_balance: Tool = {
   description:
     "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Call it before offering to buy anything: a purchase is paid from this prepaid balance, not charged to a card, so this number decides whether a registration, renewal or transfer goes through as-is. If it is short and the account has a saved card, `top_up_account_credit` adds credit in one call (ask the user first, with the amount); `get_auto_topup` reports whether a card is on file. Without a card, or if you do not charge cards on a user's behalf, the user adds credit with **buy account credit** at https://porkbun.com/account/credit.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/account/balance", { method: "GET" });
   },
@@ -206,7 +212,7 @@ const get_auto_topup: Tool = {
   description:
     "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount added, whether a payment method is actually on file, and `effectiveAmount` \u2014 what `top_up_account_credit` would charge right now. If `paymentMethodOnFile` is false the settings are inert: nothing can be charged and auto top-up will never fire, and a card can only be saved on porkbun.com, never through the API.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/account/autoTopup", { method: "GET" });
   },
@@ -238,7 +244,7 @@ const configure_auto_topup: Tool = {
     amount: legacyCents("amount_cents"),
     dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.enabled !== undefined) body.enabled = args.enabled;
@@ -266,7 +272,7 @@ const top_up_account_credit: Tool = {
     amount: legacyCents("amount_cents"),
     dry_run: z.boolean().optional().describe("If true, report what would be charged without charging it."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     const amount = pickCents(args, "amount_cents", "amount");
@@ -289,7 +295,7 @@ const create_sandbox_key: Tool = {
   inputSchema: {
     name: z.string().max(255).optional().describe("Optional label/title for the sandbox key."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { sandbox: true };
     if (args.name) body.name = args.name;
@@ -305,7 +311,7 @@ const sandbox_topup: Tool = {
     amount_cents: z.number().int().positive().optional().describe("Fake credit to add (default 100000 = $1000; max 1000000)." + CENTS_EXAMPLE),
     amount: legacyCents("amount_cents"),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     const amount = pickCents(args, "amount_cents", "amount");
@@ -319,7 +325,7 @@ const sandbox_reset: Tool = {
   description:
     "SANDBOX ONLY. Wipe the sandbox account's simulated state (domains, DNS, orders, credit) and re-grant $1000 fake credit — a clean slate between test runs. Requires a sandbox API key (`pk1_sb_…`). With a live key this endpoint is not available.",
   inputSchema: {},
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/sandbox/reset", { method: "POST" });
   },
@@ -362,7 +368,7 @@ const mock_call: Tool = {
       .describe("The real endpoint path to mock, without leading slash — e.g. `domain/listAll`. Omit to list all mockable endpoints."),
     error: z.boolean().optional().describe("Return the error-response shape instead of success."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     let path = "/mock";
     if (args.path) path += "/" + String(args.path).replace(/^\/+/, "");
@@ -376,7 +382,7 @@ const get_pricing: Tool = {
   description:
     "Get current Porkbun pricing for all supported TLDs. Returns registration, renewal, and transfer prices per TLD in USD. No authentication required. Useful when an agent needs to compare TLD costs before registering. Note: this returns standard pricing only — premium domains have their own per-domain pricing reported by check_domain.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/pricing/get", { method: "POST" });
   },
@@ -392,7 +398,7 @@ const list_dns_records: Tool = {
       .min(3)
       .describe("Fully qualified domain name registered at Porkbun, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/retrieve/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -441,7 +447,7 @@ const import_dns_records: Tool = {
       .optional()
       .describe("Exact records to create. Omit to import what a live scan of the domain finds."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -610,7 +616,7 @@ const get_ssl_bundle: Tool = {
       .min(3)
       .describe("Fully qualified domain name registered at Porkbun, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/ssl/retrieve/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -624,7 +630,7 @@ const get_nameservers: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getNs/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -638,7 +644,7 @@ const list_url_forwards: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getUrlForwarding/${encodeURIComponent(domain)}`, {
@@ -654,7 +660,7 @@ const list_dnssec_records: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/getDnssecRecords/${encodeURIComponent(domain)}`, {
@@ -668,7 +674,7 @@ const list_transfers: Tool = {
   description:
     "List all in-progress and recent inbound domain transfers for the authenticated account. Returns each transfer's domain, status (`NEW`, `PENDINGAUTH`, `PENDINGSUBMIT`, `PENDINGTRANSFER`, `DONE`, `CANCELED`, etc.), and create date. Use this to monitor transfers initiated by `transfer_domain`.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/domain/listTransfers", { method: "GET" });
   },
@@ -681,7 +687,7 @@ const get_transfer_status: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose transfer status to check, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getTransfer/${encodeURIComponent(domain)}`, {
@@ -736,7 +742,7 @@ const get_api_settings: Tool = {
   description:
     "Get the authenticated account's API spend control configuration: monthly spend limit, low-balance alert threshold, auto top-up settings, and current month's API spend total. All amounts are in cents. Useful for an agent to check budget headroom before initiating expensive operations — `register_domain` will be hard-blocked if it would push monthly spend over the configured limit.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/account/apiSettings", { method: "GET" });
   },
@@ -749,7 +755,7 @@ const list_glue_records: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Domain to list glue records for, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getGlue/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -771,7 +777,7 @@ const create_glue_record: Tool = {
       .min(1)
       .describe("Array of IPv4 and/or IPv6 addresses to associate with the host."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const subdomain = String(args.subdomain).toLowerCase();
@@ -795,7 +801,7 @@ const update_glue_record: Tool = {
       .min(1)
       .describe("Full replacement set of IPv4/IPv6 addresses for the host."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const subdomain = String(args.subdomain).toLowerCase();
@@ -815,7 +821,7 @@ const delete_glue_record: Tool = {
     domain: z.string().min(3).describe("Parent domain, e.g. `example.com`"),
     subdomain: z.string().min(1).describe("Host portion only, e.g. `ns1`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const subdomain = String(args.subdomain).toLowerCase();
@@ -870,7 +876,7 @@ const register_domain: Tool = {
         "If true, validate everything (availability, price match, eligibility, funds, spend limit) and return a preview with `dryRun: true` and `wouldSucceed` WITHOUT registering or charging. Use to safely confirm before committing."
       ),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), agreeToTerms: "yes" };
@@ -901,7 +907,7 @@ const renew_domain: Tool = {
       .optional()
       .describe("If true, validate and preview (`dryRun: true`, `wouldSucceed`) WITHOUT renewing or charging."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true) };
@@ -964,7 +970,7 @@ const update_auto_renew: Tool = {
       .enum(["on", "off"])
       .describe("`on` enables auto-renew, `off` disables it."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/updateAutoRenew/${encodeURIComponent(domain)}`, {
@@ -1003,7 +1009,7 @@ const list_dns_restore_points: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose zone history to list, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/history/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1021,7 +1027,7 @@ const diff_dns_restore_point: Tool = {
       .int()
       .describe("Restore point id from `list_dns_restore_points`."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(
@@ -1051,7 +1057,7 @@ const restore_dns_zone: Tool = {
       .optional()
       .describe("If true, report what would change without changing anything."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { snapshotId: args.snapshot_id };
@@ -1095,7 +1101,7 @@ const create_dns_record: Tool = {
       .optional()
       .describe("If true, validate only — returns wouldSucceed without creating the record."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -1135,7 +1141,7 @@ const update_dns_record: Tool = {
       .optional()
       .describe("If true, validate only — confirms the record exists and is editable, returns wouldSucceed without changing it."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const recordId = String(args.record_id);
@@ -1167,7 +1173,7 @@ const delete_dns_record: Tool = {
       .optional()
       .describe("If true, validate only — confirms the record exists and is deletable, returns wouldSucceed without deleting it."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const recordId = String(args.record_id);
@@ -1199,7 +1205,7 @@ const create_dnssec_record: Tool = {
     keyDataAlgo: z.string().optional().describe("DNSKEY algorithm (optional)."),
     keyDataPubKey: z.string().optional().describe("Base64-encoded public key (optional)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -1227,7 +1233,7 @@ const delete_dnssec_record: Tool = {
     domain: z.string().min(3).describe("Domain to remove the DS record from."),
     keyTag: z.string().describe("Key tag of the DS record to remove (from `list_dnssec_records`)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const keyTag = String(args.keyTag);
@@ -1269,7 +1275,7 @@ const create_url_forward: Tool = {
       .optional()
       .describe("Subdomain prefix to forward. Empty/omitted = the apex (root domain). Examples: `www`, `shop`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -1299,7 +1305,7 @@ const delete_url_forward: Tool = {
       .min(1)
       .describe("Numeric forward record ID from `list_url_forwards`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const recordId = String(args.record_id);
@@ -1329,7 +1335,7 @@ const update_nameservers: Tool = {
       .optional()
       .describe("If true, validate only — returns wouldSucceed without changing the nameservers."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { ns: args.nameservers };
@@ -1369,7 +1375,7 @@ const get_contacts: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getContacts/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1403,7 +1409,7 @@ const update_contacts: Tool = {
       .optional()
       .describe("For a registrant change on an address-validated TLD (.de/.nrw/.uk/.us/.ca/.nyc/.au/.eu/.in/.nz families) after an ADDRESS_VALIDATION_REQUIRED response: 'accept_suggestion' saves the standardized suggestedAddress returned there; 'use_as_entered' keeps the submitted address (rejected if a real correction was offered)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -1426,7 +1432,7 @@ const list_hosting_plans: Tool = {
   description:
     "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost_cents` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Currently Secure Static Hosting; more products are added over time.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/hosting/plans", { method: "GET" });
   },
@@ -1447,7 +1453,7 @@ const create_hosting: Tool = {
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
     dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { sku: args.sku, acknowledgedCost: pickCents(args, "acknowledged_cost_cents", "acknowledged_cost", true), agreeToTerms: args.agree_to_terms };
@@ -1462,7 +1468,7 @@ const get_hosting: Tool = {
   description:
     "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting.",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/get/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1485,7 +1491,7 @@ const deploy_site: Tool = {
       .min(1)
       .describe("Files to upload."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/deploy/${encodeURIComponent(domain)}`, { method: "POST", body: { files: args.files } });
@@ -1499,7 +1505,7 @@ const list_hosting_files: Tool = {
     domain: z.string().min(3).describe("Domain whose hosting files to list."),
     path: z.string().optional().describe("Subdirectory to list (default: root)."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -1515,7 +1521,7 @@ const delete_hosting_file: Tool = {
     domain: z.string().min(3).describe("Domain whose hosting file to delete."),
     path: z.string().min(1).describe("Path to delete, e.g. `old/page.html`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/deleteFile/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
@@ -1530,7 +1536,7 @@ const make_hosting_dir: Tool = {
     domain: z.string().min(3).describe("Domain whose hosting to create the directory in."),
     path: z.string().min(1).describe("Directory path to create, e.g. `assets/img`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/makeDir/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
@@ -1548,7 +1554,7 @@ const create_wp_credentials: Tool = {
     name: z.string().max(40).optional().describe("Label shown in wp-admin (letters, digits, dashes), e.g. `Acme-Agent`."),
     dry_run: z.boolean().optional().describe("Validate without creating anything."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -1568,7 +1574,7 @@ const list_wp_credentials: Tool = {
     domain: z.string().min(3).describe("Domain whose WordPress site to inspect."),
     wp_user: z.string().optional().describe("WordPress username (defaults to the dedicated `porkbun-agent` user)."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const qs = args.wp_user ? `?wpUser=${encodeURIComponent(String(args.wp_user))}` : "";
@@ -1587,7 +1593,7 @@ const delete_wp_credentials: Tool = {
     wp_user: z.string().optional().describe("WordPress username (defaults to `porkbun-agent`)."),
     dry_run: z.boolean().optional().describe("Validate without revoking."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -1604,7 +1610,7 @@ const delete_hosting: Tool = {
   description:
     "Deprovision (cancel) Secure Static Hosting for a domain; teardown is scheduled by Porkbun. Note: the domain has already used its one free trial, so provisioning it again later will be charged (no second free trial).",
   inputSchema: { domain: z.string().min(3).describe("Domain to deprovision hosting for.") },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/delete/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true });
@@ -1618,7 +1624,7 @@ const get_webhook_event_types: Tool = {
   description:
     "List the event types you can subscribe a webhook endpoint to. Returns event-type strings like `domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, and `dns.record.created|updated|deleted`. Use these values (or `*` for all, or a prefix wildcard like `dns.*`) when calling create_webhook.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/webhook/eventTypes", { method: "GET" });
   },
@@ -1629,7 +1635,7 @@ const list_webhooks: Tool = {
   description:
     "List the webhook endpoints registered on the authenticated account. Each endpoint includes its id, URL, subscribed events, status (ACTIVE|DISABLED), consecutive failure count, last success/failure timestamps, last error, and signing secret. Porkbun POSTs a signed JSON payload to each endpoint when subscribed events occur; deliveries are signed with the endpoint's secret via HMAC-SHA256 over `{timestamp}.{rawBody}` and sent in the `X-Porkbun-Signature` header.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/webhook/list", { method: "GET" });
   },
@@ -1642,7 +1648,7 @@ const get_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id (from list_webhooks or create_webhook)."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     return await call(config, `/webhook/get/${encodeURIComponent(String(args.id))}`, { method: "GET" });
   },
@@ -1701,7 +1707,7 @@ const rotate_webhook_secret: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     return await call(config, "/webhook/rotateSecret", { method: "POST", body: { id: args.id } });
   },
@@ -1727,7 +1733,7 @@ const delete_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id to delete."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     return await call(config, "/webhook/delete", { method: "POST", body: { id: args.id } });
   },
@@ -1746,7 +1752,7 @@ const list_webhook_deliveries: Tool = {
     start: z.number().int().min(0).optional().describe("Offset for pagination (default 0)."),
     limit: z.number().int().min(1).max(200).optional().describe("Page size, 1-200 (default 50)."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const params = new URLSearchParams();
     if (args.endpointId !== undefined) params.set("endpointId", String(args.endpointId));
@@ -1765,7 +1771,7 @@ const get_webhook_delivery: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The delivery id."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     return await call(config, `/webhook/delivery/${encodeURIComponent(String(args.id))}`, { method: "GET" });
   },
@@ -1803,7 +1809,7 @@ const list_doc_topics: Tool = {
   description:
     "List the available Porkbun API documentation topics. Returns the docs index (Markdown) — every per-topic page (e.g. dns, domain, webhooks, ssl, pricing) with a one-line description and endpoint count, plus links to the full reference and the OpenAPI spec. Use this first to discover what docs exist, then read_doc to read one. Grounds an agent in Porkbun's own docs without leaving the conversation.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     const text = await fetchDoc(config, "/llms");
     return { topic: "index", url: `${config.docsBaseUrl}/llms`, content: text };
@@ -1820,7 +1826,7 @@ const read_doc: Tool = {
       .min(1)
       .describe("Doc topic, e.g. `dns`, `webhooks`, `domain`; or `overview` / `full` / `index`."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const topic = String(args.topic);
     const path = docPathForTopic(topic);
@@ -1849,7 +1855,7 @@ const search_docs: Tool = {
       .optional()
       .describe("Max sections to return (default 6)."),
   },
-  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const query = String(args.query);
     const limit = typeof args.limit === "number" ? args.limit : 6;
@@ -1904,7 +1910,7 @@ const get_cloudflare_connection: Tool = {
   description:
     "Check whether this Porkbun account is connected to a Cloudflare account, and which one. THIS IS THE POLL TARGET for the connect flow. Connecting is a HUMAN action: Cloudflare's consent screen must be completed in a browser and the authorization is bound to the Porkbun web session that starts it, so it cannot be driven over the API. When `connected` is false the response includes a `connectUrl` — show that URL to the user, ask them to authorize, then call this tool again every few seconds until `connected` is true. Everything else in the Cloudflare flow is fully automatable once this is true.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => await call(config, `/cloudflare/getConnection`, { method: "GET" }),
 };
 
@@ -1913,7 +1919,7 @@ const list_cloudflare_inventory: Tool = {
   description:
     "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers, uses Porkbun hosting, etc). Read this BEFORE queueing so you can tell the user what will move and what won't. Works even when the Cloudflare account isn't connected yet, so you can plan while the user authorizes.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => await call(config, `/cloudflare/inventory`, { method: "GET" }),
 };
 
@@ -1925,7 +1931,7 @@ const connect_domains_to_cloudflare: Tool = {
     domains: z.array(z.string()).min(1).max(500).describe("Domain names to move into the customer's Cloudflare account."),
     dry_run: z.boolean().optional().describe("Preview the per-domain verdicts without queueing anything."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { domains: (args.domains as string[]).map((d) => String(d).toLowerCase()) };
     if (args.dry_run) body.dryRun = true;
@@ -1938,7 +1944,7 @@ const get_cloudflare_queue: Tool = {
   description:
     "List every Cloudflare move this account has requested, with per-domain status and message. Use this to poll progress after connect_domains_to_cloudflare. Queue rows are never deleted, so this is also the audit trail of past moves.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => await call(config, `/cloudflare/getQueue`, { method: "GET" }),
 };
 
@@ -1947,7 +1953,7 @@ const get_cloudflare_domain_status: Tool = {
   description:
     "Get the Cloudflare move status for ONE domain, including the Cloudflare zone id once created and the nameservers Porkbun replaced (kept so the move can be undone). Returns NOT_QUEUED if the domain has never been queued.",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/cloudflare/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -1960,7 +1966,7 @@ const retry_cloudflare_domain: Tool = {
     domain: z.string().min(3).describe("Domain to re-queue."),
     dry_run: z.boolean().optional().describe("Validate without re-queueing."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
@@ -1976,7 +1982,7 @@ const rollback_cloudflare_domain: Tool = {
     domain: z.string().min(3).describe("Domain whose move should be undone."),
     dry_run: z.boolean().optional().describe("Validate without changing nameservers."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
@@ -1989,7 +1995,7 @@ const disconnect_cloudflare: Tool = {
   description:
     "Remove this account's stored Cloudflare connection. Domains already moved stay on Cloudflare and keep resolving — this only stops Porkbun making further changes on the customer's behalf. Reconnecting requires the human browser authorization again, so confirm before calling.",
   inputSchema: { dry_run: z.boolean().optional().describe("Validate without disconnecting.") },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
@@ -2002,7 +2008,7 @@ const get_cloudflare_records: Tool = {
   description:
     "List a domain's LIVE DNS records as Cloudflare holds them, each with its orange-cloud (`proxied`) state and whether it is `proxiable` at all. Once a domain has moved to Cloudflare THIS is the authoritative record set — list_dns_records reads the Porkbun zone, which is no longer answering queries for it. Returns ZONE_NOT_READY if the zone does not exist yet.",
   inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/cloudflare/getRecords/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2017,7 +2023,7 @@ const set_cloudflare_proxy: Tool = {
     records: z.array(z.string()).optional().describe('Optional: limit to these names. "@" = apex; bare labels are expanded (e.g. ["@","www"]).'),
     dry_run: z.boolean().optional().describe("Preview which records would change, without changing them."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { enabled: !!args.enabled };
     if (args.records) body.records = args.records;
@@ -2031,7 +2037,7 @@ const preview_cloudflare_move: Tool = {
   description:
     "Show exactly which DNS records would be copied into Cloudflare for a domain, and which would be dropped, WITHOUT queueing anything. Use this to tell a user what a move will do to their DNS before committing. Records are always created DNS-only (grey cloud); proxying is a separate step via set_cloudflare_proxy.",
   inputSchema: { domain: z.string().min(3).describe("Domain to preview.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/cloudflare/preview/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2041,7 +2047,7 @@ const get_cloudflare_zone: Tool = {
   description:
     "Get what CLOUDFLARE currently says about a domain's zone (status, paused, its nameservers, activation date) rather than what Porkbun's queue row remembers. These drift: if someone repoints the nameservers elsewhere after the move, the Porkbun row still says done while Cloudflare has stopped serving the domain. The response includes the live public nameservers and a `nameserversDrifted` boolean so you don't have to diff them yourself.",
   inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/cloudflare/getZone/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2051,7 +2057,7 @@ const get_cloudflare_zone_settings: Tool = {
   description:
     "Read the Cloudflare zone settings that matter after a move: ssl mode, always_use_https, automatic_https_rewrites, min_tls_version, development_mode, cache_level. Warns when SSL mode is `off` or `flexible`, which means Cloudflare fetches the origin over plain HTTP while visitors still see a padlock. If this returns CLOUDFLARE_REAUTHORIZE_REQUIRED the customer's Cloudflare connection predates this permission — show them the connectUrl and ask them to reconnect (one click; domains already moved are unaffected).",
   inputSchema: { domain: z.string().min(3).describe("Domain whose zone settings to read.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/cloudflare/getZoneSettings/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2070,7 +2076,7 @@ const set_cloudflare_zone_settings: Tool = {
     cache_level: z.enum(["aggressive", "basic", "simplified"]).optional(),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     for (const k of ["ssl", "always_use_https", "automatic_https_rewrites", "min_tls_version", "development_mode", "cache_level"]) {
@@ -2097,7 +2103,7 @@ const create_cloudflare_record: Tool = {
     data: z.record(z.string(), z.any()).optional().describe("Structured value for SRV/CAA/etc, shaped as Cloudflare documents it."),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const { domain, dry_run, ...rest } = args as Record<string, unknown>;
     const body: Record<string, unknown> = { ...rest };
@@ -2123,7 +2129,7 @@ const edit_cloudflare_record: Tool = {
     data: z.record(z.string(), z.any()).optional(),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const { domain, record_id, dry_run, ...rest } = args as Record<string, unknown>;
     const body: Record<string, unknown> = { ...rest };
@@ -2141,7 +2147,7 @@ const delete_cloudflare_record: Tool = {
     record_id: z.string().describe("Cloudflare record id from get_cloudflare_records."),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
