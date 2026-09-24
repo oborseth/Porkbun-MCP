@@ -132,19 +132,15 @@ address.
 
 ## Tools
 
-Everything in the npm package except:
+Everything in the npm package except the four sandbox-only ones
+(`create_sandbox_key`, `sandbox_topup`, `sandbox_reset`, `sandbox_trigger_webhook`):
+a hosted connection is always a live account.
 
-- the four sandbox-only ones (`create_sandbox_key`, `sandbox_topup`,
-  `sandbox_reset`, `sandbox_trigger_webhook`): a hosted connection is always a
-  live account;
-- the two that charge a card (`top_up_account_credit`, `configure_auto_topup`).
-  Anthropic's directory policy (section 4.A) bars software that moves money on a
-  user's behalf, and the Claude apps refuse to charge a card to fund an account
-  even when asked. Buying with credit already on the account is unaffected.
-  `get_auto_topup` stays (read-only).
-
-Tools whose text mentions funding carry a `hostedDescription` (see
-`src/tools.ts`), so hosted assistants tell the user to add credit themselves
-instead of reaching for a tool that is not there. The API does the same for
-connector traffic: its `INSUFFICIENT_FUNDS` hint never says to call
-`/account/topup`.
+The card-charging tools (`top_up_account_credit`, `configure_auto_topup`) are
+included on purpose: some clients use them with the user's OK. Others will not
+(the Claude apps refuse to charge a card to fund an account), so the funding
+text on every purchase tool, and the API's `INSUFFICIENT_FUNDS` hint, end with a
+fallback: tell the user the shortfall and send them to "buy account credit".
+Note for the Claude directory submission: its policy (section 4.A) bars
+software that "transfers money ... on behalf of users", which these two tools
+may be read as.

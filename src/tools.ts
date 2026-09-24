@@ -21,26 +21,19 @@ export interface Tool<S extends ZodRawShape = ZodRawShape> {
   annotations?: ToolAnnotations;
   /**
    * Description for the hosted connector (mcp.porkbun.com), when it must differ:
-   * the hosted server leaves out the tools that charge a card, so text that
-   * points at them would send the assistant after a tool that is not there.
+   * the hosted server leaves out the sandbox-only tools, so text that points at
+   * them would send the assistant after a tool that is not there.
    */
   hostedDescription?: string;
   handler: (config: PorkbunConfig, args: Record<string, unknown>) => Promise<unknown>;
 }
 
-// How a purchase is funded, in the two flavours of this server. Shared by every
-// tool that spends credit so the wording cannot drift between them.
-//
-// The hosted connector (ChatGPT, Claude) has no card-charging tools at all:
-// Anthropic's directory policy bars software that moves money on a user's
-// behalf, and the Claude apps refuse to charge a card even when asked. Buying
-// with credit the user already has is fine there, so a shortfall is handed back
-// to the user to fund themselves.
+// How a purchase is funded. Shared by every tool that spends credit so the
+// wording cannot drift between them. The last sentence matters: some assistants
+// (the Claude apps, for one) will not charge a card on a user's behalf, and they
+// need a correct next step too.
 const FUNDING_LOCAL =
-  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time.";
-
-const FUNDING_HOSTED =
-  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). Adding money is the account holder's step, not yours: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. For next time, auto top-up in their API settings (https://porkbun.com/account/api) refills the balance from their saved card on its own.";
+  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
 
 // ─── Read-only tools ────────────────────────────────────────────────────────
 
@@ -166,9 +159,7 @@ const get_domain: Tool = {
 const get_balance: Tool = {
   name: "get_balance",
   description:
-    "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Call it before offering to buy anything: a purchase is paid from this prepaid balance, not charged to a card, so this number decides whether a registration, renewal or transfer goes through as-is. If it is short and the account has a saved card, `top_up_account_credit` adds credit in one call (ask the user first, with the amount); `get_auto_topup` reports whether a card is on file. Without a card, credit is added at https://porkbun.com/account/credit.",
-  hostedDescription:
-    "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Call it before offering to buy anything: a purchase is paid from this prepaid balance, not charged to a card, so this number decides whether a registration, renewal or transfer goes through. If it is short, tell the user by how much; adding money is their step, with **buy account credit** at https://porkbun.com/account/credit (or auto top-up, set in their API settings, for next time).",
+    "Get the available account credit balance for the authenticated Porkbun account. Returns the balance in cents (integer) and a human-readable display string (e.g. `$12.34`). Call it before offering to buy anything: a purchase is paid from this prepaid balance, not charged to a card, so this number decides whether a registration, renewal or transfer goes through as-is. If it is short and the account has a saved card, `top_up_account_credit` adds credit in one call (ask the user first, with the amount); `get_auto_topup` reports whether a card is on file. Without a card, or if you do not charge cards on a user's behalf, the user adds credit with **buy account credit** at https://porkbun.com/account/credit.",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
@@ -180,8 +171,6 @@ const get_auto_topup: Tool = {
   name: "get_auto_topup",
   description:
     "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount added, whether a payment method is actually on file, and `effectiveAmount` \u2014 what `top_up_account_credit` would charge right now. If `paymentMethodOnFile` is false the settings are inert: nothing can be charged and auto top-up will never fire, and a card can only be saved on porkbun.com, never through the API.",
-  hostedDescription:
-    "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount it adds, and whether a payment method is actually on file (`paymentMethodOnFile`). Read-only. Auto top-up is a standing rule the account holder sets in their API settings (https://porkbun.com/account/api); when it is on, an order that leaves the balance under the threshold refills it from their saved card. If `paymentMethodOnFile` is false, it can never fire. Changing these settings, or charging a card, is not available through this connector.",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
@@ -2217,14 +2206,6 @@ export const tools: Tool[] = [
   edit_cloudflare_record,
   delete_cloudflare_record,
 ];
-
-// Tools that spend credit share FUNDING_LOCAL; their hosted text swaps in
-// FUNDING_HOSTED, so nothing hosted points at a card-charging tool.
-for (const t of tools) {
-  if (!t.hostedDescription && t.description.includes(FUNDING_LOCAL)) {
-    t.hostedDescription = t.description.replace(FUNDING_LOCAL, FUNDING_HOSTED);
-  }
-}
 
 // Hosted connections are always live keys, so the sandbox route does not exist there.
 const createWebhook = tools.find((t) => t.name === "create_webhook");
