@@ -40,7 +40,7 @@ email arrives with a Case ID; quote it in any follow-up.
 > when they renew, and manage DNS records, nameservers, URL forwarding, glue
 > records and DNSSEC. Before a risky change, preflight a domain to see what would
 > break, and roll a DNS zone back to an earlier restore point if something goes
-> wrong. You can also manage Porkbun hosting sites, SSL certificates, webhooks,
+> wrong. You can also manage Porkbun hosting sites, webhooks,
 > and domains connected to your own Cloudflare account.
 >
 > You sign in with your Porkbun account and approve access; ChatGPT never sees a
@@ -221,7 +221,7 @@ restrictions apply as usual; do not select embargoed regions.
 > Initial submission of the Porkbun app: a hosted MCP server
 > (`https://mcp.porkbun.com/mcp/no-purchases`) that lets a signed-in Porkbun
 > customer manage the domains they own: availability and pricing lookups, DNS,
-> nameservers, URL forwarding, glue, DNSSEC, DNS restore points, hosting, SSL,
+> nameservers, URL forwarding, glue, DNSSEC, DNS restore points, hosting,
 > webhooks and Cloudflare-connected domains. Sign-in is OAuth 2.1 with PKCE
 > against porkbun.com; each connection is its own revocable API key limited by
 > the account's API settings. This path deliberately exposes no purchasing

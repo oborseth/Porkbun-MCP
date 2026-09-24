@@ -44,6 +44,8 @@ export interface Profile {
    * describe the endpoint; only its signing secret is withheld).
    */
   redactKeys?: string[];
+  /** Appended to any remaining tool whose text mentions a redacted field, so it does not promise one. */
+  redactNote?: string;
 }
 
 /** Replace the named keys anywhere in a tool result. Returns a new value. */
@@ -97,6 +99,7 @@ export const PROFILES: Profile[] = [
     path: "/mcp/no-purchases",
     exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES, ...SECRETS, ...CREDENTIAL_INPUTS]),
     redactKeys: ["secret"],
+    redactNote: "On this connection the webhook signing secret is not returned: the `secret` field holds a note instead. The user sees or rotates the secret in their Porkbun API settings (https://porkbun.com/account/api).",
     note: "On this connection nothing can be bought: registering, renewing or transferring domains, buying closeouts and starting hosting are done by the user on porkbun.com, and the tools named above for them are not available here. Share prices and availability, then let the user complete it at https://porkbun.com, or point them to " + FULL + ".",
     instructions:
       "This is the ChatGPT app directory version of Porkbun's connector. To follow the directory's rules it leaves out two kinds of tools: anything that buys (registering, renewing or transferring domains, buying closeouts, starting hosting, adding account credit), and anything that returns a secret (SSL certificate private keys, WordPress application passwords, webhook signing secrets; webhook details are shown with the secret hidden, and webhooks are created or their secrets rotated in the user's Porkbun API settings). Everything else works: availability and pricing, DNS, nameservers, forwarding, glue, DNSSEC, restore points, hosting sites, webhooks and Cloudflare. When the user asks for something this version leaves out, say so plainly and offer both routes: do it on porkbun.com, or use " + FULL + ", which includes those tools.",
@@ -115,6 +118,10 @@ export function describeFor(profile: Profile, name: string, description: string)
 
   let d = description;
   if (profile.funding && d.includes(FUNDING_LOCAL)) d = d.replace(FUNDING_LOCAL, profile.funding);
+
+  if (profile.redactNote && profile.redactKeys?.some((k) => new RegExp(`\\b${k}\\b`, "i").test(d))) {
+    d += `\n\n${profile.redactNote}`;
+  }
 
   if (profile.note) {
     for (const missing of profile.exclude) {

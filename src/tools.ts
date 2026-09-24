@@ -349,7 +349,7 @@ const sandbox_trigger_webhook: Tool = {
       .describe("The webhook event type to emit."),
     domain: z.string().optional().describe("Domain used in the sample payload (default example.com)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { eventType: args.eventType };
     if (args.domain) body.domain = args.domain;
@@ -1727,7 +1727,7 @@ const test_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id to send a test event to."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/webhook/test", { method: "POST", body: { id: args.id } });
   },
@@ -1791,7 +1791,7 @@ const resend_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The delivery id to resend (from list_webhook_deliveries)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/webhook/resend", { method: "POST", body: { id: args.id } });
   },
