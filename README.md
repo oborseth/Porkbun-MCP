@@ -57,7 +57,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 
 | Tool | What it does |
 |------|--------------|
-| `configure_auto_topup` | Turn auto top-up on/off: below `threshold`, add `amount` from the saved payment method. Amounts set via the API are capped at $500 |
+| `configure_auto_topup` | Turn auto top-up on/off: below `threshold_cents`, add `amount_cents` from the saved payment method. Amounts set via the API are capped at $500 |
 | `top_up_account_credit` | **Charges the saved card now** and adds the credit. The amount is the account's configured one (or $50 default) — the caller does not choose it. 5/day, 20/month |
 
 **Domain lifecycle writes (spend account credit)**
@@ -255,6 +255,10 @@ The server speaks JSON-RPC 2.0 over stdio. Smoke test from a shell:
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}') \
   | PORKBUN_API_KEY=pk1_… PORKBUN_SECRET_API_KEY=sk1_… node dist/index.js
 ```
+
+## Money parameters are in cents, and say so
+
+Every money parameter ends in `_cents` and takes integer US cents: `cost_cents: 1108` is $11.08, `amount_cents: 803` is $8.03. The unit is in the name because some clients build their approval prompt from the raw arguments, and a bare `amount: 803` was shown to a user as "$803". The old names (`cost`, `amount`, `threshold`, `acknowledged_cost`, `price_min`, `price_max`) are still accepted in the same unit; sending both names with different values is refused before anything reaches the API.
 
 ## Reliability
 

@@ -28,12 +28,46 @@ export interface Tool<S extends ZodRawShape = ZodRawShape> {
   handler: (config: PorkbunConfig, args: Record<string, unknown>) => Promise<unknown>;
 }
 
+// Money parameters carry their unit in the NAME (`amount_cents`, `cost_cents`).
+// The unit used to live only in the description, and ChatGPT's approval dialog,
+// which it writes itself from the raw arguments, showed `amount: 803` (= $8.03)
+// to a user as "$803". A name the dialog cannot misread is the fix. The old
+// names stay accepted, same unit, so existing clients keep working.
+const CENTS_EXAMPLE = " Integer US cents: 803 means $8.03, not $803.";
+
+function legacyCents(name: string) {
+  return z
+    .number()
+    .int()
+    .optional()
+    .describe(`Deprecated alias of \`${name}\`, same unit (integer US cents). Send \`${name}\` instead.`);
+}
+
+/**
+ * The value of a money parameter, from its `_cents` name or the legacy one.
+ * Sent under both names with different values is refused before anything
+ * reaches the API, so a unit mix-up cannot turn into a charge.
+ */
+function pickCents(args: Record<string, unknown>, name: string, legacy: string, required = false): number | undefined {
+  const a = args[name];
+  const b = args[legacy];
+  if (a !== undefined && b !== undefined && Number(a) !== Number(b)) {
+    throw new Error(`\`${name}\` (${a}) and \`${legacy}\` (${b}) disagree. Send only \`${name}\`, in integer US cents (803 = $8.03). Nothing was done.`);
+  }
+  const v = a !== undefined ? a : b;
+  if (v === undefined) {
+    if (required) throw new Error(`\`${name}\` is required, in integer US cents (803 = $8.03). Nothing was done.`);
+    return undefined;
+  }
+  return Number(v);
+}
+
 // How a purchase is funded. Shared by every tool that spends credit so the
 // wording cannot drift between them. The last sentence matters: some assistants
 // (the Claude apps, for one) will not charge a card on a user's behalf, and they
 // need a correct next step too.
 export const FUNDING_LOCAL =
-  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
+  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
 
 // ─── Read-only tools ────────────────────────────────────────────────────────
 
@@ -51,7 +85,7 @@ const ping: Tool = {
 const check_domain: Tool = {
   name: "check_domain",
   description:
-    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
+    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
   inputSchema: {
     domain: z
       .string()
@@ -181,33 +215,37 @@ const get_auto_topup: Tool = {
 const configure_auto_topup: Tool = {
   name: "configure_auto_topup",
   description:
-    "Set the top-up amount, and/or turn auto top-up on or off.\n\n`amount` (integer US cents) is what a top-up adds, and it stands on its own: `top_up_account_credit` charges this same figure on demand, so setting it without enabling automation is a normal thing to do. Capped at $500 (50000) with a $5 floor when set through the API; a larger figure has to be set by the account holder at https://porkbun.com/account/api and is honoured as-is.\n\n`enabled: true` (with `threshold`) additionally makes it fire by itself: an order that drops the balance below `threshold` charges the saved payment method for the amount and adds it \u2014 the way to stop an unattended workflow dead-ending on INSUFFICIENT_FUNDS. `enabled: false` stops it firing on a threshold but KEEPS the amount on file.\n\nConfirm the numbers with the user before calling: this authorises charges to their card. No card is added or changed here, and none can be added over the API. Supports dry_run.",
+    "Set the top-up amount, and/or turn auto top-up on or off.\n\n`amount_cents` (integer US cents) is what a top-up adds, and it stands on its own: `top_up_account_credit` charges this same figure on demand, so setting it without enabling automation is a normal thing to do. Capped at $500 (50000) with a $5 floor when set through the API; a larger figure has to be set by the account holder at https://porkbun.com/account/api and is honoured as-is.\n\n`enabled: true` (with `threshold_cents`) additionally makes it fire by itself: an order that drops the balance below `threshold_cents` charges the saved payment method for the amount and adds it \u2014 the way to stop an unattended workflow dead-ending on INSUFFICIENT_FUNDS. `enabled: false` stops it firing on a threshold but KEEPS the amount on file.\n\nConfirm the numbers with the user before calling: this authorises charges to their card. No card is added or changed here, and none can be added over the API. Supports dry_run.",
   inputSchema: {
     enabled: z
       .boolean()
       .optional()
       .describe("True to switch auto top-up on (threshold required, plus an amount either here or already on file), false to switch it off. Omit it to change only the amount."),
-    threshold: z
+    threshold_cents: z
       .number()
       .int()
       .min(1)
       .optional()
-      .describe("Balance in integer US cents below which a top-up fires. Required when enabling. E.g. 2000 = $20."),
-    amount: z
+      .describe("Balance below which a top-up fires. Required when enabling. E.g. 2000 = $20." + CENTS_EXAMPLE),
+    amount_cents: z
       .number()
       .int()
       .min(500)
       .max(50000)
       .optional()
-      .describe("What a top-up adds, in integer US cents, 500-50000 when set via the API. Can be sent on its own. E.g. 10000 = $100."),
+      .describe("What a top-up adds, 500-50000 when set via the API. Can be sent on its own. E.g. 10000 = $100." + CENTS_EXAMPLE),
+    threshold: legacyCents("threshold_cents"),
+    amount: legacyCents("amount_cents"),
     dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.enabled !== undefined) body.enabled = args.enabled;
-    if (args.threshold !== undefined) body.threshold = args.threshold;
-    if (args.amount !== undefined) body.amount = args.amount;
+    const threshold = pickCents(args, "threshold_cents", "threshold");
+    const amount = pickCents(args, "amount_cents", "amount");
+    if (threshold !== undefined) body.threshold = threshold;
+    if (amount !== undefined) body.amount = amount;
     if (args.dry_run) body.dryRun = true;
     return await call(config, "/account/autoTopup", { method: "POST", body });
   },
@@ -216,21 +254,23 @@ const configure_auto_topup: Tool = {
 const top_up_account_credit: Tool = {
   name: "top_up_account_credit",
   description:
-    "**Charges the user's saved payment method** and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling, with the figure. This spends real money off a card, not credit they already bought.** Omit `amount` and it charges what the account has configured (or $50 if it never has) \u2014 that is the right default, and `amount_source` in the response says which was used. Pass `amount` only when the user wants a specific one-off figure, e.g. enough to cover a particular purchase; it does NOT change their saved setting, so prefer it over calling `configure_auto_topup` for a single charge.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` when the month's dollars or the frequency run out \u2014 the account's monthly spend limit caps top-up dollars as well as domain spend, an account with no limit set gets $100/month, and there are 5/day and 20/month count caps. `get_auto_topup` reports `monthlyCeiling`, `ceilingSource` and `toppedUpThisMonth`, so check there before promising a user a top-up will go through. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
+    "**Charges the user's saved payment method** (`amount_cents` is integer cents: 803 charges $8.03; tell the user the dollar figure first) and adds the money to their Porkbun account credit immediately. Use it when a purchase failed with INSUFFICIENT_FUNDS and the user wants to continue now \u2014 enabling auto top-up does not help in that moment, because it only fires on the next order.\n\n**Ask the user before calling, with the figure. This spends real money off a card, not credit they already bought.** Omit `amount_cents` and it charges what the account has configured (or $50 if it never has) \u2014 that is the right default, and `amount_source` in the response says which was used. Pass `amount_cents` only when the user wants a specific one-off figure, e.g. enough to cover a particular purchase; it does NOT change their saved setting, so prefer it over calling `configure_auto_topup` for a single charge.\n\nFails with `NO_PAYMENT_METHOD` when nothing is saved to charge (the user has to save a card or buy credit on porkbun.com; the API cannot add one), `CARD_DECLINED` when the card refuses, and `TOPUP_LIMIT_EXCEEDED` when the month's dollars or the frequency run out \u2014 the account's monthly spend limit caps top-up dollars as well as domain spend, an account with no limit set gets $100/month, and there are 5/day and 20/month count caps. `get_auto_topup` reports `monthlyCeiling`, `ceilingSource` and `toppedUpThisMonth`, so check there before promising a user a top-up will go through. Every successful charge emails the account holder. A sandbox key grants simulated credit and charges nothing. Supports dry_run, which previews and charges nothing.",
   inputSchema: {
-    amount: z
+    amount_cents: z
       .number()
       .int()
       .min(500)
       .max(50000)
       .optional()
-      .describe("One-off amount to charge, in integer US cents (500-50000). Omit to charge the account's configured top-up amount. Does not change any saved setting."),
+      .describe("One-off amount to charge, 500-50000. Omit to charge the account's configured top-up amount. Does not change any saved setting." + CENTS_EXAMPLE),
+    amount: legacyCents("amount_cents"),
     dry_run: z.boolean().optional().describe("If true, report what would be charged without charging it."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
-    if (args.amount !== undefined) body.amount = args.amount;
+    const amount = pickCents(args, "amount_cents", "amount");
+    if (amount !== undefined) body.amount = amount;
     if (args.dry_run) body.dryRun = true;
     return await call(config, "/account/topup", {
       method: "POST",
@@ -260,14 +300,16 @@ const create_sandbox_key: Tool = {
 const sandbox_topup: Tool = {
   name: "sandbox_topup",
   description:
-    "SANDBOX ONLY. Grant fake account credit to the sandbox account so paid operations (register/renew/transfer) can keep being exercised after funds run out. Requires a sandbox API key (`pk1_sb_…`). Optional `amount` in US cents (default 100000 = $1000; capped 1,000,000). Returns the new balance. With a live key this endpoint is not available.",
+    "SANDBOX ONLY. Grant fake account credit to the sandbox account so paid operations (register/renew/transfer) can keep being exercised after funds run out. Requires a sandbox API key (`pk1_sb_…`). Optional `amount_cents` (integer US cents) (default 100000 = $1000; capped 1,000,000). Returns the new balance. With a live key this endpoint is not available.",
   inputSchema: {
-    amount: z.number().int().positive().optional().describe("Fake credit to add, in US cents (default 100000 = $1000; max 1000000)."),
+    amount_cents: z.number().int().positive().optional().describe("Fake credit to add (default 100000 = $1000; max 1000000)." + CENTS_EXAMPLE),
+    amount: legacyCents("amount_cents"),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
-    if (args.amount !== undefined) body.amount = args.amount;
+    const amount = pickCents(args, "amount_cents", "amount");
+    if (amount !== undefined) body.amount = amount;
     return await call(config, "/sandbox/topup", { method: "POST", body });
   },
 };
@@ -423,8 +465,10 @@ const search_closeouts: Tool = {
     name_length: z.number().int().positive().optional().describe("Exact SLD character count."),
     age_min: z.number().int().nonnegative().optional().describe("Minimum domain age in years."),
     age_max: z.number().int().nonnegative().optional().describe("Maximum domain age in years."),
-    price_min: z.number().int().nonnegative().optional().describe("Minimum closeout price in cents."),
-    price_max: z.number().int().nonnegative().optional().describe("Maximum closeout price in cents."),
+    price_min_cents: z.number().int().nonnegative().optional().describe("Minimum closeout price." + CENTS_EXAMPLE),
+    price_max_cents: z.number().int().nonnegative().optional().describe("Maximum closeout price." + CENTS_EXAMPLE),
+    price_min: legacyCents("price_min_cents"),
+    price_max: legacyCents("price_max_cents"),
     sort_name: z
       .enum(["domain", "endTime", "price", "revenue", "visitors", "inboundLinks", "registrationDate"])
       .optional()
@@ -438,10 +482,14 @@ const search_closeouts: Tool = {
     const qs = new URLSearchParams();
     const map: Record<string, string> = {
       query: "query", tld: "tld", name_length: "nameLength", age_min: "ageMin", age_max: "ageMax",
-      price_min: "priceMin", price_max: "priceMax", sort_name: "sortName", sort_direction: "sortDirection",
+      sort_name: "sortName", sort_direction: "sortDirection",
       start: "start", limit: "limit",
     };
     for (const [k, v] of Object.entries(map)) if (args[k] !== undefined) qs.set(v, String(args[k]));
+    const priceMin = pickCents(args, "price_min_cents", "price_min");
+    const priceMax = pickCents(args, "price_max_cents", "price_max");
+    if (priceMin !== undefined) qs.set("priceMin", String(priceMin));
+    if (priceMax !== undefined) qs.set("priceMax", String(priceMax));
     const q = qs.toString();
     return await call(config, `/closeout/search${q ? "?" + q : ""}`, { method: "GET" });
   },
@@ -451,7 +499,7 @@ const get_closeout: Tool = {
   name: "get_closeout",
   description:
     "Get one closeout plus `totalPrice` \u2014 the binding amount, which is the closeout price plus the registration year that comes with it. " +
-    "Always call this before buy_closeout: totalPrice is what you must pass as `cost`, and it cannot be derived from search results because a name already at Porkbun is renewed while anything else is transferred in, and those price differently. " +
+    "Always call this before buy_closeout: totalPrice is what you must pass as `cost_cents`, and it cannot be derived from search results because a name already at Porkbun is renewed while anything else is transferred in, and those price differently. " +
     "`available: false` means somebody already claimed it. Quote the user totalPrice, never the search `price`.",
   inputSchema: { domain: z.string().min(3).describe("Domain offered as a closeout, e.g. `example.com`") },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
@@ -463,18 +511,19 @@ const buy_closeout: Tool = {
   name: "buy_closeout",
   description:
     "**Spends account credit.** Buys a closeout at its current price and claims the name. Confirm the total with the user first. " +
-    "`cost` must equal `totalPrice` from get_closeout exactly \u2014 any other value is refused, so you cannot accidentally charge a price the user did not agree to. Use dry_run with cost 0 to quote without charging. " +
+    "`cost_cents` must equal `totalPrice` from get_closeout exactly \u2014 any other value is refused, so you cannot accidentally charge a price the user did not agree to. Use dry_run with cost 0 to quote without charging. " +
     "**The domain is reserved, not delivered.** The provider releases it over the following days, so do not tell the user it is in their account: poll list_domains or watch the domain.registered webhook. " +
     "Every post-charge failure refunds automatically and reports refunded:true. Losing the race to another buyer (CLOSEOUT_UNAVAILABLE) is not worth retrying on the same name \u2014 closeouts are first-come at a fixed price. " +
     "CLOSEOUT_NOT_ELIGIBLE means support has blocked this account from auctions and closeouts over past-due invoices or an auction terms violation \u2014 do not retry, tell the user to contact support. There is no account-age or order-history requirement: eligibility is the same as registering a domain, plus verified email and phone.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to buy, e.g. `example.com`"),
-    cost: z.number().int().nonnegative().describe("Exact totalPrice in cents from get_closeout. Use 0 only with dry_run."),
+    cost_cents: z.number().int().nonnegative().optional().describe("Exact totalPrice from get_closeout. Use 0 only with dry_run. Required." + CENTS_EXAMPLE),
+    cost: legacyCents("cost_cents"),
     dry_run: z.boolean().optional().describe("Validate and price without charging or claiming."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
-    const body: Record<string, unknown> = { cost: Number(args.cost) };
+    const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true) };
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/closeout/buy/${encodeURIComponent(String(args.domain).toLowerCase())}`, {
       method: "POST", body, idempotent: !args.dry_run,
@@ -799,19 +848,21 @@ const DNS_RECORD_TYPES = [
 const register_domain: Tool = {
   name: "register_domain",
   description:
-    "**Spends account credit.** Registers a new domain on the authenticated Porkbun account. The `cost` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL,
+    "**Spends account credit.** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL,
   inputSchema: {
     domain: z
       .string()
       .min(3)
       .describe("Fully qualified domain name to register, e.g. `example.com`"),
-    cost: z
+    cost_cents: z
       .number()
       .int()
       .positive()
+      .optional()
       .describe(
-        "Registration price in cents. Must match the value returned by `check_domain` for this domain (multiplied by years if duration > 1)."
+        "Registration price. Must match the value returned by `check_domain` for this domain (multiplied by years if duration > 1). Required." + CENTS_EXAMPLE
       ),
+    cost: legacyCents("cost_cents"),
     dry_run: z
       .boolean()
       .optional()
@@ -822,7 +873,7 @@ const register_domain: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    const body: Record<string, unknown> = { cost: Number(args.cost), agreeToTerms: "yes" };
+    const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), agreeToTerms: "yes" };
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/create/${encodeURIComponent(domain)}`, {
       method: "POST",
@@ -835,14 +886,16 @@ const register_domain: Tool = {
 const renew_domain: Tool = {
   name: "renew_domain",
   description:
-    "**Spends account credit.** Renews an existing domain in the authenticated account. The `cost` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL,
+    "**Spends account credit.** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL,
   inputSchema: {
     domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
-    cost: z
+    cost_cents: z
       .number()
       .int()
       .positive()
-      .describe("Renewal price in cents. Must match the value returned by `check_domain`."),
+      .optional()
+      .describe("Renewal price. Must match the value returned by `check_domain`. Required." + CENTS_EXAMPLE),
+    cost: legacyCents("cost_cents"),
     dry_run: z
       .boolean()
       .optional()
@@ -851,7 +904,7 @@ const renew_domain: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    const body: Record<string, unknown> = { cost: Number(args.cost) };
+    const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true) };
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/renew/${encodeURIComponent(domain)}`, {
       method: "POST",
@@ -864,14 +917,16 @@ const renew_domain: Tool = {
 const transfer_domain: Tool = {
   name: "transfer_domain",
   description:
-    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL,
+    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost_cents` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to transfer in, e.g. `example.com`"),
-    cost: z
+    cost_cents: z
       .number()
       .int()
       .positive()
-      .describe("Transfer price in cents. Must match the value returned by `check_domain`."),
+      .optional()
+      .describe("Transfer price. Must match the value returned by `check_domain`. Required." + CENTS_EXAMPLE),
+    cost: legacyCents("cost_cents"),
     auth_code: z
       .string()
       .min(1)
@@ -888,7 +943,7 @@ const transfer_domain: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    const body: Record<string, unknown> = { cost: Number(args.cost), authCode: String(args.auth_code) };
+    const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), authCode: String(args.auth_code) };
     if (args.hold_for_dns_setup) body.holdForDnsSetup = true;
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/domain/transfer/${encodeURIComponent(domain)}`, {
@@ -1369,7 +1424,7 @@ const update_contacts: Tool = {
 const list_hosting_plans: Tool = {
   name: "list_hosting_plans",
   description:
-    "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Currently Secure Static Hosting; more products are added over time.",
+    "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost_cents` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Currently Secure Static Hosting; more products are added over time.",
   inputSchema: {},
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
@@ -1380,13 +1435,14 @@ const list_hosting_plans: Tool = {
 const create_hosting: Tool = {
   name: "create_hosting",
   description:
-    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials.",
+    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost_cents` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
     sku: z
       .string()
       .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) / `PIXIESECURESTATICY2` ($30.00/yr). Cloud for WordPress: `CLOUDWORDPRESSM1` ($12.00/mo) / `CLOUDWORDPRESSY1` ($120.00/yr) and the Pro/Business tiers."),
-    acknowledged_cost: z.number().int().describe("The chosen plan's price in cents — take the `price` field of the SAME row you took `sku` from in list_hosting_plans (e.g. 300 static monthly, 3000 static yearly, 1200 WordPress Starter monthly, 12000 WordPress Starter yearly). Must match exactly or the call is rejected — this confirms the human was told the cost."),
+    acknowledged_cost_cents: z.number().int().optional().describe("The chosen plan's price — take the `price` field of the SAME row you took `sku` from in list_hosting_plans (e.g. 300 static monthly, 3000 static yearly, 1200 WordPress Starter monthly, 12000 WordPress Starter yearly). Must match exactly or the call is rejected — this confirms the human was told the cost. Required." + CENTS_EXAMPLE),
+    acknowledged_cost: legacyCents("acknowledged_cost_cents"),
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
     dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
@@ -1394,7 +1450,7 @@ const create_hosting: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    const body: Record<string, unknown> = { sku: args.sku, acknowledgedCost: args.acknowledged_cost, agreeToTerms: args.agree_to_terms };
+    const body: Record<string, unknown> = { sku: args.sku, acknowledgedCost: pickCents(args, "acknowledged_cost_cents", "acknowledged_cost", true), agreeToTerms: args.agree_to_terms };
     if (args.agree_to_nameserver_change) body.agreeToNameserverChange = true;
     if (args.dry_run) body.dryRun = true;
     return await call(config, `/hosting/create/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
