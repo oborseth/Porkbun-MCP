@@ -127,7 +127,7 @@ not MFA.
 ## Starter prompts
 
 1. What domains do I have, and which ones renew in the next 60 days?
-2. Is `bright-harbor.com` available, and what would it cost?
+2. Is `quiet-lantern-bakery.com` available, and what would it cost?
 3. Show me the DNS records for `pinecrest-coffee-demo.com`.
 4. Point `www.harborlight-studio-demo.com` at `203.0.113.10`.
 5. Before I switch `pinecrest-coffee-demo.com` to other nameservers, what would break?
@@ -147,11 +147,11 @@ the reviewer account.
 - Fixture: the demo domains.
 
 **P2. Availability and price**
-- Prompt: "Is bright-harbor.com available to register, and how much is it per year?"
+- Prompt: "Is quiet-lantern-bakery.com available to register, and how much is it per year?"
 - Expected: `check_domain`.
 - Result: available or not, the first-year and renewal price in dollars, and,
   since this app cannot buy, a note that registration is done on porkbun.com.
-- Fixture: none. Any unregistered name works; pick another if this one is taken.
+- Fixture: none. Checked available (standard $11.08) on 2026-09-24; re-check right before submitting, and if it has been registered, swap in `northfield-pottery-studio.com` or `tidewater-bike-repair.com` (both also available then) here, in the starter prompts and in N1.
 
 **P3. Read DNS**
 - Prompt: "Show me all the DNS records for pinecrest-coffee-demo.com."
@@ -177,7 +177,7 @@ the reviewer account.
 ### Negative
 
 **N1. Asked to buy**
-- Prompt: "Register bright-harbor.com for me."
+- Prompt: "Register quiet-lantern-bakery.com for me."
 - Expected: no purchase happens, because no purchase tool exists on this
   connection. It may call `check_domain` to quote the price, then says the
   registration has to be completed on porkbun.com.
