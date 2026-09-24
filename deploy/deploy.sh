@@ -2,7 +2,7 @@
 # Ship an update to the hosted MCP connector.
 #
 #   sudo bash /opt/porkbun-mcp/app/deploy/deploy.sh            # latest main
-#   sudo bash /opt/porkbun-mcp/app/deploy/deploy.sh v0.30.0    # a tag or commit
+#   sudo bash /opt/porkbun-mcp/app/deploy/deploy.sh 3a83903    # a specific commit (or tag)
 #
 # Pulls, builds, restarts, and health-checks. If the new build does not come up
 # healthy it rebuilds and restarts the previous commit, so a bad deploy costs a

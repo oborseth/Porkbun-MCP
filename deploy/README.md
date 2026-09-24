@@ -68,7 +68,7 @@ checks `/health`, the protected-resource metadata and the 401. Safe to re-run.
 
 ```bash
 sudo bash /opt/porkbun-mcp/app/deploy/deploy.sh            # latest main
-sudo bash /opt/porkbun-mcp/app/deploy/deploy.sh v0.30.0    # a tag or commit
+sudo bash /opt/porkbun-mcp/app/deploy/deploy.sh 3a83903    # a specific commit (or tag)
 ```
 
 Pulls, builds, restarts, health-checks — and if the new build is not healthy it
