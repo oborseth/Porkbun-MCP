@@ -90,6 +90,8 @@ the ALB health check can take the instance out.
 ```bash
 # Discovery: what ChatGPT and Claude read first. `resource` must be exactly this URL.
 curl -s https://mcp.porkbun.com/.well-known/oauth-protected-resource
+# ...and per restricted path (resource = that path)
+curl -s https://mcp.porkbun.com/.well-known/oauth-protected-resource/mcp/no-purchases
 
 # Unauthenticated: must be 401 with WWW-Authenticate pointing at the metadata above.
 curl -si -X POST https://mcp.porkbun.com/mcp -d '{}' | grep -iE '^HTTP|www-authenticate'
@@ -130,17 +132,29 @@ and `mcpConnectorIps` in the web app's config.php. Until both change, every
 connector user shares one 2 req/s bucket and is fraud-scored on the new
 address.
 
-## Tools
+## Tools and paths
 
-Everything in the npm package except the four sandbox-only ones
-(`create_sandbox_key`, `sandbox_topup`, `sandbox_reset`, `sandbox_trigger_webhook`):
-a hosted connection is always a live account.
+One server, three URL paths, defined in `src/profiles.ts`. Every path shares the
+OAuth server, the tokens and the API; only the offered tool list differs, and
+the API enforces none of it (a token works on any path).
 
-The card-charging tools (`top_up_account_credit`, `configure_auto_topup`) are
-included on purpose: some clients use them with the user's OK. Others will not
-(the Claude apps refuse to charge a card to fund an account), so the funding
-text on every purchase tool, and the API's `INSUFFICIENT_FUNDS` hint, end with a
-fallback: tell the user the shortfall and send them to "buy account credit".
-Note for the Claude directory submission: its policy (section 4.A) bars
-software that "transfers money ... on behalf of users", which these two tools
-may be read as.
+| Path | Tools | Leaves out | For |
+|---|---|---|---|
+| `/mcp` | 95 | the four sandbox-only tools | everyone who adds the URL themselves (documented everywhere) |
+| `/mcp/no-topups` | 93 | + `top_up_account_credit`, `configure_auto_topup` | the Claude directory listing: Anthropic's policy 4.A bars software that "transfers money ... on behalf of users" |
+| `/mcp/no-purchases` | 88 | + `register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout`, `create_hosting` | the ChatGPT app directory: OpenAI allows commerce "only for physical goods" and no links to checkout pages |
+
+Named for what they leave out, not the vendor, so a path stays accurate if a
+policy changes and another listing with the same rule can reuse it.
+
+A remaining tool whose text names a left-out tool gets the profile's note
+appended (or a full override), so an assistant is never pointed at a tool it
+does not have; `/mcp/no-purchases` never links to the buy-credit page. On `/mcp`
+the card-charging tools stay on purpose (some clients use them with the user's
+OK); their funding text ends with a fallback for assistants that will not
+charge a card (the Claude apps refuse): tell the user the shortfall and send
+them to "buy account credit".
+
+**Adding a path:** add a profile in `src/profiles.ts` AND its URL to
+`$config['oauth2']['resources']` in the web app's config.php. The OAuth server
+refuses to issue tokens for a resource it does not list.

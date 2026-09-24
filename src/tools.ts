@@ -32,7 +32,7 @@ export interface Tool<S extends ZodRawShape = ZodRawShape> {
 // wording cannot drift between them. The last sentence matters: some assistants
 // (the Claude apps, for one) will not charge a card on a user's behalf, and they
 // need a correct next step too.
-const FUNDING_LOCAL =
+export const FUNDING_LOCAL =
   "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
 
 // ─── Read-only tools ────────────────────────────────────────────────────────

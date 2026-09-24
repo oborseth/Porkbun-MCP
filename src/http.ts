@@ -25,6 +25,7 @@ import net from "node:net";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig, type PorkbunConfig } from "./api.js";
 import { buildServer } from "./server.js";
+import { PROFILES, describeFor, type Profile } from "./profiles.js";
 
 // Reach the API over IPv4 only. Every connector call leaves from this instance,
 // and the API exempts exactly one address from its per-IP rate limits: the
@@ -40,27 +41,19 @@ net.setDefaultAutoSelectFamily(false);
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || "127.0.0.1";
 const PUBLIC_URL = (process.env.MCP_PUBLIC_URL || "https://mcp.porkbun.com").replace(/\/$/, "");
-const RESOURCE = `${PUBLIC_URL}/mcp`;
 const ISSUER = (process.env.OAUTH_ISSUER || "https://porkbun.com").replace(/\/$/, "");
-const PRM_URL = `${PUBLIC_URL}/.well-known/oauth-protected-resource`;
+const PRM_BASE = `${PUBLIC_URL}/.well-known/oauth-protected-resource`;
+// /mcp keeps the bare metadata URL it has always advertised; the other paths use
+// the RFC 9728 form with the resource path appended.
+const prmUrlFor = (p: Profile) => (p.path === "/mcp" ? PRM_BASE : `${PRM_BASE}${p.path}`);
 const SCOPES = ["api", "offline_access"];
 const MAX_BODY = 1024 * 1024;
 const TOKEN_CACHE_MS = 30_000;
 
-// Tools that only make sense with a sandbox key, or that hand out keys. A hosted
-// connection is always a live bearer token, so these would either fail or mint
-// credentials into a chat transcript for no purpose.
-//
-// The card-charging tools (top_up_account_credit, configure_auto_topup) stay:
-// some clients will use them with the user's OK. Others will not; the Claude
-// apps refuse to charge a card to fund an account, so the funding text in
-// tools.ts always carries a hand-it-back-to-the-user fallback.
-const HOSTED_EXCLUDE = new Set([
-  "create_sandbox_key",
-  "sandbox_topup",
-  "sandbox_reset",
-  "sandbox_trigger_webhook",
-]);
+// Which tools each URL path offers (full set, or minus what a directory listing
+// forbids) lives in profiles.ts. Every path shares the same OAuth server, tokens
+// and API; only the tool list differs.
+const PROFILE_BY_PATH = new Map<string, Profile>(PROFILES.map((p) => [p.path, p]));
 
 const baseConfig: PorkbunConfig = { ...loadConfig(), apiKey: "", secretApiKey: "" };
 
@@ -119,8 +112,8 @@ function send(res: http.ServerResponse, status: number, body: unknown, headers: 
   res.end(payload);
 }
 
-function unauthorized(res: http.ServerResponse, invalidToken: boolean) {
-  const params = [`resource_metadata="${PRM_URL}"`, `scope="${SCOPES.join(" ")}"`];
+function unauthorized(res: http.ServerResponse, invalidToken: boolean, profile: Profile) {
+  const params = [`resource_metadata="${prmUrlFor(profile)}"`, `scope="${SCOPES.join(" ")}"`];
   if (invalidToken) params.unshift(`error="invalid_token"`);
 
   send(res, 401, { error: invalidToken ? "invalid_token" : "unauthorized" }, {
@@ -160,15 +153,15 @@ function readJson(req: http.IncomingMessage): Promise<unknown> {
 }
 
 // RFC 9728. `resource` must match the URL the user enters EXACTLY, path
-// included — Claude compares them.
-const protectedResourceMetadata = {
-  resource: RESOURCE,
+// included — Claude compares them. So each path has its own document.
+const protectedResourceMetadata = (p: Profile) => ({
+  resource: `${PUBLIC_URL}${p.path}`,
   authorization_servers: [ISSUER],
   scopes_supported: SCOPES,
   bearer_methods_supported: ["header"],
   resource_name: "Porkbun",
   resource_documentation: "https://porkbun.com/mcp",
-};
+});
 
 // ── Server ───────────────────────────────────────────────────────────────────
 
@@ -183,22 +176,26 @@ const server = http.createServer(async (req, res) => {
   });
 
   try {
-    // Both the bare and the path-suffixed forms: clients probe either.
-    if (req.method === "GET" && (path === "/.well-known/oauth-protected-resource" || path === "/.well-known/oauth-protected-resource/mcp")) {
-      return send(res, 200, protectedResourceMetadata, { "Cache-Control": "public, max-age=3600" });
+    // Bare form (= /mcp) and the path-suffixed form for every profile: clients probe either.
+    if (req.method === "GET" && path.startsWith("/.well-known/oauth-protected-resource")) {
+      const suffix = path.slice("/.well-known/oauth-protected-resource".length) || "/mcp";
+      const p = PROFILE_BY_PATH.get(suffix);
+      if (!p) return send(res, 404, { error: "not_found" });
+      return send(res, 200, protectedResourceMetadata(p), { "Cache-Control": "public, max-age=3600" });
     }
 
     if (req.method === "GET" && path === "/health") {
       return send(res, 200, { ok: true });
     }
 
-    if (path !== "/mcp") {
+    const profile = PROFILE_BY_PATH.get(path);
+    if (!profile) {
       return send(res, 404, { error: "not_found" });
     }
 
     const token = bearerFrom(req);
-    if (!token) return unauthorized(res, false);
-    if (!token.startsWith("pbo_at_")) return unauthorized(res, true);
+    if (!token) return unauthorized(res, false, profile);
+    if (!token.startsWith("pbo_at_")) return unauthorized(res, true, profile);
 
     let valid: boolean;
     try {
@@ -206,7 +203,7 @@ const server = http.createServer(async (req, res) => {
     } catch {
       return send(res, 503, { error: "temporarily_unavailable" }, { "Retry-After": "5" });
     }
-    if (!valid) return unauthorized(res, true);
+    if (!valid) return unauthorized(res, true, profile);
 
     // Stateless: no standalone SSE stream to open (GET) and no session to end
     // (DELETE). Clients handle a 405 here as "not supported".
@@ -221,7 +218,11 @@ const server = http.createServer(async (req, res) => {
       return send(res, (e as Error).message === "too_large" ? 413 : 400, { error: (e as Error).message });
     }
 
-    const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), { exclude: HOSTED_EXCLUDE, hosted: true });
+    const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), {
+      exclude: profile.exclude,
+      hosted: true,
+      describe: (name, description) => describeFor(profile, name, description),
+    });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
 
     res.on("close", () => {
@@ -238,7 +239,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
-  console.log(`porkbun-mcp hosted connector on ${HOST}:${PORT} as ${RESOURCE} (issuer ${ISSUER}, API ${baseConfig.baseUrl})`);
+  console.log(`porkbun-mcp hosted connector on ${HOST}:${PORT} serving ${PROFILES.map((p) => PUBLIC_URL + p.path).join(", ")} (issuer ${ISSUER}, API ${baseConfig.baseUrl})`);
 });
 
 for (const sig of ["SIGTERM", "SIGINT"] as const) {
