@@ -1,8 +1,10 @@
-# Porkbun MCP Server
+# Porkbun MCP Server (official)
 
 [![npm version](https://img.shields.io/npm/v/@porkbunllc/mcp-server.svg?color=cb3837&label=npm)](https://www.npmjs.com/package/@porkbunllc/mcp-server)
 [![npm downloads](https://img.shields.io/npm/dm/@porkbunllc/mcp-server.svg)](https://www.npmjs.com/package/@porkbunllc/mcp-server)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+**The official MCP server from Porkbun, built and maintained by Porkbun** (by [Owen Borseth](https://github.com/oborseth), Porkbun's CTO). It is published on npm as [`@porkbunllc/mcp-server`](https://www.npmjs.com/package/@porkbunllc/mcp-server) and hosted by Porkbun at `https://mcp.porkbun.com/mcp`. Other "Porkbun MCP" projects on GitHub and in MCP directories are community wrappers around the public API; they are not made or supported by Porkbun.
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes the [Porkbun v3 API](https://porkbun.com/api/json/v3/documentation) as native tools for AI agents — Claude Desktop, Cursor, Cline, and any other MCP-compatible client.
 
