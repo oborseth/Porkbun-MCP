@@ -103,15 +103,32 @@ curl -s https://porkbun.com/.well-known/oauth-authorization-server
 1. **The OAuth server on porkbun.com must be deployed** (`/oauth2/*` and the
    `pbo_at_` token branch in `MY_ApiController`). Until it is, every token fails
    validation and the connector answers 401 to everyone.
-2. **api.porkbun.com rate limits.** All connector traffic arrives from this
+2. **api.porkbun.com rate limits (done).** All connector traffic arrives from this
    instance's Elastic IP, so the per-IP `limit_req` zones on the API vhost would
    throttle every ChatGPT and Claude user together at a couple of requests a
-   second. Exempt this instance's EIP from those zones. Per-key limits still apply
-   per connection, because every connection is its own API key.
-3. **Fraud scoring** on registrations uses the request IP, which through the
-   connector is this instance's EIP, not the end user's. Orders under $50 are
-   scored but not blocked. Above that, all connector traffic shares one IP's
-   signals.
+   second. The EIP is exempt in both `geo $whitelist` blocks of the fleet's
+   nginx.conf (identical on every web box). Per-key limits still apply per
+   connection, because every connection is its own API key. This only works
+   because the server reaches the API over IPv4 (see Networking above).
+3. **The API recognises connector traffic (done).** `$config['mcpConnectorIps']`
+   in the web app lists the EIP. A request from there that authenticates with a
+   connector token (`pbo_at_…`) skips the IP-based fraud signals (IPQS would
+   score this AWS address as a proxy and block real orders over $50; email,
+   account, domain and address signals still run), can never be blocked by
+   `badIps`, and is labelled as connector traffic in terms-agreement records,
+   fraud alerts and the admin orders view. An ordinary API key used from this
+   box gets none of that.
+
+4. **Connection keys have no IP allowlist.** Every call comes from this box, so
+   an IP restriction on a "(connected app)" key could only disconnect it; the
+   API settings page hides the field for those keys and refuses to save one.
+   Customers limit a connection with per-key **allowed domains** instead.
+
+**If the Elastic IP ever changes,** update both places together: the two
+`geo $whitelist` blocks in nginx.conf (roll out with the fleet nginx script)
+and `mcpConnectorIps` in the web app's config.php. Until both change, every
+connector user shares one 2 req/s bucket and is fraud-scored on the new
+address.
 
 ## Tools
 
