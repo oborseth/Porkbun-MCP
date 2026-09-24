@@ -48,8 +48,12 @@ email arrives with a Case ID; quote it in any follow-up.
 > you have opted in to API access), and you can disconnect at any time from your
 > Porkbun API settings.
 >
-> This app does not buy anything. To register, renew or transfer a domain, you
-> complete the purchase on porkbun.com.
+> This is the ChatGPT directory version of Porkbun's connector. To follow the
+> directory's rules it does not buy anything and does not return secrets such as
+> SSL private keys: to register, renew or transfer a domain, you complete the
+> purchase on porkbun.com. Porkbun's full connector, with those features, is
+> described at https://porkbun.com/mcp for anyone who prefers to add it
+> themselves.
 
 ## MCP server
 
@@ -89,6 +93,9 @@ does:
   on everything bounded to the user's own account.
 - Money parameters are integer cents and named `..._cents`, so an approval
   prompt cannot show 803 as "$803".
+- The server sends MCP **instructions** on this path saying what it leaves out
+  and why, so the assistant tells a user "not available in this version; do it
+  on porkbun.com or use the full connector" instead of guessing.
 - Two tools that return a secret by design (`get_ssl_bundle`, the certificate
   private key; `create_wp_credentials`, a WordPress application password) are
   left out of this path, because the guidelines ask that tool responses exclude

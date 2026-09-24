@@ -147,9 +147,11 @@ the API enforces none of it (a token works on any path).
 Named for what they leave out, not the vendor, so a path stays accurate if a
 policy changes and another listing with the same rule can reuse it.
 
-A remaining tool whose text names a left-out tool gets the profile's note
-appended (or a full override), so an assistant is never pointed at a tool it
-does not have; `/mcp/no-purchases` never links to the buy-credit page. On `/mcp`
+Each restricted path also sends MCP server **instructions** on initialize: what
+it leaves out, that this is to follow the directory's rules, and that the full
+server is at `/mcp` (setup at https://porkbun.com/mcp). A remaining tool whose
+text names a left-out tool gets the profile's note appended (or a full
+override), so an assistant is never pointed at a tool it does not have; `/mcp/no-purchases` never links to the buy-credit page. On `/mcp`
 the card-charging tools stay on purpose (some clients use them with the user's
 OK); their funding text ends with a fallback for assistants that will not
 charge a card (the Claude apps refuse): tell the user the shortfall and send

@@ -32,7 +32,16 @@ export interface Profile {
   note?: string;
   /** Whole-description replacements, where appending a note is not enough. */
   overrides?: Record<string, string>;
+  /**
+   * MCP server instructions, sent on initialize and read by the client along
+   * with the tool list. Used on the restricted paths to say, once and up front,
+   * what this version leaves out and why, and that the full server exists.
+   */
+  instructions?: string;
 }
+
+// Where the full server and its setup live, for the restricted paths to point at.
+const FULL = "the full Porkbun server, which the user can add themselves as a custom connector: https://mcp.porkbun.com/mcp (setup: https://porkbun.com/mcp)";
 
 // A hosted connection is always a live key, so the sandbox tools never apply.
 const SANDBOX = ["create_sandbox_key", "sandbox_topup", "sandbox_reset", "sandbox_trigger_webhook"];
@@ -56,12 +65,16 @@ export const PROFILES: Profile[] = [
     path: "/mcp/no-topups",
     exclude: new Set([...SANDBOX, ...TOPUPS]),
     funding: FUNDING_NO_TOPUPS,
-    note: "On this connection, adding account credit and changing auto top-up are done by the account holder (https://porkbun.com/account/credit and https://porkbun.com/account/api); the top-up tools named above are not available here.",
+    note: "On this connection, adding account credit and changing auto top-up are done by the account holder (https://porkbun.com/account/credit and https://porkbun.com/account/api); the top-up tools named above are not available here. They are in " + FULL + ".",
+    instructions:
+      "This is the directory version of Porkbun's connector. To follow the directory's rules it cannot add money to the account: there are no top-up tools (charging a saved card for credit, or changing auto top-up). Everything else works, including buying with credit already on the account. When the user wants credit added, tell them the amount and that they can add it on porkbun.com; if they want an assistant that can top up for them, that is " + FULL + ".",
   },
   {
     path: "/mcp/no-purchases",
     exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES, ...SECRETS]),
-    note: "On this connection nothing can be bought: registering, renewing or transferring domains, buying closeouts and starting hosting are done by the user on porkbun.com, and the tools named above for them are not available here. Share prices and availability, then let the user complete it at https://porkbun.com.",
+    note: "On this connection nothing can be bought: registering, renewing or transferring domains, buying closeouts and starting hosting are done by the user on porkbun.com, and the tools named above for them are not available here. Share prices and availability, then let the user complete it at https://porkbun.com, or point them to " + FULL + ".",
+    instructions:
+      "This is the ChatGPT app directory version of Porkbun's connector. To follow the directory's rules it leaves out two kinds of tools: anything that buys (registering, renewing or transferring domains, buying closeouts, starting hosting, adding account credit), and anything that returns a secret (SSL certificate private keys, WordPress application passwords). Everything else works: availability and pricing, DNS, nameservers, forwarding, glue, DNSSEC, restore points, hosting sites, webhooks and Cloudflare. When the user asks for something this version leaves out, say so plainly and offer both routes: do it on porkbun.com, or use " + FULL + ", which includes those tools.",
     overrides: {
       get_balance:
         "Get the available account credit balance for the authenticated Porkbun account, in cents (integer) and as a display string (e.g. `$12.34`). Read-only and informational on this connection, which cannot buy anything.",

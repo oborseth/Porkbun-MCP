@@ -232,6 +232,7 @@ const server = http.createServer(async (req, res) => {
       exclude: profile.exclude,
       hosted: true,
       describe: (name, description) => describeFor(profile, name, description),
+      instructions: profile.instructions,
     });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
 

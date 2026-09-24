@@ -3,7 +3,7 @@ import type { PorkbunConfig } from "./api.js";
 import { tools } from "./tools.js";
 
 export const SERVER_NAME = "porkbun-mcp";
-export const SERVER_VERSION = "0.33.1";
+export const SERVER_VERSION = "0.34.0";
 
 // Human-readable display title for each tool, derived from its snake_case name
 // (domain acronyms kept upper-case). Every tool in the Connectors Directory must
@@ -28,6 +28,8 @@ export interface BuildOptions {
   hosted?: boolean;
   /** Final say over each description (the hosted connector's per-path profiles). */
   describe?: (name: string, description: string) => string;
+  /** MCP server instructions sent on initialize (the restricted hosted paths). */
+  instructions?: string;
 }
 
 /**
@@ -38,7 +40,10 @@ export interface BuildOptions {
  * (http.ts, a fresh server per request bound to that request's bearer token).
  */
 export function buildServer(getConfig: () => PorkbunConfig, opts: BuildOptions = {}): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
+  const server = new McpServer(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    opts.instructions ? { instructions: opts.instructions } : undefined
+  );
 
   for (const tool of tools) {
     if (opts.exclude?.has(tool.name)) continue;
