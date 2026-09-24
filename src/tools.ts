@@ -380,11 +380,18 @@ const mock_call: Tool = {
 const get_pricing: Tool = {
   name: "get_pricing",
   description:
-    "Get current Porkbun pricing for all supported TLDs. Returns registration, renewal, and transfer prices per TLD in USD. No authentication required. Useful when an agent needs to compare TLD costs before registering. Note: this returns standard pricing only — premium domains have their own per-domain pricing reported by check_domain.",
-  inputSchema: {},
+    "Get current Porkbun pricing: registration, renewal and transfer prices per TLD in USD. No authentication required. **Pass `tlds` whenever you know which TLDs matter** (e.g. `[\"com\", \"io\"]`): without it the response lists every TLD Porkbun sells, around 900 of them. Case, a leading dot and IDN form are handled. A TLD Porkbun does not sell comes back in `unsupported` instead of being priced, and if none of them are sold the call fails with INVALID_TLD. Standard pricing only: premium names have their own per-domain price, reported by check_domain.",
+  inputSchema: {
+    tlds: z
+      .array(z.string().min(1))
+      .max(200)
+      .optional()
+      .describe("TLDs to price, e.g. [\"com\", \"io\", \"dev\"]. Omit for every TLD."),
+  },
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
-  handler: async (config) => {
-    return await call(config, "/pricing/get", { method: "POST" });
+  handler: async (config, args) => {
+    const tlds = Array.isArray(args.tlds) ? (args.tlds as string[]) : [];
+    return await call(config, "/pricing/get", { method: "POST", body: tlds.length ? { tlds } : undefined });
   },
 };
 
