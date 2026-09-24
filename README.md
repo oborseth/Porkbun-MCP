@@ -8,7 +8,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 **Setup guide, client configs and the full tool list: [porkbun.com/mcp](https://porkbun.com/mcp)**
 
-**No install: use the hosted connector.** Porkbun runs this server at `https://mcp.porkbun.com/mcp`. Add that URL as a custom connector in ChatGPT or Claude (or `claude mcp add --transport http porkbun https://mcp.porkbun.com/mcp` in Claude Code), sign in to Porkbun and approve. No API key to copy. Steps per client: [Connect ChatGPT or Claude](https://porkbun.com/llms/guides/connect-chatgpt-or-claude). How it is deployed: [`deploy/README.md`](deploy/README.md).
+**No install: use the hosted connector.** Porkbun runs this server at `https://mcp.porkbun.com/mcp`. Add that URL as a custom connector in ChatGPT or Claude (or `claude mcp add --transport http porkbun https://mcp.porkbun.com/mcp` in Claude Code), sign in to Porkbun and approve. No API key to copy. Steps per client: [Connect ChatGPT or Claude](https://porkbun.com/llms/guides/connect-chatgpt-or-claude). How it is deployed: [`deploy/README.md`](deploy/README.md). Two narrower variants serve the app-directory listings: `/mcp/no-topups` (no card top-up tools, Claude directory) and `/mcp/no-purchases` (no tool that spends money, ChatGPT app directory); they change which tools are offered, not what a connection may do.
 
 > **Status:** full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks; current version on the npm badge above). Also runs **hosted** at `https://mcp.porkbun.com/mcp` for ChatGPT and Claude, with sign-in instead of API keys. Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
@@ -58,7 +58,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | Tool | What it does |
 |------|--------------|
 | `configure_auto_topup` | Turn auto top-up on/off: below `threshold_cents`, add `amount_cents` from the saved payment method. Amounts set via the API are capped at $500 |
-| `top_up_account_credit` | **Charges the saved card now** and adds the credit. The amount is the account's configured one (or $50 default) — the caller does not choose it. 5/day, 20/month |
+| `top_up_account_credit` | **Charges the saved card now** and adds the credit. Omit `amount_cents` for the account's configured amount (or $50 if never set), or pass `amount_cents` (500-50000) for a one-off figure. Ask the user first, in dollars. 5/day, 20/month, within the monthly spend limit |
 
 **Domain lifecycle writes (spend account credit)**
 

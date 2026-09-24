@@ -1,5 +1,12 @@
 # Connectors Directory submission notes
 
+> **Scope:** these notes are for the **desktop extension (MCPB) / local npm**
+> submission, which reviewers run with a sandbox key. The **hosted connector**
+> listings are separate and point at restricted paths of `mcp.porkbun.com`
+> (see `deploy/README.md`, "Tools and paths"): the Claude directory uses
+> `/mcp/no-topups` (Anthropic policy 4.A, money transfers) and the ChatGPT app
+> directory uses `/mcp/no-purchases` (OpenAI: commerce for physical goods only).
+
 Reference material for submitting this server to Anthropic's directory
 (desktop extension / MCPB path). Not shipped in the npm package.
 
