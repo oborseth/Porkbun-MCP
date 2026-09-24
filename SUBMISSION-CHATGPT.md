@@ -15,7 +15,7 @@ email arrives with a Case ID; quote it in any follow-up.
       "Developer Identity" field. Reviewers reject unverified or mismatched
       identities.
 - [ ] **Role.** The submitter needs "Apps Management: Write" in the Platform org.
-- [ ] **Reviewer account** (details under "Test credentials" below).
+- [x] **Reviewer account** (details under "Test credentials" below; owner still sets its password via Forgot password).
 - [ ] **Hosted connector on 0.33.0 or later** (the tool annotations below are
       what the review checks).
 
@@ -106,14 +106,17 @@ does:
 A dedicated Porkbun account, set up exactly as reviewers will use it. It must
 work "without MFA, SMS, email confirmation, or private-network access".
 
-- [ ] New account (not a staff account), email and phone verified.
-- [ ] **No 2FA** of any kind (no authenticator app, no security key).
-- [ ] **Account settings → "Email a code when I sign in from a new device": OFF.**
+- [x] New account (not a staff account), email and phone verified.
+- [x] **No 2FA** of any kind (no authenticator app, no security key).
+- [x] **Account settings → "Email a code when I sign in from a new device": OFF.**
       Otherwise every reviewer sign-in stops at an emailed code.
-- [ ] Two or three domains that it owns, each **opted in to API access**, with a
-      handful of DNS records (A, CNAME, MX, a TXT) and one URL forward.
-      Placeholders below: `DEMO_DOMAIN_1`, `DEMO_DOMAIN_2`.
-- [ ] Monthly API spend limit set low (e.g. $10). Nothing on this path can
+- [x] Three domains, all opted in to API access (created 2026-09-24):
+      - `pinecrest-coffee-demo.com`: A @ 203.0.113.10, CNAME www, MX (Porkbun
+        forwarding), SPF TXT
+      - `harborlight-studio-demo.com`: A @ 203.0.113.20, CNAME www, MX, SPF TXT
+      - `maple-rye-bakery-demo.com`: URL forward to https://porkbun.com, MX,
+        SPF TXT
+- [x] Monthly API spend limit set low ($10). Nothing on this path can
       spend, but it caps the account if the credentials leak.
 - [ ] Put the username and password only in the portal's credentials field,
       never in this file.
@@ -125,9 +128,9 @@ not MFA.
 
 1. What domains do I have, and which ones renew in the next 60 days?
 2. Is `bright-harbor.com` available, and what would it cost?
-3. Show me the DNS records for `DEMO_DOMAIN_1`.
-4. Point `www.DEMO_DOMAIN_2` at `203.0.113.10`.
-5. Before I switch `DEMO_DOMAIN_1` to other nameservers, what would break?
+3. Show me the DNS records for `pinecrest-coffee-demo.com`.
+4. Point `www.harborlight-studio-demo.com` at `203.0.113.10`.
+5. Before I switch `pinecrest-coffee-demo.com` to other nameservers, what would break?
 
 ## Test cases
 
@@ -151,25 +154,25 @@ the reviewer account.
 - Fixture: none. Any unregistered name works; pick another if this one is taken.
 
 **P3. Read DNS**
-- Prompt: "Show me all the DNS records for DEMO_DOMAIN_1."
+- Prompt: "Show me all the DNS records for pinecrest-coffee-demo.com."
 - Expected: `list_dns_records`.
 - Result: a list of records with type, host, value and TTL.
-- Fixture: records on DEMO_DOMAIN_1.
+- Fixture: records on pinecrest-coffee-demo.com.
 
 **P4. Add a DNS record (write, confirmed)**
-- Prompt: "Add a TXT record to DEMO_DOMAIN_1 with the value `openai-review-test`."
+- Prompt: "Add a TXT record to pinecrest-coffee-demo.com with the value `openai-review-test`."
 - Expected: ChatGPT asks for confirmation (the tool is marked as a write), then
   `create_dns_record`.
 - Result: the record's ID and a confirmation. A later "show the DNS records"
   includes it.
-- Fixture: DEMO_DOMAIN_1 opted in to API access.
+- Fixture: pinecrest-coffee-demo.com opted in to API access.
 
 **P5. Preflight a risky change**
-- Prompt: "I'm thinking of moving DEMO_DOMAIN_1 to Cloudflare's nameservers. What would break?"
+- Prompt: "I'm thinking of moving pinecrest-coffee-demo.com to Cloudflare's nameservers. What would break?"
 - Expected: `preflight_domain` (read-only; changes nothing).
 - Result: blockers and warnings, for example mail records that would stop
   resolving, and the checks that ran.
-- Fixture: DEMO_DOMAIN_1 with an MX record.
+- Fixture: pinecrest-coffee-demo.com with an MX record.
 
 ### Negative
 
