@@ -25,7 +25,7 @@ import net from "node:net";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig, type PorkbunConfig } from "./api.js";
 import { buildServer } from "./server.js";
-import { PROFILES, describeFor, type Profile } from "./profiles.js";
+import { PROFILES, describeFor, redact, type Profile } from "./profiles.js";
 
 // Reach the API over IPv4 only. Every connector call leaves from this instance,
 // and the API exempts exactly one address from its per-IP rate limits: the
@@ -233,6 +233,9 @@ const server = http.createServer(async (req, res) => {
       hosted: true,
       describe: (name, description) => describeFor(profile, name, description),
       instructions: profile.instructions,
+      transformResult: profile.redactKeys?.length
+        ? (_name, result) => redact(result, profile.redactKeys!, "[hidden on this connection; see API settings at porkbun.com/account/api]")
+        : undefined,
     });
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
 

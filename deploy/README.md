@@ -142,7 +142,7 @@ the API enforces none of it (a token works on any path).
 |---|---|---|---|
 | `/mcp` | 95 | the four sandbox-only tools | everyone who adds the URL themselves (documented everywhere) |
 | `/mcp/no-topups` | 93 | + `top_up_account_credit`, `configure_auto_topup` | the Claude directory listing: Anthropic's policy 4.A bars software that "transfers money ... on behalf of users" |
-| `/mcp/no-purchases` | 86 | + `register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout`, `create_hosting`, and the secret-returning `get_ssl_bundle`, `create_wp_credentials` | the ChatGPT app directory: OpenAI allows commerce "only for physical goods", no links to checkout pages, and no auth secrets in tool output |
+| `/mcp/no-purchases` | 83 | + `register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout`, `create_hosting`; the secret-returning `get_ssl_bundle`, `create_wp_credentials`, `create_webhook`, `rotate_webhook_secret`; and `update_transfer_auth_code` (takes a transfer credential). Webhook `secret` fields are redacted in the rest | the ChatGPT app directory: OpenAI allows commerce "only for physical goods", no links to checkout pages, and no auth secrets in tool output |
 
 Named for what they leave out, not the vendor, so a path stays accurate if a
 policy changes and another listing with the same rule can reuse it.

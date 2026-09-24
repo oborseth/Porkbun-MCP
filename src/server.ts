@@ -3,7 +3,7 @@ import type { PorkbunConfig } from "./api.js";
 import { tools } from "./tools.js";
 
 export const SERVER_NAME = "porkbun-mcp";
-export const SERVER_VERSION = "0.35.0";
+export const SERVER_VERSION = "0.36.0";
 
 // Human-readable display title for each tool, derived from its snake_case name
 // (domain acronyms kept upper-case). Every tool in the Connectors Directory must
@@ -30,6 +30,8 @@ export interface BuildOptions {
   describe?: (name: string, description: string) => string;
   /** MCP server instructions sent on initialize (the restricted hosted paths). */
   instructions?: string;
+  /** Last word on each tool result before it is serialised (per-path redaction). */
+  transformResult?: (name: string, result: unknown) => unknown;
 }
 
 /**
@@ -62,7 +64,8 @@ export function buildServer(getConfig: () => PorkbunConfig, opts: BuildOptions =
       },
       async (args) => {
         try {
-          const result = await tool.handler(getConfig(), args as Record<string, unknown>);
+          const raw = await tool.handler(getConfig(), args as Record<string, unknown>);
+          const result = opts.transformResult ? opts.transformResult(tool.name, raw) : raw;
           return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);

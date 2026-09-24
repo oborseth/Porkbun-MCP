@@ -84,9 +84,9 @@ sign-in and account as `/mcp`; only the offered tools differ. See
 The portal scans the server and lists the tools itself. What to know when it
 does:
 
-- **86 tools** on this path, each with `readOnlyHint`, `destructiveHint`,
+- **83 tools** on this path, each with `readOnlyHint`, `destructiveHint`,
   `openWorldHint` and a `title`.
-- `openWorldHint` follows OpenAI's definition: **true on 16 tools here** that
+- `openWorldHint` follows OpenAI's definition: **true on 14 tools here** that
   take an arbitrary domain or URL or reach a third party (availability checks,
   public DNS scans and preflight, marketplace and closeout inventory,
   inbound-transfer preparation, webhooks that post to a URL you give), and false
@@ -96,10 +96,18 @@ does:
 - The server sends MCP **instructions** on this path saying what it leaves out
   and why, so the assistant tells a user "not available in this version; do it
   on porkbun.com or use the full connector" instead of guessing.
-- Two tools that return a secret by design (`get_ssl_bundle`, the certificate
-  private key; `create_wp_credentials`, a WordPress application password) are
-  left out of this path, because the guidelines ask that tool responses exclude
-  auth secrets. They remain on `/mcp`.
+- No tool on this path returns a secret, because the guidelines ask that tool
+  responses exclude auth secrets. Left out: `get_ssl_bundle` (certificate private
+  key), `create_wp_credentials` (WordPress application password),
+  `create_webhook` and `rotate_webhook_secret` (webhook signing secrets). The
+  remaining webhook tools show each endpoint with its `secret` field replaced by
+  a note; webhooks are created and secrets rotated in Porkbun's API settings.
+  `update_transfer_auth_code` is also left out: it takes a domain-transfer
+  credential, and no transfer can be started on this path.
+- `destructiveHint` follows OpenAI's definition: true for anything that deletes,
+  overwrites, revokes or cannot be undone (including edits to an existing DNS
+  record and nameserver changes), and set explicitly (false) on every read-only
+  tool.
 
 ## Test credentials
 
