@@ -15,7 +15,8 @@ import { FUNDING_LOCAL } from "./tools.js";
  *                      that "transfers money ... on behalf of users"
  * - /mcp/no-purchases  ChatGPT app directory: OpenAI allows commerce "only for
  *                      physical goods", so no domains, hosting, closeouts or
- *                      credit, and no links to checkout pages
+ *                      credit, and no links to checkout pages; also no tools
+ *                      that return a secret (its review excludes auth secrets)
  *
  * Named for what they leave out, not for the vendor, so the name stays true if a
  * policy changes and any other listing with the same rule can reuse the path.
@@ -37,6 +38,11 @@ export interface Profile {
 const SANDBOX = ["create_sandbox_key", "sandbox_topup", "sandbox_reset", "sandbox_trigger_webhook"];
 const TOPUPS = ["top_up_account_credit", "configure_auto_topup"];
 const PURCHASES = ["register_domain", "renew_domain", "transfer_domain", "buy_closeout", "create_hosting"];
+// Tools whose whole output is a secret: the certificate private key, and a
+// WordPress application password. OpenAI's app review asks that tool responses
+// exclude auth secrets, so the ChatGPT listing's path leaves them out. They stay
+// on /mcp, where the user added the server themselves.
+const SECRETS = ["get_ssl_bundle", "create_wp_credentials"];
 
 const FUNDING_NO_TOPUPS =
   "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). On this connection, adding money is the account holder's step: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. Auto top-up, which they can set in their API settings (https://porkbun.com/account/api), refills the balance from their saved card on its own next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08).";
@@ -54,7 +60,7 @@ export const PROFILES: Profile[] = [
   },
   {
     path: "/mcp/no-purchases",
-    exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES]),
+    exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES, ...SECRETS]),
     note: "On this connection nothing can be bought: registering, renewing or transferring domains, buying closeouts and starting hosting are done by the user on porkbun.com, and the tools named above for them are not available here. Share prices and availability, then let the user complete it at https://porkbun.com.",
     overrides: {
       get_balance:

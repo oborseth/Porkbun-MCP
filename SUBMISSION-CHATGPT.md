@@ -62,7 +62,8 @@ email arrives with a Case ID; quote it in any follow-up.
 
 `/mcp/no-purchases` is the hosted server minus every tool that spends money
 (register, renew, transfer, closeout purchase, new hosting, card top-ups),
-because OpenAI allows commerce "only for physical goods". It is the same server,
+because OpenAI allows commerce "only for physical goods", and minus the two
+tools that return a secret. It is the same server,
 sign-in and account as `/mcp`; only the offered tools differ. See
 `deploy/README.md`, "Tools and paths".
 
@@ -79,7 +80,7 @@ sign-in and account as `/mcp`; only the offered tools differ. See
 The portal scans the server and lists the tools itself. What to know when it
 does:
 
-- **88 tools** on this path, each with `readOnlyHint`, `destructiveHint`,
+- **86 tools** on this path, each with `readOnlyHint`, `destructiveHint`,
   `openWorldHint` and a `title`.
 - `openWorldHint` follows OpenAI's definition: **true on 16 tools here** that
   take an arbitrary domain or URL or reach a third party (availability checks,
@@ -88,12 +89,10 @@ does:
   on everything bounded to the user's own account.
 - Money parameters are integer cents and named `..._cents`, so an approval
   prompt cannot show 803 as "$803".
-- **Decide before submitting:** `get_ssl_bundle` returns the certificate's
-  private key, and `create_wp_credentials` returns a WordPress application
-  password. Both are the point of those tools, but the guidelines ask that tool
-  responses exclude "auth secrets". Either keep them and explain in the release
-  notes, or leave them out of `/mcp/no-purchases` (one line each in
-  `src/profiles.ts`).
+- Two tools that return a secret by design (`get_ssl_bundle`, the certificate
+  private key; `create_wp_credentials`, a WordPress application password) are
+  left out of this path, because the guidelines ask that tool responses exclude
+  auth secrets. They remain on `/mcp`.
 
 ## Test credentials
 
