@@ -386,7 +386,7 @@ const import_dns_records: Tool = {
       .optional()
       .describe("Exact records to create. Omit to import what a live scan of the domain finds."),
   },
-  annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -1597,7 +1597,7 @@ const create_webhook: Tool = {
         "Event types to subscribe to, e.g. `['domain.registered','dns.*']`. Omit or use `['*']` for all events. Call get_webhook_event_types for the catalog."
       ),
   },
-  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { url: args.url };
     if (Array.isArray(args.events) && args.events.length > 0) body.events = args.events;
@@ -1615,7 +1615,7 @@ const update_webhook: Tool = {
     events: z.array(z.string()).optional().describe("Replacement event subscription list (or `['*']` for all)."),
     status: z.enum(["ACTIVE", "DISABLED"]).optional().describe("Enable or pause the endpoint."),
   },
-  annotations: { readOnlyHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { id: args.id };
     if (args.url !== undefined) body.url = args.url;
@@ -1645,7 +1645,7 @@ const test_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id to send a test event to."),
   },
-  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/webhook/test", { method: "POST", body: { id: args.id } });
   },
@@ -1709,7 +1709,7 @@ const resend_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The delivery id to resend (from list_webhook_deliveries)."),
   },
-  annotations: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/webhook/resend", { method: "POST", body: { id: args.id } });
   },
