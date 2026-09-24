@@ -61,7 +61,10 @@ if [ "$NEW" = "$PREVIOUS" ]; then
 fi
 
 log "Deploying $(g log --oneline -1 "$NEW")   (was $(g log --oneline -1 "$PREVIOUS"))"
-g checkout --quiet --detach "$NEW"
+# --force: the checkout is build output only (settings live in $ENV_FILE), and a
+# build can leave a tracked file modified. npm rewrote package-lock.json when its
+# version lagged package.json, and a plain checkout then refused to move.
+g checkout --quiet --force --detach "$NEW"
 
 if build_and_restart && healthy; then
 	log "Healthy on $(g log --oneline -1)"
@@ -70,7 +73,7 @@ fi
 
 log "New build is NOT healthy — rolling back to $(g log --oneline -1 "$PREVIOUS")"
 journalctl -u "$SVC" -n 30 --no-pager || true
-g checkout --quiet --detach "$PREVIOUS"
+g checkout --quiet --force --detach "$PREVIOUS"
 if build_and_restart && healthy; then
 	die "rolled back to $(g log --oneline -1); the deploy of $NEW failed"
 fi
