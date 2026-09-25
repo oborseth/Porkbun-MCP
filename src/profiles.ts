@@ -11,12 +11,16 @@ import { FUNDING_LOCAL } from "./tools.js";
  * tools an assistant is offered.
  *
  * - /mcp               everything (minus the sandbox-only tools, as always)
- * - /mcp/no-topups     Claude directory: Anthropic's policy (4.A) bars software
+ * - /mcp/no-topups     no listing today (Claude moved to no-purchases); was for the
+ *                      Claude directory: Anthropic's policy (4.A) bars software
  *                      that "transfers money ... on behalf of users"
- * - /mcp/no-purchases  ChatGPT app directory: OpenAI allows commerce "only for
+ * - /mcp/no-purchases  ChatGPT and Claude directory listings. OpenAI allows commerce "only for
  *                      physical goods", so no domains, hosting, closeouts or
  *                      credit, and no links to checkout pages; also no tools
- *                      that return a secret (its review excludes auth secrets)
+ *                      that return a secret (its review excludes auth secrets).
+ *                      Claude's directory uses it too: Anthropic's policy bars
+ *                      software that "executes financial transactions on behalf
+ *                      of users", and its portal asks for an acknowledgment.
  *
  * Named for what they leave out, not for the vendor, so the name stays true if a
  * policy changes and any other listing with the same rule can reuse the path.
@@ -72,7 +76,7 @@ const PURCHASES = ["register_domain", "renew_domain", "transfer_domain", "buy_cl
 // WordPress application password, and a webhook signing secret (create and
 // rotate exist only to hand one out). Other webhook tools stay, with the
 // secret field redacted (redactKeys below). OpenAI's app review asks that tool responses
-// exclude auth secrets, so the ChatGPT listing's path leaves them out. They stay
+// exclude auth secrets, so the directory listings' path leaves them out. They stay
 // on /mcp, where the user added the server themselves.
 const SECRETS = ["get_ssl_bundle", "create_wp_credentials", "create_webhook", "rotate_webhook_secret"];
 // Takes a domain-transfer authorization (EPP) code, a credential. No transfer can
@@ -91,7 +95,7 @@ export const PROFILES: Profile[] = [
     path: "/mcp/no-topups",
     exclude: new Set([...SANDBOX, ...TOPUPS]),
     funding: FUNDING_NO_TOPUPS,
-    note: "On this connection, adding account credit and changing auto top-up are done by the account holder (https://porkbun.com/account/credit and https://porkbun.com/account/api); the top-up tools named above are not available here. They are in " + FULL + ".",
+    note: "On this connection, adding account credit and changing auto top-up are done by the account holder (https://porkbun.com/account/credit and https://porkbun.com/account/api); the top-up tools named above are not available here.",
     instructions:
       "This is the directory version of Porkbun's connector. To follow the directory's rules it cannot add money to the account: there are no top-up tools (charging a saved card for credit, or changing auto top-up). Everything else works, including buying with credit already on the account. When the user wants credit added, tell them the amount and that they can add it on porkbun.com; if they want an assistant that can top up for them, that is " + FULL + ".",
   },
@@ -105,7 +109,7 @@ export const PROFILES: Profile[] = [
     // porkbun.com", no pointer to the full server in purchase contexts).
     note: "Some tools named above are not part of this app. Buying anything (registering, renewing or transferring domains, closeouts, new hosting, account credit) is not available in this app: if asked, say so, without directing the user anywhere to buy. SSL certificate keys, WordPress application passwords and webhook signing secrets are not returned here; the user can get them from their Porkbun account settings.",
     instructions:
-      "This is the ChatGPT app directory version of Porkbun's connector. It does not buy anything: registering, renewing or transferring domains, buying closeouts, starting hosting and adding account credit are not available in this app. You can still share availability and prices. If the user asks to buy, say that purchasing isn't available in this app; do not direct them to a website, checkout or other connector to buy. It also returns no secrets: webhook details are shown with the signing secret hidden, and SSL certificate keys, WordPress application passwords and webhook signing secrets are not available here (the user can find them in their Porkbun account settings). Everything else works: availability and pricing, DNS, nameservers, forwarding, glue, DNSSEC, restore points, hosting sites, webhooks and Cloudflare.",
+      "This is the app-directory version of Porkbun's connector. It does not buy anything: registering, renewing or transferring domains, buying closeouts, starting hosting and adding account credit are not available in this app. You can still share availability and prices. If the user asks to buy, say that purchasing isn't available in this app; do not direct them to a website, checkout or other connector to buy. It also returns no secrets: webhook details are shown with the signing secret hidden, and SSL certificate keys, WordPress application passwords and webhook signing secrets are not available here (the user can find them in their Porkbun account settings). Everything else works: availability and pricing, DNS, nameservers, forwarding, glue, DNSSEC, restore points, hosting sites, webhooks and Cloudflare.",
     overrides: {
       get_balance:
         "Get the available account credit balance for the authenticated Porkbun account, in cents (integer) and as a display string (e.g. `$12.34`). Read-only and informational on this connection, which cannot buy anything.",

@@ -23,21 +23,25 @@ submitted through a different form.
 
 | Field | Value |
 |---|---|
-| Server URL | `https://mcp.porkbun.com/mcp/no-topups` |
+| Server URL | `https://mcp.porkbun.com/mcp/no-purchases` |
 | Transport | Streamable HTTP |
 | How users reach it | Universal URL |
 
-`/mcp/no-topups` is the hosted server minus the two tools that charge a card
-for account credit (`top_up_account_credit`, `configure_auto_topup`), because
-Anthropic's policy does not accept connectors that "transfer money,
-cryptocurrency, or other financial assets". Buying a domain with credit
-already on the account stays. Same sign-in, tokens and account as `/mcp`.
+`/mcp/no-purchases` is the same path the ChatGPT listing uses: the hosted
+server minus every tool that spends money or charges a card (register, renew,
+transfer, closeout purchase, new hosting, top-ups), minus the tools that return
+a secret (SSL private keys, WordPress application passwords, webhook signing
+secrets, which are also redacted from the remaining webhook results), and minus
+the tool that takes a transfer authorization code. Anthropic's policy bars
+software that "transfers money ... or executes financial transactions on behalf
+of users", and the portal asks for an acknowledgment of exactly that; on this
+path it is simply true. Same sign-in, tokens and account as `/mcp`.
 
 ## 2. Tools
 
 Synced from the server. Every tool has a `title`, `readOnlyHint` and
 `destructiveHint` (and `openWorldHint`); names are all under 64 characters.
-On this path: 93 tools, 48 read-only, 45 write, 31 marked destructive
+On this path: 83 tools, 47 read-only, 36 write, 28 marked destructive
 (deletes, overwrites, revocations, anything that cannot be undone, and sends
 that cannot be recalled). No catch-all request tool: reads and writes are
 separate tools.
@@ -57,33 +61,30 @@ separate tools.
 
 **Description (≤2,000)**
 
-> Connect Claude to your Porkbun account to register and look after your
-> domains in conversation. Check whether a name is available and what it costs,
-> register, renew or transfer domains using your Porkbun account credit, and
-> see your domains and when they renew. Manage DNS records, nameservers, URL
+> Connect Claude to your Porkbun account to look after the domains you already
+> own, in conversation. Check whether a name is available and what it costs, see
+> your domains and when they renew, and manage DNS records, nameservers, URL
 > forwarding, glue records, DNSSEC and domain contacts. Before a risky change,
 > preflight a domain to see what would break, and roll a DNS zone back to an
 > earlier restore point if something goes wrong. You can also manage Porkbun
-> hosting (static sites and WordPress), SSL certificates, webhooks, and domains
-> connected to your own Cloudflare account.
+> hosting sites, webhooks, and domains connected to your own Cloudflare account.
 >
 > You sign in with your Porkbun account and approve access; Claude never sees a
 > password or API key. Each connection is its own API key that follows your
-> account's API settings: only domains you have opted in to API access, your
-> monthly API spend limit, and any per-key domain limits. Purchases spend
-> account credit you already have; this connector cannot charge a card or add
-> credit. Every billable action supports a dry run, writes are idempotent, and
-> you can disconnect at any time from your Porkbun API settings.
+> account's API settings: only domains you have opted in to API access, and any
+> per-key domain limits. This connector does not buy anything and does not
+> return secrets such as SSL private keys. Writes are idempotent, destructive
+> changes are marked so Claude asks first, and you can disconnect at any time
+> from your Porkbun API settings.
 
 ## 4. Use cases
 
-- **Primary use cases:** check availability and pricing; register, renew and
-  transfer domains with existing account credit; manage DNS and nameservers;
-  preflight risky changes and restore DNS zones; manage hosting, SSL,
-  webhooks and Cloudflare-connected domains.
-- **What users need first:** a Porkbun account; the domains they want managed
-  opted in to API access (per domain, or all at once in API settings); for
-  purchases, account credit.
+- **Primary use cases:** check availability and pricing; see domains and
+  renewal dates; manage DNS and nameservers; preflight risky changes and
+  restore DNS zones; manage hosting sites, webhooks and Cloudflare-connected
+  domains.
+- **What users need first:** a Porkbun account, and the domains they want
+  managed opted in to API access (per domain, or all at once in API settings).
 - **Reads, writes or both:** both.
 
 ## 5. Company
@@ -134,11 +135,10 @@ Seven required acknowledgments: directory guidelines, first-party API usage,
 financial transactions, AI media generation, prompt injection, conversation
 data collection, public documentation.
 
-- **Financial transactions:** the connector does not transfer money or
-  cryptocurrency, and cannot charge a card or add account credit (those tools
-  are not on this path). It can register, renew or transfer a domain, paid from
-  credit the user already holds, after the user confirms; each such call
-  supports a dry run and is marked non-read-only so Claude asks first.
+- **Financial transactions:** none. The connector does not transfer money or
+  cryptocurrency, does not buy anything (no register, renew, transfer, closeout
+  or hosting purchase tools on this path), and cannot charge a card or add
+  account credit. Asked to buy, it says purchasing isn't available.
 - **AI media generation:** none.
 - **Conversation data:** the server keeps nothing from conversations; request
   logs record method, path, status and timing, never tokens or bodies.
