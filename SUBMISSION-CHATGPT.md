@@ -80,9 +80,9 @@ sign-in and account as `/mcp`; only the offered tools differ. See
 The portal scans the server and lists the tools itself. What to know when it
 does:
 
-- **83 tools** on this path, each with `readOnlyHint`, `destructiveHint`,
+- **81 tools** on this path, each with `readOnlyHint`, `destructiveHint`,
   `openWorldHint` and a `title`.
-- `openWorldHint` follows OpenAI's definition: **true on 14 tools here** that
+- `openWorldHint` follows OpenAI's definition: **true on 13 tools here** that
   take an arbitrary domain or URL or reach a third party (availability checks,
   public DNS scans and preflight, marketplace and closeout inventory,
   inbound-transfer preparation, webhooks that post to a URL you give), and false
@@ -99,7 +99,9 @@ does:
   remaining webhook tools show each endpoint with its `secret` field replaced by
   a note; webhooks are created and secrets rotated in Porkbun's API settings.
   `update_transfer_auth_code` is also left out: it takes a domain-transfer
-  credential, and no transfer can be started on this path.
+  credential, and no transfer can be started on this path. So are
+  `cancel_transfer` (it refunds a paid order) and `update_auto_renew` (turning
+  it on authorises charges at expiry).
 - `destructiveHint` follows OpenAI's definition: true for anything that deletes,
   overwrites, revokes or cannot be undone (including edits to an existing DNS
   record and nameserver changes), and set explicitly (false) on every read-only

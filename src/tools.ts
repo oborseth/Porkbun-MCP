@@ -1507,7 +1507,7 @@ const deploy_site: Tool = {
 
 const list_hosting_files: Tool = {
   name: "list_hosting_files",
-  description: "List file/directory names under an optional `path` in a domain's Secure Static Hosting space.",
+  description: "List file/directory names under an optional `path` in a domain's Secure Static Hosting space. Calls the Porkbun Hosting API (https://porkbun.com/llms/hosting).",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting files to list."),
     path: z.string().optional().describe("Subdirectory to list (default: root)."),
@@ -1523,7 +1523,7 @@ const list_hosting_files: Tool = {
 
 const delete_hosting_file: Tool = {
   name: "delete_hosting_file",
-  description: "Delete a file (or empty directory) at `path` in a domain's Secure Static Hosting space.",
+  description: "Delete a file (or empty directory) at `path` in a domain's Secure Static Hosting space. Calls the Porkbun Hosting API (https://porkbun.com/llms/hosting).",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting file to delete."),
     path: z.string().min(1).describe("Path to delete, e.g. `old/page.html`."),
@@ -1538,7 +1538,7 @@ const delete_hosting_file: Tool = {
 const make_hosting_dir: Tool = {
   name: "make_hosting_dir",
   description:
-    "Create a directory (and any missing parent directories) at `path` in a domain's Secure Static Hosting space. deploy_site already auto-creates the directories in a file's path, so use this only to stand up an empty directory explicitly.",
+    "Create a directory (and any missing parent directories) at `path` in a domain's Secure Static Hosting space. deploy_site already auto-creates the directories in a file's path, so use this only to stand up an empty directory explicitly. Calls the Porkbun Hosting API (https://porkbun.com/llms/hosting).",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to create the directory in."),
     path: z.string().min(1).describe("Directory path to create, e.g. `assets/img`."),
@@ -1690,7 +1690,7 @@ const create_webhook: Tool = {
 const update_webhook: Tool = {
   name: "update_webhook",
   description:
-    "Update a webhook endpoint. Only the supplied fields change. Set `status` to `DISABLED` to pause deliveries or `ACTIVE` to resume (resuming also clears the consecutive-failure counter). A replacement `url` must satisfy the same public-HTTPS rules as create_webhook. Idempotent.",
+    "Update a webhook endpoint. Only the supplied fields change. Set `status` to `DISABLED` to pause deliveries or `ACTIVE` to resume (resuming also clears the consecutive-failure counter). A replacement `url` must satisfy the same public-HTTPS rules as create_webhook. Idempotent. Calls the Porkbun Webhooks API (https://porkbun.com/llms/webhooks).",
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id."),
     url: z.string().url().optional().describe("New HTTPS URL. Same rules as create_webhook: port 443, publicly resolvable hostname, no embedded credentials."),

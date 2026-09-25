@@ -31,8 +31,10 @@ submitted through a different form.
 server minus every tool that spends money or charges a card (register, renew,
 transfer, closeout purchase, new hosting, top-ups), minus the tools that return
 a secret (SSL private keys, WordPress application passwords, webhook signing
-secrets, which are also redacted from the remaining webhook results), and minus
-the tool that takes a transfer authorization code. Anthropic's policy bars
+secrets, which are also redacted from the remaining webhook results), minus
+the tool that takes a transfer authorization code, and minus `cancel_transfer`
+(refunds a paid order) and `update_auto_renew` (turning it on authorises
+charges at expiry). Anthropic's policy bars
 software that "transfers money ... or executes financial transactions on behalf
 of users", and the portal asks for an acknowledgment of exactly that; on this
 path it is simply true. Same sign-in, tokens and account as `/mcp`.
@@ -41,7 +43,7 @@ path it is simply true. Same sign-in, tokens and account as `/mcp`.
 
 Synced from the server. Every tool has a `title`, `readOnlyHint` and
 `destructiveHint` (and `openWorldHint`); names are all under 64 characters.
-On this path: 83 tools, 47 read-only, 36 write, 28 marked destructive
+On this path: 81 tools, 47 read-only, 34 write, 26 marked destructive
 (deletes, overwrites, revocations, anything that cannot be undone, and sends
 that cannot be recalled). No catch-all request tool: reads and writes are
 separate tools.
