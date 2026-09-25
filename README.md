@@ -169,6 +169,15 @@ Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and 
 
 Porkbun POSTs a signed JSON payload to your endpoint when subscribed events occur (`domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, `dns.record.created|updated|deleted`). Verify the `X-Porkbun-Signature` header — it's `sha256=` + HMAC-SHA256 of `{timestamp}.{rawBody}` keyed by the endpoint secret, where `{timestamp}` is the `X-Porkbun-Webhook-Timestamp` header.
 
+## Claude plugin
+
+[`plugin/`](plugin/) is a Claude plugin (claude.ai, Cowork and Claude Code): the
+hosted connector at `https://mcp.porkbun.com/mcp/no-purchases` plus two skills,
+`publish-website` (publish a site Claude builds to Porkbun Secure Static
+Hosting instead of giving upload steps) and `change-dns-safely`. It holds no
+code. To try it in Claude Code: `claude --plugin-dir ./plugin`. Raise `version`
+in `plugin/.claude-plugin/plugin.json` with every change to the folder.
+
 ## Install
 
 You'll need [Node.js](https://nodejs.org) 18 or newer.

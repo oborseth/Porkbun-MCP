@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "porkbun": {
+      "type": "http",
+      "url": "https://mcp.porkbun.com/mcp/no-purchases"
+    }
+  }
+}
