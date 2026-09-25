@@ -10,7 +10,7 @@ submitted through a different form.
 
 ## Before you start
 
-- [ ] **A Claude Team or Enterprise organization.** The portal lives in
+- [x] **A Claude Team or Enterprise organization.** The portal lives in
       organization settings: https://claude.ai/admin-settings/directory/submissions/new
 - [ ] **Owner access** (or, on Enterprise, a custom role with the Directory
       permission).
@@ -179,3 +179,9 @@ Plan (Owen, 2026-09-25): list `/mcp/no-purchases` first, then try for purchases.
   transactions" the Software Directory Policy (4.A) bars.
 - ChatGPT stays on `/mcp/no-purchases`: OpenAI supports physical-goods commerce
   only.
+
+## Status
+
+- 2026-09-25: submitted through the Claude portal on `/mcp/no-purchases`
+  (reviewer account set up, every tool self-tested, API 3.44 live). Track at
+  https://claude.ai/admin-settings/directory/submissions.
