@@ -113,8 +113,16 @@ PKCE S256, refresh tokens rotated. Authentication is required from the start
 
 ## 8. Test & launch
 
-Test account: TBD (see decisions below). Access instructions to paste,
-once the account exists:
+Test account: a dedicated Porkbun account created 2026-09-25 (username and
+password are not in this public file; they go only into the portal). No 2FA,
+new-device email codes off, API access on for all domains, $10 monthly spend
+limit. Domains:
+- `cedar-ridge-florist-demo.com`: A @ 203.0.113.30, CNAME www, MX (Porkbun
+  forwarding), SPF TXT
+- `bluewater-yoga-demo.com`: A @ 203.0.113.40, CNAME www, MX, SPF TXT
+- `copper-kettle-cafe-demo.com`: URL forward to https://porkbun.com, MX, SPF TXT
+
+Access instructions to paste:
 
 ```
 Sign-in: connect the connector in Claude. A Porkbun sign-in page opens
@@ -123,7 +131,11 @@ short "I'm human" check may appear; there is no two-factor, SMS or email code.
 Then click "Allow Claude" and you are returned to Claude.
 Username: <test account>
 Password: <password>
-Test data: <domains and what is on them>
+Test data: three demo domains, all enabled for API access:
+- cedar-ridge-florist-demo.com (A record, www CNAME, MX, SPF)
+- bluewater-yoga-demo.com (A record, www CNAME, MX, SPF)
+- copper-kettle-cafe-demo.com (URL forward to porkbun.com, MX, SPF)
+The connector cannot make purchases.
 ```
 
 You also confirm you have run every tool yourself (MCP Inspector or as a
