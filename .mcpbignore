@@ -1,0 +1,11 @@
+# Keep the desktop extension to what it runs: dist/, node_modules/, manifest, icon, README, LICENSE.
+src/
+scripts/
+deploy/
+kb/
+assets/
+SUBMISSION*.md
+server.json
+tsconfig.json
+*.mcpb
+.git/
