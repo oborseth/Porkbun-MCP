@@ -57,7 +57,7 @@ Related: Which Porkbun MCP endpoint should I use? · Manage or disconnect an AI 
 
 ## 2. Connect Porkbun to ChatGPT
 
-- **Title:** How to Connect Porkbun to ChatGPT
+- **Title:** How to Connect Porkbun to ChatGPT (No Install)
 - **Slug:** connect-porkbun-to-chatgpt
 - **Keywords:** chatgpt, openai, chatgpt app, chatgpt plugin, developer mode, connector, mcp, mcp server, ai assistant, porkbun mcp, connect chatgpt to porkbun, manage domains with chatgpt
 
