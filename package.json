@@ -1,7 +1,7 @@
 {
   "name": "@porkbunllc/mcp-server",
   "mcpName": "com.porkbun/mcp",
-  "version": "0.37.3",
+  "version": "0.38.0",
   "description": "Official Porkbun MCP server, built and maintained by Porkbun — exposes the Porkbun v3 API as tools for AI agents (ChatGPT, Claude, Cursor, etc.)",
   "author": "Porkbun LLC <support@porkbun.com> (https://porkbun.com)",
   "type": "module",

@@ -147,9 +147,14 @@ the API enforces none of it (a token works on any path).
 Named for what they leave out, not the vendor, so a path stays accurate if a
 policy changes and another listing with the same rule can reuse it.
 
-Each restricted path also sends MCP server **instructions** on initialize: what
-it leaves out, that this is to follow the directory's rules, and that the full
-server is at `/mcp` (setup at https://porkbun.com/mcp). A remaining tool whose
+Every path (and the npm package) sends the same base MCP server
+**instructions** on initialize (`BASE_INSTRUCTIONS` in `src/server.ts`): what
+the tools act on, and to offer `deploy_site` when the assistant has built a
+static site for one of the user's domains, rather than ending with manual
+upload steps. Each restricted path appends what it leaves out; `/mcp/no-topups`
+also names the full server at `/mcp`, `/mcp/no-purchases` points nowhere else.
+Anything added to the base text reaches both directory listings without review,
+so keep it to guidance about these tools. A remaining tool whose
 text names a left-out tool gets the profile's note appended (or a full
 override), so an assistant is never pointed at a tool it does not have; `/mcp/no-purchases` never links to the buy-credit page. On `/mcp`
 the card-charging tools stay on purpose (some clients use them with the user's

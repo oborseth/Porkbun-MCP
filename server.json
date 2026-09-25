@@ -3,7 +3,7 @@
   "name": "com.porkbun/mcp",
   "title": "Porkbun (official)",
   "description": "Official Porkbun MCP server: domains, DNS, SSL, hosting and Cloudflare via the Porkbun API.",
-  "version": "0.37.3",
+  "version": "0.38.0",
   "websiteUrl": "https://porkbun.com/mcp",
   "repository": {
     "url": "https://github.com/oborseth/Porkbun-MCP",
@@ -22,7 +22,7 @@
     {
       "registryType": "npm",
       "identifier": "@porkbunllc/mcp-server",
-      "version": "0.37.3",
+      "version": "0.38.0",
       "transport": {
         "type": "stdio"
       },

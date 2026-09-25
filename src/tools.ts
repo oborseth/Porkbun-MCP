@@ -1485,7 +1485,7 @@ const get_hosting: Tool = {
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
-    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first).",
+    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). Use this when you have built or edited a static site for a domain in the user's account: offer to publish it here rather than giving manual upload steps, and get their OK first, since files at the same path are replaced.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
     files: z
