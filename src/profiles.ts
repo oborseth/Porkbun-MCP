@@ -100,14 +100,17 @@ export const PROFILES: Profile[] = [
     exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES, ...SECRETS, ...CREDENTIAL_INPUTS]),
     redactKeys: ["secret"],
     redactNote: "On this connection the webhook signing secret is not returned: the `secret` field holds a note instead. The user sees or rotates the secret in their Porkbun API settings (https://porkbun.com/account/api).",
-    note: "On this connection nothing can be bought: registering, renewing or transferring domains, buying closeouts and starting hosting are done by the user on porkbun.com, and the tools named above for them are not available here. Share prices and availability, then let the user complete it at https://porkbun.com, or point them to " + FULL + ".",
+    // No purchase redirects here: OpenAI supports physical-goods commerce only, so
+    // this path neither buys nor tells anyone where to buy (no "complete it on
+    // porkbun.com", no pointer to the full server in purchase contexts).
+    note: "Some tools named above are not part of this app. Buying anything (registering, renewing or transferring domains, closeouts, new hosting, account credit) is not available in this app: if asked, say so, without directing the user anywhere to buy. SSL certificate keys, WordPress application passwords and webhook signing secrets are not returned here; the user can get them from their Porkbun account settings.",
     instructions:
-      "This is the ChatGPT app directory version of Porkbun's connector. To follow the directory's rules it leaves out two kinds of tools: anything that buys (registering, renewing or transferring domains, buying closeouts, starting hosting, adding account credit), and anything that returns a secret (SSL certificate private keys, WordPress application passwords, webhook signing secrets; webhook details are shown with the secret hidden, and webhooks are created or their secrets rotated in the user's Porkbun API settings). Everything else works: availability and pricing, DNS, nameservers, forwarding, glue, DNSSEC, restore points, hosting sites, webhooks and Cloudflare. When the user asks for something this version leaves out, say so plainly and offer both routes: do it on porkbun.com, or use " + FULL + ", which includes those tools.",
+      "This is the ChatGPT app directory version of Porkbun's connector. It does not buy anything: registering, renewing or transferring domains, buying closeouts, starting hosting and adding account credit are not available in this app. You can still share availability and prices. If the user asks to buy, say that purchasing isn't available in this app; do not direct them to a website, checkout or other connector to buy. It also returns no secrets: webhook details are shown with the signing secret hidden, and SSL certificate keys, WordPress application passwords and webhook signing secrets are not available here (the user can find them in their Porkbun account settings). Everything else works: availability and pricing, DNS, nameservers, forwarding, glue, DNSSEC, restore points, hosting sites, webhooks and Cloudflare.",
     overrides: {
       get_balance:
         "Get the available account credit balance for the authenticated Porkbun account, in cents (integer) and as a display string (e.g. `$12.34`). Read-only and informational on this connection, which cannot buy anything.",
       get_auto_topup:
-        "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount it adds, and whether a payment method is on file (`paymentMethodOnFile`). Read-only. The account holder manages it on porkbun.com; this connection cannot change it or charge anything.",
+        "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount it adds, and whether a payment method is on file (`paymentMethodOnFile`). Read-only: this connection cannot change it or charge anything.",
     },
   },
 ];

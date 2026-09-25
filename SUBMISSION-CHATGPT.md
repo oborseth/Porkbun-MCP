@@ -48,12 +48,8 @@ email arrives with a Case ID; quote it in any follow-up.
 > you have opted in to API access), and you can disconnect at any time from your
 > Porkbun API settings.
 >
-> This is the ChatGPT directory version of Porkbun's connector. To follow the
-> directory's rules it does not buy anything and does not return secrets such as
-> SSL private keys: to register, renew or transfer a domain, you complete the
-> purchase on porkbun.com. Porkbun's full connector, with those features, is
-> described at https://porkbun.com/mcp for anyone who prefers to add it
-> themselves.
+> This app does not buy anything and does not return secrets such as SSL
+> private keys. It is for looking after the domains you already have.
 
 ## MCP server
 
@@ -93,9 +89,9 @@ does:
   on everything bounded to the user's own account.
 - Money parameters are integer cents and named `..._cents`, so an approval
   prompt cannot show 803 as "$803".
-- The server sends MCP **instructions** on this path saying what it leaves out
-  and why, so the assistant tells a user "not available in this version; do it
-  on porkbun.com or use the full connector" instead of guessing.
+- The server sends MCP **instructions** on this path saying what it leaves out,
+  so when asked to buy, the assistant says purchasing isn't available in this
+  app, without directing the user anywhere else to buy.
 - No tool on this path returns a secret, because the guidelines ask that tool
   responses exclude auth secrets. Left out: `get_ssl_bundle` (certificate private
   key), `create_wp_credentials` (WordPress application password),
@@ -157,8 +153,8 @@ the reviewer account.
 **P2. Availability and price**
 - Prompt: "Is quiet-lantern-bakery.com available to register, and how much is it per year?"
 - Expected: `check_domain`.
-- Result: available or not, the first-year and renewal price in dollars, and,
-  since this app cannot buy, a note that registration is done on porkbun.com.
+- Result: available or not, and the first-year and renewal price in dollars.
+  Information only; the app does not offer to register it.
 - Fixture: none. Checked available (standard $11.08) on 2026-09-24; re-check right before submitting, and if it has been registered, swap in `northfield-pottery-studio.com` or `tidewater-bike-repair.com` (both also available then) here, in the starter prompts and in N1.
 
 **P3. Read DNS**
@@ -187,15 +183,17 @@ the reviewer account.
 **N1. Asked to buy**
 - Prompt: "Register quiet-lantern-bakery.com for me."
 - Expected: no purchase happens, because no purchase tool exists on this
-  connection. It may call `check_domain` to quote the price, then says the
-  registration has to be completed on porkbun.com.
+  connection. It may call `check_domain` to report availability and price, and
+  says that purchasing isn't available in this app. It does not link to or
+  recommend a place to buy.
 - Rationale: OpenAI allows commerce only for physical goods; a domain is a
   digital service.
 
 **N2. Asked to add money**
 - Prompt: "Add $50 of credit to my Porkbun account from my card."
-- Expected: declines and points to adding credit on porkbun.com; no tool
-  charges anything (no top-up tool on this connection).
+- Expected: declines, saying that adding credit isn't available in this app;
+  no tool charges anything (no top-up tool on this connection), and it does not
+  direct the user elsewhere to pay.
 - Rationale: buying credits is digital commerce, and moving money on the user's
   behalf is out of scope.
 
@@ -211,6 +209,18 @@ the reviewer account.
 - Expected: the Porkbun app is not used.
 - Rationale: the tool descriptions are specific to domains, DNS and hosting.
 
+## Commerce & Purchasing
+
+| Checkbox | Answer |
+|---|---|
+| My plugin links or directs users out of ChatGPT to make purchases | **Leave unchecked.** Asked to buy, it says purchasing isn't available in this app and points nowhere |
+| My plugin does not facilitate purchases of digital goods, services, or subscriptions | **Check.** No purchase tools, no purchase links |
+| My plugin does not offer or facilitate payments for goods or services that are prohibited… | **Check** |
+| My plugin and any associated payment activity comply with applicable laws… | **Check.** No payment activity happens in the app |
+
+This depends on the hosted connector running 0.37.0 or later, which removed
+the "complete it on porkbun.com" wording from this path.
+
 ## Countries
 
 Select every region where Porkbun sells today. Porkbun's own sanctions
@@ -225,7 +235,7 @@ restrictions apply as usual; do not select embargoed regions.
 > webhooks and Cloudflare-connected domains. Sign-in is OAuth 2.1 with PKCE
 > against porkbun.com; each connection is its own revocable API key limited by
 > the account's API settings. This path deliberately exposes no purchasing
-> tools; purchases are completed on porkbun.com. Test credentials are in the
+> tools and does not direct users anywhere to make purchases. Test credentials are in the
 > credentials field. The account has no MFA and new-device email codes are off;
 > sign-in may show a captcha.
 
