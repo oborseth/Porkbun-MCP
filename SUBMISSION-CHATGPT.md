@@ -247,3 +247,9 @@ You choose when to publish, from the portal. After that, OpenAI re-fetches the
 tool list periodically: new or changed tools go live after automated checks,
 removed tools disappear on the next scan. Changes to anything in the listing
 itself need a new version and another review.
+
+## Status
+
+- 2026-09-25: submitted through the OpenAI Platform portal on
+  `/mcp/no-purchases` (domain verified, reviewer account set up). Keep the
+  Case ID from the confirmation email for any follow-up.
