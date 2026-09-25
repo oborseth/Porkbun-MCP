@@ -1473,7 +1473,7 @@ const create_hosting: Tool = {
 const get_hosting: Tool = {
   name: "get_hosting",
   description:
-    "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting.",
+    "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting. When ACTIVE, deploy_site publishes site files to it.",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
@@ -1485,7 +1485,7 @@ const get_hosting: Tool = {
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
-    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). Use this when you have built or edited a static site for a domain in the user's account: offer to publish it here rather than giving manual upload steps, and get their OK first, since files at the same path are replaced.",
+    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
     files: z

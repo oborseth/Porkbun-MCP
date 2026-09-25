@@ -3,7 +3,7 @@ import type { PorkbunConfig } from "./api.js";
 import { tools } from "./tools.js";
 
 export const SERVER_NAME = "porkbun-mcp";
-export const SERVER_VERSION = "0.38.0";
+export const SERVER_VERSION = "0.38.1";
 
 // Human-readable display title for each tool, derived from its snake_case name
 // (domain acronyms kept upper-case). Every tool in the Connectors Directory must
@@ -29,8 +29,8 @@ function deriveTitle(name: string): string {
 // never realising deploy_site is right there, so the user has to ask.
 export const BASE_INSTRUCTIONS =
   "Porkbun tools act on the signed-in user's Porkbun account: domains, DNS, hosting and related settings. " +
-  "Publishing a site: when you have written or edited static website files for the user (HTML, CSS, JavaScript, images) and the site is meant for a domain in their Porkbun account, offer to publish it with deploy_site instead of giving manual upload steps. " +
-  "Before uploading, check get_hosting (hosting must be ACTIVE; if it is not, tell the user rather than uploading), use list_hosting_files to see what is already there, say which existing files will be replaced (a new domain usually has a placeholder index.html), and get the user's OK.";
+  "Building a website: if the user asks you to build or change a website for a domain in their Porkbun account, or mentions Porkbun hosting, the last step is publishing it with deploy_site. Offer that when the files are ready; do not end with steps for uploading through the Porkbun dashboard. " +
+  "Check get_hosting first: it must be ACTIVE (if the domain has no active hosting, say so instead of uploading). Before uploading, use list_hosting_files to see what is already there, say which files will be replaced (a new site usually has a placeholder index.html), and wait for the user's OK.";
 
 export interface BuildOptions {
   /** Tool names to leave out of this server (e.g. sandbox-only tools when hosted). */

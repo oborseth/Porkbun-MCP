@@ -24,7 +24,7 @@ import http from "node:http";
 import net from "node:net";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { loadConfig, type PorkbunConfig } from "./api.js";
-import { buildServer } from "./server.js";
+import { buildServer, SERVER_VERSION } from "./server.js";
 import { PROFILES, describeFor, redact, type Profile } from "./profiles.js";
 
 // Reach the API over IPv4 only. Every connector call leaves from this instance,
@@ -195,7 +195,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && path === "/health") {
-      return send(res, 200, { ok: true });
+      return send(res, 200, { ok: true, version: SERVER_VERSION });
     }
 
     const profile = PROFILE_BY_PATH.get(path);
