@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.porkbun/mcp",
+  "title": "Porkbun (official)",
+  "description": "Official Porkbun MCP server: domains, DNS, SSL, hosting and Cloudflare via the Porkbun API.",
+  "version": "0.37.3",
+  "websiteUrl": "https://porkbun.com/mcp",
+  "repository": {
+    "url": "https://github.com/oborseth/Porkbun-MCP",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://porkbun.com/images/mcp/porkbun-connector-icon.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "1024x1024"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@porkbunllc/mcp-server",
+      "version": "0.37.3",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PORKBUN_API_KEY",
+          "description": "Porkbun API key (pk1_...). Optional: the documentation tools work without it.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "PORKBUN_SECRET_API_KEY",
+          "description": "Porkbun secret API key (sk1_...).",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.porkbun.com/mcp"
+    }
+  ]
+}
