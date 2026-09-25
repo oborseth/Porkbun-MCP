@@ -185,3 +185,6 @@ Plan (Owen, 2026-09-25): list `/mcp/no-purchases` first, then try for purchases.
 - 2026-09-25: submitted through the Claude portal on `/mcp/no-purchases`
   (reviewer account set up, every tool self-tested, API 3.44 live). Track at
   https://claude.ai/admin-settings/directory/submissions.
+- 2026-09-26: approved by automated review as a **community connector**; Owen
+  published it. Live at https://claude.ai/directory/connectors/mcp-porkbun-com
+  (slug `mcp-porkbun-com`, permanent). Verified status is Anthropic's call.
