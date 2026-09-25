@@ -164,3 +164,18 @@ data collection, public documentation.
 Submit, then track status and feedback at
 https://claude.ai/admin-settings/directory/submissions. Escalations:
 mcp-review@anthropic.com.
+
+## Later: a more capable version
+
+Plan (Owen, 2026-09-25): list `/mcp/no-purchases` first, then try for purchases.
+
+- Do NOT add tools to `/mcp/no-purchases` to widen it: tool changes on a listed
+  path reach directory users automatically, without review.
+- Instead, submit a new version whose server URL is a different path, most
+  likely `/mcp/no-topups` (purchases with existing account credit, no card
+  top-ups). It is reviewed before it replaces the listing; the slug stays.
+- Before spending a review cycle, ask mcp-review@anthropic.com whether buying a
+  domain with credit already on the account counts as the "financial
+  transactions" the Software Directory Policy (4.A) bars.
+- ChatGPT stays on `/mcp/no-purchases`: OpenAI supports physical-goods commerce
+  only.
