@@ -3,9 +3,20 @@
   "displayName": "Porkbun",
   "version": "1.0.0",
   "description": "Manage the domains you own at Porkbun from Claude: DNS, nameservers, forwarding, DNSSEC, restore points and Secure Static Hosting, including publishing a site Claude builds for you.",
-  "author": { "name": "Porkbun, LLC", "url": "https://porkbun.com" },
+  "author": {
+    "name": "Porkbun, LLC",
+    "url": "https://porkbun.com"
+  },
   "homepage": "https://porkbun.com/mcp",
+  "privacyPolicyUrl": "https://porkbun.com/legal/agreement/privacy_policy",
   "repository": "https://github.com/oborseth/Porkbun-MCP",
   "license": "MIT",
-  "keywords": ["porkbun", "domains", "dns", "static hosting", "deploy", "registrar"]
+  "keywords": [
+    "porkbun",
+    "domains",
+    "dns",
+    "static hosting",
+    "deploy",
+    "registrar"
+  ]
 }
