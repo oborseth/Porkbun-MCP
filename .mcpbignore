@@ -9,3 +9,4 @@ server.json
 tsconfig.json
 *.mcpb
 .git/
+glama.json
