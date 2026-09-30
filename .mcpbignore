@@ -11,3 +11,5 @@ tsconfig.json
 .git/
 glama.json
 .github/
+gemini-extension.json
+GEMINI.md

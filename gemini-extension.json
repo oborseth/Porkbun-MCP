@@ -1,0 +1,11 @@
+{
+  "name": "porkbun",
+  "version": "0.39.3",
+  "description": "Porkbun's official MCP server: domains, DNS, nameservers, DNSSEC, URL forwarding, DNS restore points, static hosting deploys, webhooks and Cloudflare-connected domains.",
+  "mcpServers": {
+    "porkbun": {
+      "httpUrl": "https://mcp.porkbun.com/mcp"
+    }
+  },
+  "contextFileName": "GEMINI.md"
+}

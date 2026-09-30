@@ -184,6 +184,17 @@ then `/plugin install porkbun@porkbun` (the repo root carries a marketplace file
 with `claude --plugin-dir ./plugin`. Raise `version`
 in `plugin/.claude-plugin/plugin.json` with every change to the folder.
 
+## Gemini CLI
+
+```
+gemini extensions install https://github.com/oborseth/Porkbun-MCP
+```
+
+Adds the hosted server (`gemini-extension.json` at the repo root) and a short
+`GEMINI.md` with usage rules. Then run `/mcp auth porkbun` to sign in with your
+Porkbun account. Keep `version` in `gemini-extension.json` in step with
+`package.json`: the extension gallery picks up tagged releases.
+
 ## Install
 
 You'll need [Node.js](https://nodejs.org) 18 or newer.
