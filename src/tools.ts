@@ -207,6 +207,50 @@ const get_balance: Tool = {
   },
 };
 
+const list_invoices: Tool = {
+  name: "list_invoices",
+  description:
+    "List the account's invoices (one per order), newest first, with each one's date, state (`PAID`, `PARTIALLY_REFUNDED`, `REFUNDED` or `UNPAID`), net total in cents and the domains on it. `total_cents` is what the customer was left paying: refunds are netted out. Each invoice has `url`, its page on porkbun.com, which is the easiest thing to hand a user who wants to see or print one. Use `get_invoice` for the lines and `get_invoice_pdf` for the file.",
+  inputSchema: {
+    year: z.number().int().min(2000).max(2100).optional().describe("Only invoices from this year, e.g. 2026."),
+    start: z.number().int().nonnegative().optional().describe("Paging offset. Default 0."),
+    limit: z.number().int().positive().max(100).optional().describe("Invoices per page, max 100. Default 50."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const qs = new URLSearchParams();
+    for (const k of ["year", "start", "limit"]) if (args[k] !== undefined) qs.set(k, String(args[k]));
+    const q = qs.toString();
+    return await call(config, `/account/invoices${q ? "?" + q : ""}`, { method: "GET" });
+  },
+};
+
+const get_invoice: Tool = {
+  name: "get_invoice",
+  description:
+    "Get one invoice as data: who it is billed to, how it was paid (card brand and last four only), each line with its product, term, resulting domain expiry and status, and the gross, refunded and net totals in cents. The same figures as the PDF. `url` and `pdfUrl` open it on porkbun.com (the user must be signed in). Invoice IDs come from `list_invoices`; an ID not on this account returns `INVOICE_NOT_FOUND`.",
+  inputSchema: {
+    invoice_id: z.number().int().positive().describe("Invoice (order) ID from `list_invoices`."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    return await call(config, `/account/invoice/${Number(args.invoice_id)}`, { method: "GET" });
+  },
+};
+
+const get_invoice_pdf: Tool = {
+  name: "get_invoice_pdf",
+  description:
+    "Get an invoice as a PDF file, base64-encoded in `contentBase64`, with `filename` and `sizeBytes`: the same document as Download PDF on porkbun.com. Use it when the file itself is needed (to save, attach or forward it). If the user only wants to look at it, `get_invoice` is lighter and its `pdfUrl` opens the PDF on porkbun.com.",
+  inputSchema: {
+    invoice_id: z.number().int().positive().describe("Invoice (order) ID from `list_invoices`."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    return await call(config, `/account/invoicePdf/${Number(args.invoice_id)}`, { method: "GET" });
+  },
+};
+
 const get_auto_topup: Tool = {
   name: "get_auto_topup",
   description:
@@ -2174,6 +2218,9 @@ export const tools: Tool[] = [
   get_domain,
   get_balance,
   get_auto_topup,
+  list_invoices,
+  get_invoice,
+  get_invoice_pdf,
   configure_auto_topup,
   top_up_account_credit,
   get_api_settings,

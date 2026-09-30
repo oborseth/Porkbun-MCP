@@ -86,6 +86,10 @@ const CREDENTIAL_INPUTS = ["update_transfer_auth_code"];
 // cancel_transfer refunds a paid order, and update_auto_renew turning renewal on
 // authorises charges at expiry (close to "initiating a subscription").
 const MONEY_ADJACENT = ["cancel_transfer", "update_auto_renew"];
+// Invoice tools (0.39.0) are read-only, but held off the directory path while
+// the ChatGPT review of it is still open: its tool list is what was submitted.
+// Move them onto /mcp/no-purchases once that review has concluded.
+const HELD_FOR_REVIEW = ["list_invoices", "get_invoice", "get_invoice_pdf"];
 
 const FUNDING_NO_TOPUPS =
   "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). On this connection, adding money is the account holder's step: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. Auto top-up, which they can set in their API settings (https://porkbun.com/account/api), refills the balance from their saved card on its own next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08).";
@@ -105,7 +109,7 @@ export const PROFILES: Profile[] = [
   },
   {
     path: "/mcp/no-purchases",
-    exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES, ...SECRETS, ...CREDENTIAL_INPUTS, ...MONEY_ADJACENT]),
+    exclude: new Set([...SANDBOX, ...TOPUPS, ...PURCHASES, ...SECRETS, ...CREDENTIAL_INPUTS, ...MONEY_ADJACENT, ...HELD_FOR_REVIEW]),
     redactKeys: ["secret"],
     redactNote: "On this connection the webhook signing secret is not returned: the `secret` field holds a note instead. The user sees or rotates the secret in their Porkbun API settings (https://porkbun.com/account/api).",
     // No purchase redirects here: OpenAI supports physical-goods commerce only, so

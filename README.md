@@ -32,6 +32,9 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `get_domain` | Get metadata for a single domain in the account |
 | `get_balance` | Get account credit balance |
 | `get_auto_topup` | Read auto top-up settings, whether a card is on file, and what a top-up would charge |
+| `list_invoices` | The account's invoices, newest first: date, paid/refunded state, net total, domains, and a link to each on porkbun.com |
+| `get_invoice` | One invoice as data: bill-to, payment method, lines with terms and expiry dates, and totals |
+| `get_invoice_pdf` | The invoice PDF (base64), the same document as Download PDF on porkbun.com |
 | `get_api_settings` | Get monthly spend limit, low-balance alert, auto top-up config, MTD spend |
 | `get_nameservers` | Get current nameservers for a domain |
 | `list_dns_records` | List DNS records for a domain |
