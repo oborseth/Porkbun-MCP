@@ -196,6 +196,7 @@ interface UsageEvent {
 // Coarse family from the User-Agent; the raw string is not logged.
 function uaFamily(ua: string): string {
   const u = ua.toLowerCase();
+  if (/codex/.test(u)) return "codex";
   if (/openai|chatgpt/.test(u)) return "chatgpt";
   if (/claude|anthropic/.test(u)) return "claude";
   if (/cursor/.test(u)) return "cursor";
@@ -223,7 +224,14 @@ function describeRequest(body: unknown, ev: UsageEvent) {
     if (method === "tools/call") ev.tools.push({ name: str(msg.params?.name, 64) ?? "?" });
     if (method === "initialize") {
       const ci = msg.params?.clientInfo as Record<string, unknown> | undefined;
-      if (ci) ev.client = { name: str(ci.name, 60), version: str(ci.version, 40) };
+      if (ci) {
+        ev.client = { name: str(ci.name, 60), version: str(ci.version, 40) };
+        // A client that names itself is a better guide than a bare User-Agent.
+        if (ev.ua === "other" || ev.ua === "none" || ev.ua === "node") {
+          const fam = uaFamily(String(ci.name ?? ""));
+          if (fam !== "other" && fam !== "none") ev.ua = fam;
+        }
+      }
     }
   }
 }
@@ -231,7 +239,11 @@ function describeRequest(body: unknown, ev: UsageEvent) {
 // How it ended, from the JSON response: per tools/call whether the result was
 // an error, and any JSON-RPC error codes. Responses come back in request order
 // for a batch; tools/call results are matched to tool names in that order.
-function describeResponse(raw: string, ev: UsageEvent) {
+// Error messages are kept only for transport rejections (HTTP 4xx), which
+// describe the request's shape. A JSON-RPC error inside a 200 can be a
+// validation error (-32602) that quotes part of a tool argument, so only its
+// code is kept.
+function describeResponse(raw: string, ev: UsageEvent, keepMessages: boolean) {
   let body: unknown;
   try {
     body = JSON.parse(raw);
@@ -244,7 +256,7 @@ function describeResponse(raw: string, ev: UsageEvent) {
     if (!m || typeof m !== "object") continue;
     const msg = m as { result?: { isError?: boolean; content?: unknown }; error?: { code?: number; message?: string } };
     if (msg.error) {
-      (ev.errors ??= []).push({ code: msg.error.code, message: str(msg.error.message, 160) });
+      (ev.errors ??= []).push(keepMessages ? { code: msg.error.code, message: str(msg.error.message, 160) } : { code: msg.error.code });
       if (ev.tools[toolIdx] && !ev.tools[toolIdx].outcome) ev.tools[toolIdx++].outcome = `rpc_error:${msg.error.code ?? "?"}`;
     } else if (msg.result && "content" in msg.result && ev.tools[toolIdx]) {
       ev.tools[toolIdx++].outcome = msg.result.isError ? "isError" : "ok";
@@ -358,7 +370,7 @@ const server = http.createServer(async (req, res) => {
     (res as unknown as { end: unknown }).end = (chunk?: unknown, ...rest: unknown[]) => {
       if (chunk && typeof chunk !== "function") keep(chunk);
       if (ev && captured > 0 && captured <= CAPTURE_MAX) {
-        describeResponse(Buffer.concat(chunks).toString("utf8"), ev);
+        describeResponse(Buffer.concat(chunks).toString("utf8"), ev, res.statusCode >= 400);
         if (res.statusCode >= 400 && !ev.reason) ev.reason = ev.errors?.[0]?.message ?? "transport_rejected";
       } else if (ev && captured > CAPTURE_MAX) {
         for (const t of ev.tools) t.outcome ??= "unparsed_large";
