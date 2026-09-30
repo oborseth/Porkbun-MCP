@@ -78,8 +78,19 @@ rebuilds and restarts the previous commit automatically.
 
 ```bash
 journalctl -u porkbun-mcp -f      # one line per request; never contains tokens or bodies
+journalctl -u porkbun-mcp --since today | grep '^.*mcp_event ' | sed 's/^.*mcp_event //'   # usage events, one JSON object each
 systemctl status porkbun-mcp
 ```
+
+Each request on an MCP path also logs an `mcp_event {json}` line: `path`,
+`status`, `ms`, the JSON-RPC `methods`, `tools` (name and `outcome`: `ok`,
+`isError`, `rpc_error:<code>`), `client` (from `initialize`'s clientInfo),
+`ua` (a coarse family: chatgpt, claude, cursor, vscode, ...; never the raw
+string), `proto` (MCP-Protocol-Version), `conn` (an anonymous connection id
+that survives token refresh: porkbun.com's `/ping` returns a keyed hash of the
+connection's API key for connector tokens), and `reason` for rejected requests
+(`no_token`, `invalid_token`, `bad_json`, `too_large`, `method_GET`, or the
+transport's error message). Never tokens, tool arguments or results.
 
 The unit is sandboxed (read-only filesystem, no home, no new privileges, 768 MB
 memory cap) and restarts on failure, giving up after 10 crashes in a minute so

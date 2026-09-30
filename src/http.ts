@@ -67,11 +67,15 @@ const baseConfig: PorkbunConfig = { ...loadConfig(), apiKey: "", secretApiKey: "
 // token -> time the positive answer stops being trusted. Kept short so a
 // revoked or expired token is refused at the MCP layer (with a proper 401)
 // within seconds rather than only failing inside a tool call.
-const tokenCache = new Map<string, number>();
+const tokenCache = new Map<string, { until: number; conn: string | null }>();
 
-async function tokenIsValid(token: string): Promise<boolean> {
+// Validates the token and returns the connection's anonymous id (from /ping's
+// connectionId: a keyed hash of the connection's API key, stable across token
+// refreshes), or null when the token is not valid. Throws when the API cannot
+// be reached.
+async function tokenIsValid(token: string): Promise<{ ok: boolean; conn: string | null }> {
   const cached = tokenCache.get(token);
-  if (cached && cached > Date.now()) return true;
+  if (cached && cached.until > Date.now()) return { ok: true, conn: cached.conn };
 
   try {
     // /ping authenticates the bearer the same way every endpoint does, so a
@@ -86,17 +90,18 @@ async function tokenIsValid(token: string): Promise<boolean> {
       body: "{}",
       signal: AbortSignal.timeout(5000),
     });
-    const data = (await res.json().catch(() => ({}))) as { status?: string; credentialsValid?: boolean };
+    const data = (await res.json().catch(() => ({}))) as { status?: string; credentialsValid?: boolean; connectionId?: string };
     const ok = res.ok && data.status === "SUCCESS" && data.credentialsValid !== false;
+    const conn = typeof data.connectionId === "string" && /^[a-f0-9]{8,64}$/.test(data.connectionId) ? data.connectionId : null;
 
     if (ok) {
-      tokenCache.set(token, Date.now() + TOKEN_CACHE_MS);
+      tokenCache.set(token, { until: Date.now() + TOKEN_CACHE_MS, conn });
       if (tokenCache.size > 50_000) tokenCache.clear();
     } else {
       tokenCache.delete(token);
     }
 
-    return ok;
+    return { ok, conn };
   } catch {
     // Cannot reach the API: do not tell the client its token is bad (that
     // would make it throw the token away and re-prompt the user). A 503 lets it
@@ -168,6 +173,85 @@ const protectedResourceMetadata = (p: Profile) => ({
   resource_documentation: "https://porkbun.com/mcp",
 });
 
+// ── Usage events ─────────────────────────────────────────────────────────────
+//
+// One "mcp_event {json}" line per request on a profile path, after the plain
+// request line, for usage stats: which JSON-RPC methods, which tools and how
+// they ended, which client, and an anonymous connection id. Never the token,
+// tool arguments or tool results: only method and tool names, outcomes, error
+// codes and short error messages from the transport.
+
+interface UsageEvent {
+  path: string;
+  methods: string[];
+  tools: { name: string; outcome?: string }[];
+  client?: { name?: string; version?: string };
+  ua: string;
+  proto?: string;
+  conn?: string | null;
+  reason?: string;
+  errors?: { code?: number; message?: string }[];
+}
+
+// Coarse family from the User-Agent; the raw string is not logged.
+function uaFamily(ua: string): string {
+  const u = ua.toLowerCase();
+  if (/openai|chatgpt/.test(u)) return "chatgpt";
+  if (/claude|anthropic/.test(u)) return "claude";
+  if (/cursor/.test(u)) return "cursor";
+  if (/vscode|copilot|visual studio code/.test(u)) return "vscode";
+  if (/cline/.test(u)) return "cline";
+  if (/windsurf|codeium/.test(u)) return "windsurf";
+  if (/python|httpx|aiohttp/.test(u)) return "python";
+  if (/node|undici|axios|mcp-remote/.test(u)) return "node";
+  if (/curl|wget/.test(u)) return "cli";
+  return ua ? "other" : "none";
+}
+
+const str = (v: unknown, max = 80) => (typeof v === "string" ? v.slice(0, max) : undefined);
+
+// What the request asked for. Reads only method names, the tool name and
+// initialize's clientInfo, never params beyond that.
+function describeRequest(body: unknown, ev: UsageEvent) {
+  const msgs = Array.isArray(body) ? body : body ? [body] : [];
+  for (const m of msgs) {
+    if (!m || typeof m !== "object") continue;
+    const msg = m as { method?: unknown; params?: Record<string, unknown> };
+    const method = str(msg.method, 60);
+    if (!method) continue;
+    ev.methods.push(method);
+    if (method === "tools/call") ev.tools.push({ name: str(msg.params?.name, 64) ?? "?" });
+    if (method === "initialize") {
+      const ci = msg.params?.clientInfo as Record<string, unknown> | undefined;
+      if (ci) ev.client = { name: str(ci.name, 60), version: str(ci.version, 40) };
+    }
+  }
+}
+
+// How it ended, from the JSON response: per tools/call whether the result was
+// an error, and any JSON-RPC error codes. Responses come back in request order
+// for a batch; tools/call results are matched to tool names in that order.
+function describeResponse(raw: string, ev: UsageEvent) {
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  const msgs = Array.isArray(body) ? body : [body];
+  let toolIdx = 0;
+  for (const m of msgs) {
+    if (!m || typeof m !== "object") continue;
+    const msg = m as { result?: { isError?: boolean; content?: unknown }; error?: { code?: number; message?: string } };
+    if (msg.error) {
+      (ev.errors ??= []).push({ code: msg.error.code, message: str(msg.error.message, 160) });
+      if (ev.tools[toolIdx] && !ev.tools[toolIdx].outcome) ev.tools[toolIdx++].outcome = `rpc_error:${msg.error.code ?? "?"}`;
+    } else if (msg.result && "content" in msg.result && ev.tools[toolIdx]) {
+      ev.tools[toolIdx++].outcome = msg.result.isError ? "isError" : "ok";
+    }
+  }
+}
+
 // ── Server ───────────────────────────────────────────────────────────────────
 
 const server = http.createServer(async (req, res) => {
@@ -175,9 +259,14 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url || "/", PUBLIC_URL);
   const path = url.pathname.replace(/\/+$/, "") || "/";
 
+  let ev: UsageEvent | null = null;
+
   res.on("finish", () => {
     // Never log the token or bodies.
-    console.log(`${new Date().toISOString()} ${req.method} ${path} ${res.statusCode} ${Date.now() - started}ms`);
+    const ts = new Date().toISOString();
+    const ms = Date.now() - started;
+    console.log(`${ts} ${req.method} ${path} ${res.statusCode} ${ms}ms`);
+    if (ev) console.log(`mcp_event ${JSON.stringify({ t: ts, status: res.statusCode, ms, ...ev })}`);
   });
 
   try {
@@ -203,21 +292,39 @@ const server = http.createServer(async (req, res) => {
       return send(res, 404, { error: "not_found" });
     }
 
+    ev = {
+      path,
+      methods: [],
+      tools: [],
+      ua: uaFamily(String(req.headers["user-agent"] ?? "")),
+      proto: str(req.headers["mcp-protocol-version"], 20),
+    };
+
     const token = bearerFrom(req);
-    if (!token) return unauthorized(res, false, profile);
+    if (!token) {
+      ev.reason = "no_token";
+      return unauthorized(res, false, profile);
+    }
     if (!token.startsWith("pbo_at_")) return unauthorized(res, true, profile);
 
     let valid: boolean;
     try {
-      valid = await tokenIsValid(token);
+      const check = await tokenIsValid(token);
+      valid = check.ok;
+      ev.conn = check.conn;
     } catch {
+      ev.reason = "api_unreachable";
       return send(res, 503, { error: "temporarily_unavailable" }, { "Retry-After": "5" });
     }
-    if (!valid) return unauthorized(res, true, profile);
+    if (!valid) {
+      ev.reason = "invalid_token";
+      return unauthorized(res, true, profile);
+    }
 
     // Stateless: no standalone SSE stream to open (GET) and no session to end
     // (DELETE). Clients handle a 405 here as "not supported".
     if (req.method !== "POST") {
+      ev.reason = `method_${req.method}`;
       return send(res, 405, { error: "method_not_allowed" }, { Allow: "POST" });
     }
 
@@ -225,8 +332,39 @@ const server = http.createServer(async (req, res) => {
     try {
       body = await readJson(req);
     } catch (e) {
+      ev.reason = (e as Error).message;
       return send(res, (e as Error).message === "too_large" ? 413 : 400, { error: (e as Error).message });
     }
+    describeRequest(body, ev);
+
+    // Keep a copy of the JSON response (capped) to read tool outcomes, error
+    // codes and transport rejections from. Only summarised, never logged.
+    const chunks: Buffer[] = [];
+    let captured = 0;
+    const CAPTURE_MAX = 2 * 1024 * 1024;
+    const keep = (c: unknown) => {
+      if (c == null || captured > CAPTURE_MAX) return;
+      // The SDK writes Uint8Array chunks (web streams), not always Buffers.
+      const b = Buffer.isBuffer(c) ? c : c instanceof Uint8Array ? Buffer.from(c.buffer, c.byteOffset, c.byteLength) : Buffer.from(String(c));
+      captured += b.length;
+      if (captured <= CAPTURE_MAX) chunks.push(b);
+    };
+    const origWrite = res.write.bind(res) as (...a: unknown[]) => boolean;
+    const origEnd = res.end.bind(res) as (...a: unknown[]) => http.ServerResponse;
+    (res as unknown as { write: unknown }).write = (chunk: unknown, ...rest: unknown[]) => {
+      keep(chunk);
+      return origWrite(chunk, ...rest);
+    };
+    (res as unknown as { end: unknown }).end = (chunk?: unknown, ...rest: unknown[]) => {
+      if (chunk && typeof chunk !== "function") keep(chunk);
+      if (ev && captured > 0 && captured <= CAPTURE_MAX) {
+        describeResponse(Buffer.concat(chunks).toString("utf8"), ev);
+        if (res.statusCode >= 400 && !ev.reason) ev.reason = ev.errors?.[0]?.message ?? "transport_rejected";
+      } else if (ev && captured > CAPTURE_MAX) {
+        for (const t of ev.tools) t.outcome ??= "unparsed_large";
+      }
+      return origEnd(chunk, ...rest);
+    };
 
     const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), {
       exclude: profile.exclude,
