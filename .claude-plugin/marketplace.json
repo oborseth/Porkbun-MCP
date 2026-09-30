@@ -1,0 +1,16 @@
+{
+  "name": "porkbun",
+  "owner": { "name": "Porkbun, LLC", "url": "https://porkbun.com" },
+  "metadata": {
+    "description": "Porkbun's official plugin: the hosted Porkbun connector plus skills for publishing websites and changing DNS safely."
+  },
+  "plugins": [
+    {
+      "name": "porkbun",
+      "source": "./plugin",
+      "description": "Manage the domains you own at Porkbun: DNS, nameservers, forwarding, DNSSEC, restore points and Secure Static Hosting, including publishing a site Claude builds for you.",
+      "homepage": "https://porkbun.com/mcp",
+      "license": "MIT"
+    }
+  ]
+}

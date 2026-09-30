@@ -175,7 +175,10 @@ Porkbun POSTs a signed JSON payload to your endpoint when subscribed events occu
 hosted connector at `https://mcp.porkbun.com/mcp/no-purchases` plus two skills,
 `publish-website` (publish a site Claude builds to Porkbun Secure Static
 Hosting instead of giving upload steps) and `change-dns-safely`. It holds no
-code. To try it in Claude Code: `claude --plugin-dir ./plugin`. Raise `version`
+code. Install it in Claude Code with `/plugin marketplace add oborseth/Porkbun-MCP`
+then `/plugin install porkbun@porkbun` (the repo root carries a marketplace file,
+`.claude-plugin/marketplace.json`, pointing at `./plugin`), or try a working copy
+with `claude --plugin-dir ./plugin`. Raise `version`
 in `plugin/.claude-plugin/plugin.json` with every change to the folder.
 
 ## Install
