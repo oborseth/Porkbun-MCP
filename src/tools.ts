@@ -32,7 +32,16 @@ export interface Tool<S extends ZodRawShape = ZodRawShape> {
    */
   hostedDescription?: string;
   handler: (config: PorkbunConfig, args: Record<string, unknown>) => Promise<unknown>;
+  /**
+   * Shape the MCP result content from the handler's result, when plain JSON text
+   * is the wrong vessel (a file). Default: the result as pretty-printed JSON text.
+   */
+  toContent?: (result: unknown) => ToolContent[];
 }
+
+export type ToolContent =
+  | { type: "text"; text: string }
+  | { type: "resource"; resource: { uri: string; mimeType: string; blob: string } };
 
 // Money parameters carry their unit in the NAME (`amount_cents`, `cost_cents`).
 // The unit used to live only in the description, and ChatGPT's approval dialog,
@@ -228,7 +237,7 @@ const list_invoices: Tool = {
 const get_invoice: Tool = {
   name: "get_invoice",
   description:
-    "Get one invoice as data: who it is billed to, how it was paid (card brand and last four only), each line with its product, term, resulting domain expiry and status, and the gross, refunded and net totals in cents. The same figures as the PDF. `url` and `pdfUrl` open it on porkbun.com (the user must be signed in). Invoice IDs come from `list_invoices`; an ID not on this account returns `INVOICE_NOT_FOUND`.",
+    "Get one invoice as data: who it is billed to, how it was paid (card brand and last four only), each line with its product, term, resulting domain expiry and status, and the gross, refunded and net totals in cents. The same figures as the PDF. `url` and `pdfUrl` open it on porkbun.com (the user must be signed in); `downloadUrl` downloads the PDF without signing in for 15 minutes, which is the link to hand a user who wants the file. Invoice IDs come from `list_invoices`; an ID not on this account returns `INVOICE_NOT_FOUND`.",
   inputSchema: {
     invoice_id: z.number().int().positive().describe("Invoice (order) ID from `list_invoices`."),
   },
@@ -241,13 +250,31 @@ const get_invoice: Tool = {
 const get_invoice_pdf: Tool = {
   name: "get_invoice_pdf",
   description:
-    "Get an invoice as a PDF file, base64-encoded in `contentBase64`, with `filename` and `sizeBytes`: the same document as Download PDF on porkbun.com. Use it when the file itself is needed (to save, attach or forward it). If the user only wants to look at it, `get_invoice` is lighter and its `pdfUrl` opens the PDF on porkbun.com.",
+    "Get an invoice PDF: the same document as Download PDF on porkbun.com. The file comes back as an embedded PDF resource (for clients that can show or save files), alongside `filename`, `sizeBytes` and `downloadUrl`, a link that downloads it without signing in for 15 minutes (`downloadExpires`). To give the user the file, hand them `downloadUrl`; do not try to reproduce the file's bytes yourself. `get_invoice` also returns a `downloadUrl` if you only need the link.",
   inputSchema: {
     invoice_id: z.number().int().positive().describe("Invoice (order) ID from `list_invoices`."),
   },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     return await call(config, `/account/invoicePdf/${Number(args.invoice_id)}`, { method: "GET" });
+  },
+  // The PDF goes back as an embedded resource (a file block), not as base64 in
+  // the JSON text: clients that support resources can show or save it directly,
+  // and the model is not left copying ~20k characters to rebuild the file. The
+  // text part keeps the metadata and the short-lived downloadUrl, which works
+  // in any client.
+  toContent: (result) => {
+    const r = (result ?? {}) as Record<string, unknown>;
+    const blob = typeof r.contentBase64 === "string" ? r.contentBase64 : "";
+    const { contentBase64: _omit, ...meta } = r;
+    const content: ToolContent[] = [{ type: "text", text: JSON.stringify(meta, null, 2) }];
+    if (blob) {
+      content.push({
+        type: "resource",
+        resource: { uri: `porkbun://invoices/${String(r.filename ?? "invoice.pdf")}`, mimeType: String(r.contentType ?? "application/pdf"), blob },
+      });
+    }
+    return content;
   },
 };
 
