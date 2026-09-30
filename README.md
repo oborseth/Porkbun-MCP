@@ -215,7 +215,9 @@ Restart Claude Desktop. Porkbun tools should appear in the tool picker.
 
 ### Cursor / Cline / Continue
 
-Most MCP-aware editors use a similar `mcpServers` config block. See your client's documentation for the exact location.
+**Cursor, one click:** [Add Porkbun to Cursor](cursor://anysphere.cursor-deeplink/mcp/install?name=porkbun&config=eyJ1cmwiOiJodHRwczovL21jcC5wb3JrYnVuLmNvbS9tY3AifQ==) adds the hosted server (`https://mcp.porkbun.com/mcp`); you sign in with Porkbun on first use, no API key. If the link doesn't open from here (some sites strip `cursor://` links), use the button on https://porkbun.com/mcp.
+
+For the local server, most MCP-aware editors use the same `mcpServers` config block as above. See your client's documentation for the exact location. Agents installing it can follow [llms-install.md](llms-install.md).
 
 ## Get API keys
 
