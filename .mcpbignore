@@ -10,3 +10,4 @@ tsconfig.json
 *.mcpb
 .git/
 glama.json
+.github/

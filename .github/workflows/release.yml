@@ -1,0 +1,47 @@
+# Tag and publish a GitHub release whenever package.json's version changes on
+# main. npm publishing stays manual; this only records each version on GitHub,
+# where directories (Glama and others) read maintenance from releases.
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: [package.json]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Release this version unless it already has a tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG already exists; nothing to do."
+            exit 0
+          fi
+
+          # Notes: every commit since the previous release tag.
+          PREV=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          {
+            echo "npm: https://www.npmjs.com/package/@porkbunllc/mcp-server/v/$VERSION"
+            echo
+            echo "## Changes"
+            if [ -n "$PREV" ]; then
+              git log --no-merges --pretty='- %s (%h)' "$PREV..HEAD"
+            else
+              git log --no-merges --pretty='- %s (%h)' -n 20
+            fi
+          } > notes.md
+
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "$TAG" --notes-file notes.md
