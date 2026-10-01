@@ -1,7 +1,7 @@
 {
   "name": "porkbun",
   "displayName": "Porkbun",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Manage the domains you own at Porkbun from Claude: DNS, nameservers, forwarding, DNSSEC, restore points and Secure Static Hosting, including publishing a site Claude builds for you.",
   "author": {
     "name": "Porkbun, LLC",

@@ -175,9 +175,10 @@ Porkbun POSTs a signed JSON payload to your endpoint when subscribed events occu
 ## Claude plugin
 
 [`plugin/`](plugin/) is a Claude plugin (claude.ai, Cowork and Claude Code): the
-hosted connector at `https://mcp.porkbun.com/mcp/no-purchases` plus two skills,
+hosted connector at `https://mcp.porkbun.com/mcp/no-purchases` plus four skills:
 `publish-website` (publish a site Claude builds to Porkbun Secure Static
-Hosting instead of giving upload steps) and `change-dns-safely`. It holds no
+Hosting instead of giving upload steps), `change-dns-safely`, `diagnose-domain`
+(site down, mail bouncing, DNS not updating) and `move-dns-to-porkbun`. It holds no
 code. Install it in Claude Code with `/plugin marketplace add oborseth/Porkbun-MCP`
 then `/plugin install porkbun@porkbun` (the repo root carries a marketplace file,
 `.claude-plugin/marketplace.json`, pointing at `./plugin`), or try a working copy

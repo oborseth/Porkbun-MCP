@@ -15,6 +15,13 @@ domain's Porkbun hosting, instead of handing you upload steps.
 - **publish-website** skill: when you ask Claude to build or update a site for
   a Porkbun domain, it checks your hosting, shows which files would be
   replaced, asks you, uploads, and confirms the files are live.
+- **diagnose-domain** skill: when a site is down, email stops arriving or
+  DNS changes do not show up, Claude checks the likely causes in order
+  (domain status, who answers DNS, records, hosting, mail records, DNSSEC)
+  and explains what it found before proposing a fix.
+- **move-dns-to-porkbun** skill: moves a domain's DNS to Porkbun without
+  downtime by copying the current records, checking with a preflight, and
+  only then switching nameservers, with your OK.
 - **change-dns-safely** skill: for DNS work, Claude reads the current records
   first, tells you exactly what it will change, asks before writing, runs a
   preflight before nameserver or DNSSEC changes, and can roll a zone back to a
