@@ -1594,15 +1594,16 @@ const list_hosting_files: Tool = {
 
 const delete_hosting_file: Tool = {
   name: "delete_hosting_file",
-  description: "Delete a file (or empty directory) at `path` in a domain's Secure Static Hosting space. Calls the Porkbun Hosting API (https://porkbun.com/llms/hosting).",
+  description: "Delete a file or directory at `path` in a domain's Secure Static Hosting space. Idempotent: a path that is already gone succeeds with `alreadyAbsent: true`, so there is no need to re-check before retrying. A directory that still has files fails with `HOSTING_DIR_NOT_EMPTY` and lists its `contents`; pass `recursive: true` to delete a directory with everything in it in one call (up to 2,000 items; the site root can never be deleted). To clear out a site, delete its top-level entries with `recursive: true` rather than file by file. Calls the Porkbun Hosting API (https://porkbun.com/llms/hosting).",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting file to delete."),
-    path: z.string().min(1).describe("Path to delete, e.g. `old/page.html`."),
+    path: z.string().min(1).describe("Path to delete, e.g. `old/page.html` or `assets`."),
+    recursive: z.boolean().optional().describe("Delete a directory together with everything inside it. Default false."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    return await call(config, `/hosting/deleteFile/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
+    return await call(config, `/hosting/deleteFile/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path), ...(args.recursive ? { recursive: true } : {}) } });
   },
 };
 
