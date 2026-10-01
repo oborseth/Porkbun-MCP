@@ -84,6 +84,14 @@ export interface CallOptions {
  * should start with a slash (e.g. `/domain/listAll`). Auth is injected
  * automatically: header-based for GET, body-based for POST.
  */
+/** An API error response, with its stable code and (for rate limits) seconds until the window resets. */
+export class PorkbunApiError extends Error {
+  constructor(message: string, readonly code?: string, readonly ttlRemaining?: number) {
+    super(message);
+    this.name = "PorkbunApiError";
+  }
+}
+
 export async function call<T = unknown>(
   config: PorkbunConfig,
   path: string,
@@ -148,6 +156,7 @@ export async function call<T = unknown>(
     status?: string;
     message?: string;
     code?: string;
+    ttlRemaining?: number;
     next_action?: { type?: string; hint?: string; url?: string };
   };
 
@@ -158,7 +167,7 @@ export async function call<T = unknown>(
     const na = data.next_action?.hint
       ? ` — next: ${data.next_action.hint}${data.next_action.url ? ` (${data.next_action.url})` : ""}`
       : "";
-    throw new Error(`Porkbun API error${code}: ${msg}${na}`);
+    throw new PorkbunApiError(`Porkbun API error${code}: ${msg}${na}`, data.code, typeof data.ttlRemaining === "number" ? data.ttlRemaining : undefined);
   }
 
   return parsed as T;

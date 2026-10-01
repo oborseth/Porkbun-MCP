@@ -1,5 +1,5 @@
 import { z, type ZodRawShape } from "zod";
-import { call, callPublic, fetchDoc, type PorkbunConfig } from "./api.js";
+import { call, callPublic, fetchDoc, type PorkbunConfig, PorkbunApiError } from "./api.js";
 
 export interface ToolAnnotations {
   /** Human-readable title (sometimes shown in MCP client UIs). */
@@ -110,11 +110,28 @@ const check_domain: Tool = {
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    return await call(config, `/domain/checkDomain/${encodeURIComponent(domain)}`, {
+    return await retryOnRateLimit(() => call(config, `/domain/checkDomain/${encodeURIComponent(domain)}`, {
       method: "POST",
-    });
+    }));
   },
 };
+
+// Availability checks are rate limited per key (200 domains / 60 s for batches,
+// 10 / 10 s for single checks). Assistants brainstorming names hit that and got
+// an error mid-task; when the window resets soon, wait it out and retry once so
+// they get the answer instead. Capped well under client tool timeouts.
+const RATE_LIMIT_MAX_WAIT_S = 30;
+async function retryOnRateLimit<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (err) {
+    if (err instanceof PorkbunApiError && err.code === "RATE_LIMIT_EXCEEDED" && err.ttlRemaining !== undefined && err.ttlRemaining <= RATE_LIMIT_MAX_WAIT_S) {
+      await new Promise((r) => setTimeout(r, (Math.max(0, err.ttlRemaining!) + 1) * 1000));
+      return await fn();
+    }
+    throw err;
+  }
+}
 
 const check_domains: Tool = {
   name: "check_domains",
@@ -130,10 +147,10 @@ const check_domains: Tool = {
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domains = (args.domains as string[]).map((d) => String(d).toLowerCase());
-    return await call(config, "/domain/checkDomain", {
+    return await retryOnRateLimit(() => call(config, "/domain/checkDomain", {
       method: "POST",
       body: { domains },
-    });
+    }));
   },
 };
 
