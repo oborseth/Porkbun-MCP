@@ -151,8 +151,8 @@ the API enforces none of it (a token works on any path).
 
 | Path | Tools | Leaves out | For |
 |---|---|---|---|
-| `/mcp` | 98 | the four sandbox-only tools | everyone who adds the URL themselves (documented everywhere) |
-| `/mcp/no-topups` | 96 | + `top_up_account_credit`, `configure_auto_topup` | no listing uses it today (the Claude listing moved to `/mcp/no-purchases`); kept for clients that want purchases without card top-ups |
+| `/mcp` | 100 | the four sandbox-only tools | everyone who adds the URL themselves (documented everywhere) |
+| `/mcp/no-topups` | 96 | + `top_up_account_credit`, `configure_auto_topup`, `top_up_with_usdc`, `get_usdc_topup_status` | no listing uses it today (the Claude listing moved to `/mcp/no-purchases`); kept for clients that want purchases without card top-ups |
 | `/mcp/no-purchases` | 81 | + `register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout`, `create_hosting`; the secret-returning `get_ssl_bundle`, `create_wp_credentials`, `create_webhook`, `rotate_webhook_secret`; `update_transfer_auth_code` (takes a transfer credential); and `cancel_transfer` (refunds) and `update_auto_renew` (future charges); and, for now, the three invoice tools, held off until the ChatGPT review of this path concludes. Webhook `secret` fields are redacted in the rest | both directory listings. ChatGPT: OpenAI allows commerce "only for physical goods", no links to checkout pages, no auth secrets in tool output. Claude: Anthropic's policy bars software that "transfers money ... or executes financial transactions on behalf of users" |
 
 Named for what they leave out, not the vendor, so a path stays accurate if a

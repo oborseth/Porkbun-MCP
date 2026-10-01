@@ -32,6 +32,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `get_domain` | Get metadata for a single domain in the account |
 | `get_balance` | Get account credit balance |
 | `get_auto_topup` | Read auto top-up settings, whether a card is on file, and what a top-up would charge |
+| `top_up_with_usdc` | Add credit with USDC on Base: returns an x402 URL an agent's wallet pays directly, and a payment page for the user |
+| `get_usdc_topup_status` | Whether a USDC top-up has been paid and credited |
 | `list_invoices` | The account's invoices, newest first: date, paid/refunded state, net total, domains, and a link to each on porkbun.com |
 | `get_invoice` | One invoice as data: bill-to, payment method, lines with terms and expiry dates, and totals |
 | `get_invoice_pdf` | The invoice PDF as an embedded file, plus a 15-minute download link that works without signing in |

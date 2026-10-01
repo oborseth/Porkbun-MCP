@@ -82,7 +82,7 @@ function pickCents(args: Record<string, unknown>, name: string, legacy: string, 
 // (the Claude apps, for one) will not charge a card on a user's behalf, and they
 // need a correct next step too.
 export const FUNDING_LOCAL =
-  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. Only when it is false does the user have to add credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
+  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. When it is false there is no card to charge: `top_up_with_usdc` still works (pay its `x402Url` with a wallet tool if you have one, with the user's OK, or hand the user its `payUrl`), or the user adds credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
 
 // ─── Read-only tools ────────────────────────────────────────────────────────
 
@@ -230,6 +230,35 @@ const get_balance: Tool = {
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
     return await call(config, "/account/balance", { method: "GET" });
+  },
+};
+
+const top_up_with_usdc: Tool = {
+  name: "top_up_with_usdc",
+  description:
+    "Add account credit by paying USDC on Base, through a Coinbase checkout. Use it when a purchase failed with INSUFFICIENT_FUNDS and there is no saved card (or the user would rather pay in crypto). Nothing is charged by this call; it returns two ways to pay:\n- `x402Url`: if you have a crypto wallet tool that can pay x402 URLs (for example Coinbase's Agentic Wallet or Wallet MCP, \"make an x402 request\"), pay it with that, with the user's OK and the dollar amount. It is a gasless USDC transfer on Base.\n- `payUrl`: a Coinbase page for the user to pay themselves.\nCredit lands when the payment confirms (usually within a minute), less a network fee of about $0.01; check with `get_usdc_topup_status` and then retry the purchase. `amount_cents` is integer US cents, $5 to $500. Payments are on-chain and cannot be reversed. Not available on sandbox keys (use `sandbox_topup`). Fails with CRYPTO_NOT_AVAILABLE for accounts that cannot use crypto (new accounts, bank-transfer-only accounts); they add credit on porkbun.com instead.",
+  inputSchema: {
+    amount_cents: z.number().int().min(500).max(50000).describe("Credit to add, in integer US cents (500 = $5.00, max 50000 = $500.00)." + CENTS_EXAMPLE),
+    dry_run: z.boolean().optional().describe("If true, check eligibility only; creates no checkout."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { amount: Number(args.amount_cents) };
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, "/account/topupCrypto", { method: "POST", body });
+  },
+};
+
+const get_usdc_topup_status: Tool = {
+  name: "get_usdc_topup_status",
+  description:
+    "Check a USDC top-up from `top_up_with_usdc`: `state` is ACTIVE (not paid yet), PROCESSING (paid, being credited), COMPLETED (credited: `credited` true), EXPIRED or FAILED. Also returns the current balance, so once COMPLETED you can retry the purchase that needed it.",
+  inputSchema: {
+    checkout_id: z.string().min(4).describe("The `checkoutId` returned by `top_up_with_usdc`."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    return await call(config, `/account/topupCryptoStatus/${encodeURIComponent(String(args.checkout_id))}`, { method: "GET" });
   },
 };
 
@@ -2263,6 +2292,8 @@ export const tools: Tool[] = [
   get_domain,
   get_balance,
   get_auto_topup,
+  top_up_with_usdc,
+  get_usdc_topup_status,
   list_invoices,
   get_invoice,
   get_invoice_pdf,
