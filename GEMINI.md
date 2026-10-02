@@ -21,7 +21,8 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
 - **Money:** purchases spend the account's prepaid credit and accept a dry run
   first. Money parameters are integer US cents (`cost_cents: 1108` is $11.08);
   confirm amounts in dollars with the user before anything that spends.
-  With no saved card, `top_up_with_usdc` opens a USDC checkout: pay its
+  With no saved card, `top_up_with_card_mpp` gives a link to pay with the user's
+  card from a Stripe Link agent wallet (MPP), and `top_up_with_usdc` opens a USDC checkout: pay its
   `x402Url` with a wallet tool if you have one (with the user's OK), or give
   the user its `payUrl`. Guide: https://porkbun.com/llms/guides/pay-with-usdc-x402
 

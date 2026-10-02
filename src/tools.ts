@@ -82,7 +82,7 @@ function pickCents(args: Record<string, unknown>, name: string, legacy: string, 
 // (the Claude apps, for one) will not charge a card on a user's behalf, and they
 // need a correct next step too.
 export const FUNDING_LOCAL =
-  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. When it is false there is no card to charge: `top_up_with_usdc` still works (pay its `x402Url` with a wallet tool if you have one, with the user's OK, or hand the user its `payUrl`), or the user adds credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
+  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. When it is false there is no card saved: `top_up_with_card_mpp` gives a link you pay with the user's card from a Stripe Link agent wallet, or `top_up_with_usdc` works (pay its `x402Url` with a wallet tool if you have one, with the user's OK, or hand the user its `payUrl`), or the user adds credit at https://porkbun.com/account/credit. Suggest `configure_auto_topup` if they want this to happen automatically next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
 
 // ─── Read-only tools ────────────────────────────────────────────────────────
 
@@ -246,6 +246,22 @@ const top_up_with_usdc: Tool = {
     const body: Record<string, unknown> = { amount: Number(args.amount_cents) };
     if (args.dry_run) body.dryRun = true;
     return await call(config, "/account/topupCrypto", { method: "POST", body });
+  },
+};
+
+const top_up_with_card_mpp: Tool = {
+  name: "top_up_with_card_mpp",
+  description:
+    "Get a payment link that adds account credit when paid with the user's CARD over MPP (Machine Payments Protocol), using a Stripe Shared Payment Token from their agent wallet (Stripe's Link Agent Wallet). Use it when a purchase failed with INSUFFICIENT_FUNDS and no card is saved at Porkbun. Nothing is charged by this call. Pay the returned `payUrl` with an MPP-capable wallet tool, for example Stripe's Link CLI or its MCP server (`link-cli mpp pay <payUrl> -X POST --context \"...\"`): it answers 402 with the terms, the wallet asks the user to approve the amount, and the credit is added immediately (the response shows the new balance). Tell the user the dollar amount first. The link is single-use, valid 15 minutes. `amount_cents` is integer US cents, $5 to $500; same limits as card top-ups. Not available on sandbox keys (use `sandbox_topup`). If you cannot pay MPP links, `top_up_with_usdc` or the user adding credit at porkbun.com are the alternatives.",
+  inputSchema: {
+    amount_cents: z.number().int().min(500).max(50000).describe("Credit to add, in integer US cents (500 = $5.00)." + CENTS_EXAMPLE),
+    dry_run: z.boolean().optional().describe("If true, check eligibility and limits only; creates no link."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { amount: Number(args.amount_cents) };
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, "/account/topupMpp", { method: "POST", body });
   },
 };
 
@@ -2293,6 +2309,7 @@ export const tools: Tool[] = [
   get_balance,
   get_auto_topup,
   top_up_with_usdc,
+  top_up_with_card_mpp,
   get_usdc_topup_status,
   list_invoices,
   get_invoice,
