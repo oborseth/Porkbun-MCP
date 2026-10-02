@@ -236,9 +236,9 @@ const get_balance: Tool = {
 const top_up_with_usdc: Tool = {
   name: "top_up_with_usdc",
   description:
-    "Add account credit by paying USDC on Base, through a Coinbase checkout. Use it when a purchase failed with INSUFFICIENT_FUNDS and there is no saved card (or the user would rather pay in crypto). Nothing is charged by this call; it returns two ways to pay:\n- `x402Url`: if you have a crypto wallet tool that can pay x402 URLs (for example Coinbase's Agentic Wallet or Wallet MCP, \"make an x402 request\"), pay it with that, with the user's OK and the dollar amount. It is a gasless USDC transfer on Base.\n- `payUrl`: a Coinbase page for the user to pay themselves.\nCredit lands when the payment confirms (usually within a minute), less a network fee of about $0.01; check with `get_usdc_topup_status` and then retry the purchase. `amount_cents` is integer US cents, $5 to $500. Payments are on-chain and cannot be reversed. Not available on sandbox keys (use `sandbox_topup`). Fails with CRYPTO_NOT_AVAILABLE for accounts that cannot use crypto (new accounts, bank-transfer-only accounts); they add credit on porkbun.com instead.",
+    "Add account credit by paying USDC on Base, through a Coinbase checkout. Use it when a purchase failed with INSUFFICIENT_FUNDS and there is no saved card (or the user would rather pay in crypto). Nothing is charged by this call; it returns two ways to pay:\n- `x402Url`: if you have a crypto wallet tool that can pay x402 URLs (for example Coinbase's Agentic Wallet or Wallet MCP, \"make an x402 request\"), pay it with that, with the user's OK and the dollar amount. It is a gasless USDC transfer on Base.\n- `payUrl`: a Coinbase page for the user to pay themselves.\nCredit lands when the payment confirms (usually within a minute), less Coinbase's fee of about 1% (`estimatedCredit_cents` in the response); check with `get_usdc_topup_status` and then retry the purchase. `amount_cents` is integer US cents, $1 to $500. To cover an INSUFFICIENT_FUNDS shortfall exactly (a $2.50 domain, say), use that error's `usdcAmountToCover`, which allows for the fee. Payments are on-chain and cannot be reversed. Not available on sandbox keys (use `sandbox_topup`). Fails with CRYPTO_NOT_AVAILABLE for accounts that cannot use crypto (new accounts, bank-transfer-only accounts); they add credit on porkbun.com instead.",
   inputSchema: {
-    amount_cents: z.number().int().min(500).max(50000).describe("Credit to add, in integer US cents (500 = $5.00, max 50000 = $500.00)." + CENTS_EXAMPLE),
+    amount_cents: z.number().int().min(100).max(50000).describe("Checkout amount in integer US cents (100 = $1.00, max 50000 = $500.00); credit is this less about 1%. For a shortfall, pass INSUFFICIENT_FUNDS's `usdcAmountToCover`." + CENTS_EXAMPLE),
     dry_run: z.boolean().optional().describe("If true, check eligibility only; creates no checkout."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -246,6 +246,34 @@ const top_up_with_usdc: Tool = {
     const body: Record<string, unknown> = { amount: Number(args.amount_cents) };
     if (args.dry_run) body.dryRun = true;
     return await call(config, "/account/topupCrypto", { method: "POST", body });
+  },
+};
+
+const send_phone_verification_code: Tool = {
+  name: "send_phone_verification_code",
+  description:
+    "Text a verification code to the phone number on the user's Porkbun account, to clear VERIFICATION_REQUIRED (purchases and top-ups need a verified phone and email, and new accounts are not asked to verify the phone at signup). Then ask the user for the code they received and call `confirm_phone_verification`. The number on the account is used; it cannot be chosen or changed here. If the text does not arrive, call again with `channel: \"call\"` to have the code read out by phone. A second request within 10 minutes returns `codeAlreadySent` rather than texting again. Some countries can only verify on the website (PHONE_VERIFY_UNAVAILABLE); up to 5 sends a day.",
+  inputSchema: {
+    channel: z.enum(["sms", "call"]).optional().describe("`sms` (default) or `call` for a voice call."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.channel) body.channel = args.channel;
+    return await call(config, "/account/verifyPhone/send", { method: "POST", body });
+  },
+};
+
+const confirm_phone_verification: Tool = {
+  name: "confirm_phone_verification",
+  description:
+    "Verify the account's phone number with the code the user received from `send_phone_verification_code`. On success, retry what failed with VERIFICATION_REQUIRED; `emailVerified: false` in the response means the email still needs verifying, which the user does by clicking the link in the verification email (resendable from account settings on porkbun.com). PHONE_CODE_INVALID means a wrong or expired code: check it with the user, or send a new one.",
+  inputSchema: {
+    code: z.string().min(4).max(12).describe("The digits the user received."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/account/verifyPhone/confirm", { method: "POST", body: { code: String(args.code) } });
   },
 };
 
@@ -2310,6 +2338,8 @@ export const tools: Tool[] = [
   get_auto_topup,
   top_up_with_usdc,
   top_up_with_card_mpp,
+  send_phone_verification_code,
+  confirm_phone_verification,
   get_usdc_topup_status,
   list_invoices,
   get_invoice,

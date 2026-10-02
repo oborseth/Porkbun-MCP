@@ -35,6 +35,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `top_up_with_usdc` | Add credit with USDC on Base: returns an x402 URL an agent's wallet pays directly, and a payment page for the user |
 | `get_usdc_topup_status` | Whether a USDC top-up has been paid and credited |
 | `top_up_with_card_mpp` | A payment link an agent pays with the user's card over MPP (Stripe Link agent wallet); credit lands immediately |
+| `send_phone_verification_code` | Texts (or calls) a code to the phone on the account, to clear `VERIFICATION_REQUIRED` |
+| `confirm_phone_verification` | Verifies the phone with the code the user received |
 | `list_invoices` | The account's invoices, newest first: date, paid/refunded state, net total, domains, and a link to each on porkbun.com |
 | `get_invoice` | One invoice as data: bill-to, payment method, lines with terms and expiry dates, and totals |
 | `get_invoice_pdf` | The invoice PDF as an embedded file, plus a 15-minute download link that works without signing in |
