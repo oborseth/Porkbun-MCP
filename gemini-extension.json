@@ -1,6 +1,6 @@
 {
   "name": "porkbun",
-  "version": "0.43.0",
+  "version": "0.43.1",
   "description": "Porkbun's official MCP server: domains, DNS, nameservers, DNSSEC, URL forwarding, DNS restore points, static hosting deploys, webhooks and Cloudflare-connected domains.",
   "mcpServers": {
     "porkbun": {

@@ -269,7 +269,7 @@ const confirm_phone_verification: Tool = {
   description:
     "Verify the account's phone number with the code the user received from `send_phone_verification_code`. On success, retry what failed with VERIFICATION_REQUIRED; `emailVerified: false` in the response means the email still needs verifying, which the user does by clicking the link in the verification email (resendable from account settings on porkbun.com). PHONE_CODE_INVALID means a wrong or expired code: check it with the user, or send a new one.",
   inputSchema: {
-    code: z.string().min(4).max(12).describe("The digits the user received."),
+    code: z.string().min(4).max(12).describe("The code the user received, as texted: digits, or eight letters for US and Canadian numbers."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
