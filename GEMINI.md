@@ -24,6 +24,11 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   With no saved card, `top_up_with_card_mpp` gives a link to pay with the user's
   card from a Stripe Link agent wallet (MPP), and `top_up_with_usdc` opens a USDC checkout: pay its
   `x402Url` with a wallet tool if you have one (with the user's OK), or give
-  the user its `payUrl`. Guide: https://porkbun.com/llms/guides/pay-with-usdc-x402
+  the user its `payUrl`. Open it for `INSUFFICIENT_FUNDS`'s `usdcAmountToCover`
+  (Coinbase keeps ~1%). Accounts 7 days old or younger get one USDC top-up a
+  day, so size it for everything the user wants. Guide:
+  https://porkbun.com/llms/guides/pay-with-usdc-x402
+- `VERIFICATION_REQUIRED`: `send_phone_verification_code`, ask the user for the
+  code, then `confirm_phone_verification`.
 
 Docs: https://porkbun.com/mcp
