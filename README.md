@@ -32,7 +32,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `get_domain` | Get metadata for a single domain in the account |
 | `get_balance` | Get account credit balance |
 | `get_auto_topup` | Read auto top-up settings, whether a card is on file, and what a top-up would charge |
-| `top_up_with_usdc` | Add credit with USDC on Base: returns an x402 URL an agent's wallet pays directly, and a payment page for the user |
+| `top_up_with_usdc` | Add credit with USDC on Base ($1-$500; Coinbase keeps ~1%, so use `INSUFFICIENT_FUNDS`'s `usdcAmountToCover`): returns an x402 URL an agent's wallet pays directly, and a payment page for the user |
 | `get_usdc_topup_status` | Whether a USDC top-up has been paid and credited |
 | `top_up_with_card_mpp` | A payment link an agent pays with the user's card over MPP (Stripe Link agent wallet); credit lands immediately |
 | `send_phone_verification_code` | Texts (or calls) a code to the phone on the account, to clear `VERIFICATION_REQUIRED` |
@@ -40,7 +40,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `list_invoices` | The account's invoices, newest first: date, paid/refunded state, net total, domains, and a link to each on porkbun.com |
 | `get_invoice` | One invoice as data: bill-to, payment method, lines with terms and expiry dates, and totals |
 | `get_invoice_pdf` | The invoice PDF as an embedded file, plus a 15-minute download link that works without signing in |
-| `get_api_settings` | Get monthly spend limit, low-balance alert, auto top-up config, MTD spend |
+| `get_api_settings` | The monthly limits actually enforced (`spendLimit` on purchases, `topupLimit` on credit added; $100 each by default), what was spent and added this month, alerts and auto top-up config |
 | `get_nameservers` | Get current nameservers for a domain |
 | `list_dns_records` | List DNS records for a domain |
 | `scan_dns_records` | Discover what a domain publishes now, from its live nameservers (use before a transfer — a transfer carries no zone data) |
