@@ -142,7 +142,7 @@ async function purchase(config: PorkbunConfig, path: string, body: Record<string
     howToPay:
       `Nothing has been charged yet. Pay $${(amount / 100).toFixed(2)} in USDC on Base: with a wallet tool that pays x402 URLs, pay x402Url ` +
       `(for example \`awal x402 pay <x402Url> --scheme auth-capture\`), or ask the user to pay the payUrl page in a browser. ` +
-      `Then call this tool again with the same arguments plus usdc_checkout_id: "${d.checkoutId}". If the purchase fails after payment, the payment is NOT returned to the wallet: it stays on the Porkbun account as credit (the error says `keptAsCredit: true` with the new balance), so retry without pay_with_usdc to buy from that credit.`,
+      `Then call this tool again with the same arguments plus usdc_checkout_id: "${d.checkoutId}". If the purchase fails after payment, the payment is NOT returned to the wallet: it stays on the Porkbun account as credit (the error says \`keptAsCredit: true\` with the new balance), so retry without pay_with_usdc to buy from that credit.`,
   };
 }
 
