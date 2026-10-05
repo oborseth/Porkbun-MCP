@@ -77,6 +77,23 @@ export interface CallOptions {
   body?: Record<string, unknown>;
   /** When true, generates an Idempotency-Key for safe retries on writes. */
   idempotent?: boolean;
+  /** A fixed Idempotency-Key, so a paid repeat of a purchase reuses the first call's key. */
+  idempotencyKey?: string;
+  /** Extra request headers (e.g. PAYMENT-SIGNATURE). */
+  headers?: Record<string, string>;
+  /**
+   * Return an HTTP 402 PAYMENT_REQUIRED as a value instead of throwing, so a
+   * purchase paid in USDC can sign the terms and repeat.
+   */
+  allowPaymentRequired?: boolean;
+}
+
+/** An HTTP 402 from a purchase sent with payWith "usdc": the terms to pay. */
+export interface PaymentRequired {
+  paymentRequired: true;
+  /** The PAYMENT-REQUIRED header (base64 x402 terms), or null if absent. */
+  header: string | null;
+  data: { code?: string; message?: string; amount_cents?: number; checkoutId?: string; x402Url?: string; payUrl?: string; expiresAt?: string };
 }
 
 /**
@@ -97,6 +114,14 @@ export async function call<T = unknown>(
   path: string,
   opts: CallOptions = {}
 ): Promise<T> {
+  return (await callWithPayment<T>(config, path, opts)) as T;
+}
+
+export async function callWithPayment<T = unknown>(
+  config: PorkbunConfig,
+  path: string,
+  opts: CallOptions = {}
+): Promise<T | PaymentRequired> {
   // Authenticated endpoints require credentials; the documentation tools don't
   // go through here. Fail with a clear, actionable message rather than a 401.
   if (!config.bearerToken && (!config.apiKey || !config.secretApiKey)) {
@@ -135,10 +160,13 @@ export async function call<T = unknown>(
         ? { ...(opts.body ?? {}) }
         : { ...(opts.body ?? {}), apikey: config.apiKey, secretapikey: config.secretApiKey }
     );
-    if (opts.idempotent) {
+    if (opts.idempotencyKey) {
+      headers["Idempotency-Key"] = opts.idempotencyKey;
+    } else if (opts.idempotent) {
       headers["Idempotency-Key"] = randomUUID();
     }
   }
+  Object.assign(headers, opts.headers ?? {});
 
   const res = await fetch(url, { method, headers, body });
   const text = await res.text();
@@ -159,6 +187,10 @@ export async function call<T = unknown>(
     ttlRemaining?: number;
     next_action?: { type?: string; hint?: string; url?: string };
   };
+
+  if (opts.allowPaymentRequired && res.status === 402 && data.code === "PAYMENT_REQUIRED") {
+    return { paymentRequired: true, header: res.headers.get("payment-required"), data: parsed as PaymentRequired["data"] };
+  }
 
   if (!res.ok || data.status === "ERROR") {
     const code = data.code ? ` [${data.code}]` : "";

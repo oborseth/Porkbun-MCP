@@ -74,7 +74,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 
 | Tool | Description |
 |---|---|
-| `register_domain` | Register a new domain — call `check_domain` first to confirm price |
+| `register_domain` | Register a new domain — call `check_domain` first to confirm price. Pays from credit, or directly in USDC with `pay_with_usdc` |
 | `renew_domain` | Renew an existing domain |
 | `transfer_domain` | Initiate an inbound transfer (returns transferId; takes 5-7 days) |
 | `get_transfer_setup` | Where a held inbound transfer is and what it is waiting on |
@@ -271,6 +271,8 @@ The blast radius of an accidentally-leaked key drops to "operations on these dom
 | `PORKBUN_SECRET_API_KEY` | for live ops | Your Porkbun secret API key. Omit to use only the credential-free documentation tools. |
 | `PORKBUN_BASE_URL` | no | Override the API base URL (e.g. for testing against `api-betamax.porkbun.com/api/json/v3`) |
 | `PORKBUN_DOCS_BASE` | no | Override the docs host used by the `*_doc(s)` tools (default `https://porkbun.com`) |
+| `PORKBUN_X402_PRIVATE_KEY` | no | Private key (`0x…`) of a Base wallet holding USDC. Lets the purchase tools pay directly with `pay_with_usdc: true` in one call. Use a wallet holding only what you are willing to spend. |
+| `PORKBUN_X402_MAX_CENTS` | no | Largest single USDC payment the server will sign, in cents (default `5000`, $50). |
 
 ## Local development
 
@@ -291,6 +293,15 @@ The server speaks JSON-RPC 2.0 over stdio. Smoke test from a shell:
   '{"jsonrpc":"2.0","id":2,"method":"tools/list"}') \
   | PORKBUN_API_KEY=pk1_… PORKBUN_SECRET_API_KEY=sk1_… node dist/index.js
 ```
+
+## Paying for purchases directly in USDC (x402)
+
+`register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout` and `create_hosting` take `pay_with_usdc: true`, which skips account credit entirely. The API answers with an x402 payment requirement (USDC on Base, the exact price), and:
+
+- **with `PORKBUN_X402_PRIVATE_KEY` set**, this server signs it and the purchase completes in the same tool call. It only signs terms that are exactly the quoted price in USDC on Base, and never above `PORKBUN_X402_MAX_CENTS`;
+- **without it** (and always on the hosted connector, which holds no one's key), the tool returns `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`. Pay the `x402Url` with a wallet tool (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`) or have the user pay the `payUrl` page, then call the same tool again with `usdc_checkout_id`.
+
+A purchase that fails after payment is refunded to the paying wallet. Guide: [Pay with USDC (x402)](https://porkbun.com/llms/guides/pay-with-usdc-x402).
 
 ## Money parameters are in cents, and say so
 

@@ -27,6 +27,9 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   the user its `payUrl`. Open it for `INSUFFICIENT_FUNDS`'s `usdcAmountToCover`
   (Coinbase keeps ~1%). Guide:
   https://porkbun.com/llms/guides/pay-with-usdc-x402
+- To pay for one purchase directly in USDC instead of from credit, pass `pay_with_usdc: true`;
+  if the result is `PAYMENT_REQUIRED`, pay its `x402Url` with a wallet tool (or have the user pay
+  `payUrl`), then repeat the call with `usdc_checkout_id`.
 - `VERIFICATION_REQUIRED`: `send_phone_verification_code`, ask the user for the
   code, then `confirm_phone_verification`.
 

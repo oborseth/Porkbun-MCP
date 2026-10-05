@@ -1,5 +1,7 @@
 import { z, type ZodRawShape } from "zod";
-import { call, callPublic, fetchDoc, type PorkbunConfig, PorkbunApiError } from "./api.js";
+import { randomUUID } from "node:crypto";
+import { call, callPublic, callWithPayment, fetchDoc, type PorkbunConfig, type PaymentRequired, PorkbunApiError } from "./api.js";
+import { signX402Payment, x402WalletConfigured } from "./x402.js";
 
 export interface ToolAnnotations {
   /** Human-readable title (sometimes shown in MCP client UIs). */
@@ -83,6 +85,66 @@ function pickCents(args: Record<string, unknown>, name: string, legacy: string, 
 // need a correct next step too.
 export const FUNDING_LOCAL =
   "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall` and **`topUpAvailable`** (`dry_run: true` reports the same without charging). When `topUpAvailable` is true a card is saved: tell the user the shortfall and offer to top up \u2014 with their OK, call `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount) and then retry this exact call. When it is false there is no card saved: `top_up_with_card_mpp` gives a link you pay with the user's card from a Stripe Link agent wallet, or `top_up_with_usdc` works: open it for the error's `usdcAmountToCover` (the shortfall plus Coinbase's ~1% fee; $1 minimum), then pay its `x402Url` with a wallet tool if you have one, with the user's OK, or hand the user its `payUrl`. Or the user adds credit at https://porkbun.com/account/credit. If a purchase fails with VERIFICATION_REQUIRED, `send_phone_verification_code` then `confirm_phone_verification` verifies the phone without leaving the conversation. Suggest `configure_auto_topup` if they want this to happen automatically next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not charge cards on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
+
+// ─── Paying for a purchase directly in USDC (x402) ─────────────────────────
+// The purchase tools (register, renew, transfer, buy_closeout, create_hosting)
+// can skip account credit. With a wallet configured on this server
+// (PORKBUN_X402_PRIVATE_KEY, local only) one call signs and buys; otherwise the
+// tool hands back the checkout, someone pays it, and the agent calls again
+// with usdc_checkout_id. See x402.ts and the API's MY_ApiController::x402Gate.
+
+const PAY_WITH_USDC_NOTE =
+  "\n\n**Paying directly in USDC (no account credit needed):** set `pay_with_usdc: true`. If this server has a wallet configured (PORKBUN_X402_PRIVATE_KEY, local installs only), the payment is signed and the purchase completes in this one call. Otherwise the result is `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`, and nothing is charged: pay the `x402Url` with a wallet tool that pays x402 URLs (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`), or have the user pay the `payUrl` page, then call this tool again with the same arguments plus `usdc_checkout_id`. Tell the user the dollar amount first. If the purchase fails after payment, the payment is refunded to the paying wallet.";
+
+const PAY_WITH_USDC_PARAMS = {
+  pay_with_usdc: z.boolean().optional().describe("Pay for this purchase directly in USDC on Base (x402) instead of from account credit. Tell the user the amount first."),
+  usdc_checkout_id: z.string().optional().describe("The checkoutId from an earlier PAYMENT_REQUIRED result, once its x402Url or payUrl has been paid. Send it with the same arguments as that call."),
+};
+
+function isPaymentRequired(x: unknown): x is PaymentRequired {
+  return !!x && typeof x === "object" && (x as PaymentRequired).paymentRequired === true;
+}
+
+/** POST a purchase, paying from credit or, when asked, directly in USDC. */
+async function purchase(config: PorkbunConfig, path: string, body: Record<string, unknown>, args: Record<string, unknown>, idempotent: boolean): Promise<unknown> {
+  if (body.dryRun || (!args.pay_with_usdc && !args.usdc_checkout_id)) {
+    return await call(config, path, { method: "POST", body, idempotent });
+  }
+
+  body.payWith = "usdc";
+  if (args.usdc_checkout_id) {
+    body.usdcCheckoutId = String(args.usdc_checkout_id);
+    return await call(config, path, { method: "POST", body, idempotent: true });
+  }
+
+  // One key for both calls: the API releases it on the 402, so the paid repeat runs.
+  const idempotencyKey = randomUUID();
+  const first = await callWithPayment(config, path, { method: "POST", body, idempotencyKey, allowPaymentRequired: true });
+  if (!isPaymentRequired(first)) return first;
+
+  const d = first.data;
+  const amount = typeof d.amount_cents === "number" ? d.amount_cents : 0;
+  if (x402WalletConfigured() && first.header && amount > 0) {
+    const signature = await signX402Payment(first.header, amount);
+    return await call(config, path, { method: "POST", body, idempotencyKey, headers: { "PAYMENT-SIGNATURE": signature } });
+  }
+
+  return {
+    status: "PAYMENT_REQUIRED",
+    amount_cents: amount,
+    amount: `$${(amount / 100).toFixed(2)}`,
+    currency: "USDC",
+    network: "base",
+    checkoutId: d.checkoutId,
+    x402Url: d.x402Url,
+    payUrl: d.payUrl,
+    expiresAt: d.expiresAt,
+    howToPay:
+      `Nothing has been charged yet. Pay $${(amount / 100).toFixed(2)} in USDC on Base: with a wallet tool that pays x402 URLs, pay x402Url ` +
+      `(for example \`awal x402 pay <x402Url> --scheme auth-capture\`), or ask the user to pay the payUrl page in a browser. ` +
+      `Then call this tool again with the same arguments plus usdc_checkout_id: "${d.checkoutId}". If the purchase fails after payment, the payment is refunded to the paying wallet.`,
+  };
+}
 
 // ─── Read-only tools ────────────────────────────────────────────────────────
 
@@ -684,24 +746,23 @@ const get_closeout: Tool = {
 const buy_closeout: Tool = {
   name: "buy_closeout",
   description:
-    "**Spends account credit.** Buys a closeout at its current price and claims the name. Confirm the total with the user first. " +
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Buys a closeout at its current price and claims the name. Confirm the total with the user first. " +
     "`cost_cents` must equal `totalPrice` from get_closeout exactly \u2014 any other value is refused, so you cannot accidentally charge a price the user did not agree to. Use dry_run with cost 0 to quote without charging. " +
     "**The domain is reserved, not delivered.** The provider releases it over the following days, so do not tell the user it is in their account: poll list_domains or watch the domain.registered webhook. " +
     "Every post-charge failure refunds automatically and reports refunded:true. Losing the race to another buyer (CLOSEOUT_UNAVAILABLE) is not worth retrying on the same name \u2014 closeouts are first-come at a fixed price. " +
-    "CLOSEOUT_NOT_ELIGIBLE means support has blocked this account from auctions and closeouts over past-due invoices or an auction terms violation \u2014 do not retry, tell the user to contact support. There is no account-age or order-history requirement: eligibility is the same as registering a domain, plus verified email and phone.",
+    "CLOSEOUT_NOT_ELIGIBLE means support has blocked this account from auctions and closeouts over past-due invoices or an auction terms violation \u2014 do not retry, tell the user to contact support. There is no account-age or order-history requirement: eligibility is the same as registering a domain, plus verified email and phone." + PAY_WITH_USDC_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to buy, e.g. `example.com`"),
     cost_cents: z.number().int().nonnegative().optional().describe("Exact totalPrice from get_closeout. Use 0 only with dry_run. Required." + CENTS_EXAMPLE),
     cost: legacyCents("cost_cents"),
     dry_run: z.boolean().optional().describe("Validate and price without charging or claiming."),
+    ...PAY_WITH_USDC_PARAMS,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true) };
     if (args.dry_run) body.dryRun = true;
-    return await call(config, `/closeout/buy/${encodeURIComponent(String(args.domain).toLowerCase())}`, {
-      method: "POST", body, idempotent: !args.dry_run,
-    });
+    return await purchase(config, `/closeout/buy/${encodeURIComponent(String(args.domain).toLowerCase())}`, body, args, !args.dry_run);
   },
 };
 
@@ -1022,7 +1083,7 @@ const DNS_RECORD_TYPES = [
 const register_domain: Tool = {
   name: "register_domain",
   description:
-    "**Spends account credit.** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL,
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE,
   inputSchema: {
     domain: z
       .string()
@@ -1043,24 +1104,21 @@ const register_domain: Tool = {
       .describe(
         "If true, validate everything (availability, price match, eligibility, funds, the monthly spend limit) and return a preview with `dryRun: true` and `wouldSucceed` WITHOUT registering or charging. Use to safely confirm before committing."
       ),
+    ...PAY_WITH_USDC_PARAMS,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), agreeToTerms: "yes" };
     if (args.dry_run) body.dryRun = true;
-    return await call(config, `/domain/create/${encodeURIComponent(domain)}`, {
-      method: "POST",
-      idempotent: !args.dry_run,
-      body,
-    });
+    return await purchase(config, `/domain/create/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
   },
 };
 
 const renew_domain: Tool = {
   name: "renew_domain",
   description:
-    "**Spends account credit.** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL,
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
     cost_cents: z
@@ -1074,24 +1132,21 @@ const renew_domain: Tool = {
       .boolean()
       .optional()
       .describe("If true, validate and preview (`dryRun: true`, `wouldSucceed`) WITHOUT renewing or charging."),
+    ...PAY_WITH_USDC_PARAMS,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true) };
     if (args.dry_run) body.dryRun = true;
-    return await call(config, `/domain/renew/${encodeURIComponent(domain)}`, {
-      method: "POST",
-      idempotent: !args.dry_run,
-      body,
-    });
+    return await purchase(config, `/domain/renew/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
   },
 };
 
 const transfer_domain: Tool = {
   name: "transfer_domain",
   description:
-    "**Spends account credit.** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost_cents` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL,
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost_cents` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to transfer in, e.g. `example.com`"),
     cost_cents: z
@@ -1113,6 +1168,7 @@ const transfer_domain: Tool = {
       .boolean()
       .optional()
       .describe("If true, validate and preview (`dryRun: true`, `wouldSucceed`) WITHOUT initiating the transfer or charging."),
+    ...PAY_WITH_USDC_PARAMS,
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
@@ -1120,11 +1176,7 @@ const transfer_domain: Tool = {
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), authCode: String(args.auth_code) };
     if (args.hold_for_dns_setup) body.holdForDnsSetup = true;
     if (args.dry_run) body.dryRun = true;
-    return await call(config, `/domain/transfer/${encodeURIComponent(domain)}`, {
-      method: "POST",
-      idempotent: !args.dry_run,
-      body,
-    });
+    return await purchase(config, `/domain/transfer/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
   },
 };
 
@@ -1609,7 +1661,7 @@ const list_hosting_plans: Tool = {
 const create_hosting: Tool = {
   name: "create_hosting",
   description:
-    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost_cents` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials.",
+    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost_cents` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials." + PAY_WITH_USDC_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
     sku: z
@@ -1620,6 +1672,7 @@ const create_hosting: Tool = {
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
     agree_to_nameserver_change: z.boolean().optional().describe("Set true to allow switching the domain to Porkbun nameservers (required when it isn't already on them)."),
     dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
+    ...PAY_WITH_USDC_PARAMS,
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
@@ -1627,7 +1680,7 @@ const create_hosting: Tool = {
     const body: Record<string, unknown> = { sku: args.sku, acknowledgedCost: pickCents(args, "acknowledged_cost_cents", "acknowledged_cost", true), agreeToTerms: args.agree_to_terms };
     if (args.agree_to_nameserver_change) body.agreeToNameserverChange = true;
     if (args.dry_run) body.dryRun = true;
-    return await call(config, `/hosting/create/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
+    return await purchase(config, `/hosting/create/${encodeURIComponent(domain)}`, body, args, true);
   },
 };
 
