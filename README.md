@@ -301,7 +301,7 @@ The server speaks JSON-RPC 2.0 over stdio. Smoke test from a shell:
 - **with `PORKBUN_X402_PRIVATE_KEY` set**, this server signs it and the purchase completes in the same tool call. It only signs terms that are exactly the quoted price in USDC on Base, and never above `PORKBUN_X402_MAX_CENTS`;
 - **without it** (and always on the hosted connector, which holds no one's key), the tool returns `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`. Pay the `x402Url` with a wallet tool (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`) or have the user pay the `payUrl` page, then call the same tool again with `usdc_checkout_id`.
 
-A purchase that fails after payment is refunded to the paying wallet. Guide: [Pay with USDC (x402)](https://porkbun.com/llms/guides/pay-with-usdc-x402).
+If a purchase fails after payment, the payment is not sent back to the wallet: it stays on the Porkbun account as credit (the error says so, with the new balance), ready to retry from credit or spend on anything else. Guide: [Pay with USDC (x402)](https://porkbun.com/llms/guides/pay-with-usdc-x402).
 
 ## Money parameters are in cents, and say so
 

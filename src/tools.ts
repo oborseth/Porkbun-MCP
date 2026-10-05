@@ -94,7 +94,7 @@ export const FUNDING_LOCAL =
 // with usdc_checkout_id. See x402.ts and the API's MY_ApiController::x402Gate.
 
 const PAY_WITH_USDC_NOTE =
-  "\n\n**Buying for a new or unfunded account:** the whole path, including what only the human can do, is at https://porkbun.com/llms/guides/buy-a-domain-from-an-agent. **Paying directly in USDC (no account credit needed):** set `pay_with_usdc: true`. If this server has a wallet configured (PORKBUN_X402_PRIVATE_KEY, local installs only), the payment is signed and the purchase completes in this one call. Otherwise the result is `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`, and nothing is charged: pay the `x402Url` with a wallet tool that pays x402 URLs (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`), or have the user pay the `payUrl` page, then call this tool again with the same arguments plus `usdc_checkout_id`. Tell the user the dollar amount first. If the purchase fails after payment, the payment is refunded to the paying wallet.";
+  "\n\n**Buying for a new or unfunded account:** the whole path, including what only the human can do, is at https://porkbun.com/llms/guides/buy-a-domain-from-an-agent. **Paying directly in USDC (no account credit needed):** set `pay_with_usdc: true`. If this server has a wallet configured (PORKBUN_X402_PRIVATE_KEY, local installs only), the payment is signed and the purchase completes in this one call. Otherwise the result is `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`, and nothing is charged: pay the `x402Url` with a wallet tool that pays x402 URLs (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`), or have the user pay the `payUrl` page, then call this tool again with the same arguments plus `usdc_checkout_id`. Tell the user the dollar amount first. If the purchase fails after payment, the payment is NOT returned to the wallet: it stays on the Porkbun account as credit (the error says `keptAsCredit: true` with the new balance), so retry without pay_with_usdc to buy from that credit.";
 
 const PAY_WITH_USDC_PARAMS = {
   pay_with_usdc: z.boolean().optional().describe("Pay for this purchase directly in USDC on Base (x402) instead of from account credit. Tell the user the amount first."),
@@ -142,7 +142,7 @@ async function purchase(config: PorkbunConfig, path: string, body: Record<string
     howToPay:
       `Nothing has been charged yet. Pay $${(amount / 100).toFixed(2)} in USDC on Base: with a wallet tool that pays x402 URLs, pay x402Url ` +
       `(for example \`awal x402 pay <x402Url> --scheme auth-capture\`), or ask the user to pay the payUrl page in a browser. ` +
-      `Then call this tool again with the same arguments plus usdc_checkout_id: "${d.checkoutId}". If the purchase fails after payment, the payment is refunded to the paying wallet.`,
+      `Then call this tool again with the same arguments plus usdc_checkout_id: "${d.checkoutId}". If the purchase fails after payment, the payment is NOT returned to the wallet: it stays on the Porkbun account as credit (the error says `keptAsCredit: true` with the new balance), so retry without pay_with_usdc to buy from that credit.`,
   };
 }
 
