@@ -97,7 +97,7 @@ export const PAY_WITH_USDC_NOTE =
   "\n\n**Buying for a new or unfunded account:** the whole path, including what only the human can do, is at https://porkbun.com/llms/guides/buy-a-domain-from-an-agent. **Paying directly in USDC (no account credit needed):** set `pay_with_usdc: true`. If this server has a wallet configured (PORKBUN_X402_PRIVATE_KEY, local installs only), the payment is signed and the purchase completes in this one call. Otherwise the result is `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`, and nothing is charged: pay the `x402Url` with a wallet tool that pays x402 URLs (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`), or have the user pay the `payUrl` page, then call this tool again with the same arguments plus `usdc_checkout_id`. Tell the user the dollar amount first. If the purchase fails after payment, the payment is NOT returned to the wallet: it stays on the Porkbun account as credit (the error says `keptAsCredit: true` with the new balance), so retry without pay_with_usdc to buy from that credit.";
 
 export const PAY_WITH_CARD_NOTE =
-  "\n\n**Paying directly by card, with a hold (no account credit needed):** set `pay_with_card: true` when the user pays with Stripe Link. The result is `status: PAYMENT_REQUIRED` with a `payUrl` and a `cardPaymentId`; nothing is charged. Pay the `payUrl` with an MPP wallet tool. With Link's CLI that is two commands: `link-cli mpp pay <payUrl> -X POST --context \"...\"` (context at least 100 characters) creates a spend request the user approves in Link; once approved, complete it with `link-cli mpp pay <payUrl> --spend-request-id <lsrq_id> -X POST`. That only authorizes the card. Then call this tool again with the same arguments plus `card_payment_id`: if the purchase succeeds the card is charged, and if it fails the hold is released and nothing is charged.";
+  "\n\n**Paying directly by card, with a hold (no account credit needed):** set `pay_with_card: true` when the user pays with Stripe Link. The result is `status: PAYMENT_REQUIRED` with a `payUrl` and a `cardPaymentId`; nothing is charged. Pay the `payUrl` with an MPP wallet tool. With Link's CLI that is two commands: `link-cli mpp pay <payUrl> -X POST --context \"...\"` (context at least 100 characters) creates a spend request the user approves in Link; once approved, complete it with `link-cli mpp pay <payUrl> --spend-request-id <lsrq_id> -X POST`. That only authorizes the card. If link-cli answers `NOT_AUTHENTICATED`, run `link-cli auth login` first (a one-time device login the user approves). Then call this tool again with the same arguments plus `card_payment_id`: if the purchase succeeds the card is charged, and if it fails the hold is released and nothing is charged. The link works until `expiresAt`; if that passes before it is paid, call this tool again without `card_payment_id` for a fresh link instead of paying the old one.";
 
 export const PAY_DIRECT_PARAMS = ["pay_with_card", "card_payment_id", "pay_with_usdc", "usdc_checkout_id"];
 export const PAY_DIRECT_OPENING = ", or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`)";
@@ -142,7 +142,9 @@ async function purchase(config: PorkbunConfig, path: string, body: Record<string
       howToPay:
         `Nothing has been charged yet. Pay the payUrl from the user's Stripe Link agent wallet over MPP ` +
         `(with Link's CLI: \`link-cli mpp pay <payUrl> -X POST --context "..."\` creates a spend request the user approves in Link; once approved, run \`link-cli mpp pay <payUrl> --spend-request-id <lsrq_id> -X POST\` to complete it). That only authorizes $${(cents / 100).toFixed(2)} on the card. ` +
-        `Then call this tool again with the same arguments plus card_payment_id: "${c.cardPaymentId}". The card is charged only if the purchase succeeds; if it fails the hold is released.`,
+        `First time with link-cli? If it answers NOT_AUTHENTICATED, run \`link-cli auth login\` (a one-time device login the user approves), then pay again. No shell? Link's own MCP server does the same where your client can run one (\`npx -y @stripe/link-cli --mcp\`, or \`link-cli mcp add\` to register it); without either, card payment is not available here, so use account credit or pay_with_usdc instead. ` +
+        `Then call this tool again with the same arguments plus card_payment_id: "${c.cardPaymentId}". The card is charged only if the purchase succeeds; if it fails the hold is released. ` +
+        `The link works until expiresAt (${c.expiresAt}); if that passes before it is paid, call this tool again without card_payment_id for a fresh link rather than paying the old one.`,
     };
   }
 
@@ -186,7 +188,7 @@ async function purchase(config: PorkbunConfig, path: string, body: Record<string
 const ping: Tool = {
   name: "ping",
   description:
-    "Verify the Porkbun API connection and credentials. Returns the caller's public IP and whether the API key is valid. Use this as a first sanity check before making other calls.",
+    "Verify the Porkbun API connection and credentials. Returns the caller's public IP, whether the API key is valid, and `account`: the username of the Porkbun account the key belongs to. Use this as a first sanity check before making other calls, and to confirm you are in the account the user means (a domain in another account comes back as `DOMAIN_NOT_FOUND`, which also names the account).",
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
@@ -197,7 +199,7 @@ const ping: Tool = {
 const check_domain: Tool = {
   name: "check_domain",
   description:
-    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
+    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. For a domain already in the user's account the result has `inYourAccount: true`: the top-level `price` is still the registration price, and the renewal price is `additional.renewal.price` (use that, or a `renew_domain` dry run, before renewing). Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
   inputSchema: {
     domain: z
       .string()
@@ -306,7 +308,7 @@ const list_domains: Tool = {
 const get_domain: Tool = {
   name: "get_domain",
   description:
-    "Get the metadata for a single domain in the authenticated account: status, TLD, create date, expire date, security lock, WHOIS privacy, auto-renew, API access opt-in, and (optionally) labels. Returns an error with code `DOMAIN_NOT_FOUND` if the domain isn't in the account.",
+    "Get the metadata for a single domain in the authenticated account: status, TLD, create date, expire date, security lock, WHOIS privacy, auto-renew, API access opt-in, and (optionally) labels. Returns an error with code `DOMAIN_NOT_FOUND` if the domain isn't in the account; the error's `account` field names the account the key belongs to, so a domain in a different account is easy to tell from a missing one.",
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name in the account, e.g. `example.com`"),
     include_labels: z.boolean().optional().describe("Include user-defined domain labels in the response."),
@@ -1153,7 +1155,7 @@ const register_domain: Tool = {
 const renew_domain: Tool = {
   name: "renew_domain",
   description:
-    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON` with `renewableAt`, the date it becomes renewable; nothing is charged, so tell the user that date rather than retrying. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
+    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings), and only the user can turn that on: check `apiAccess` in `get_domain` or `list_domains` before starting, and if it is off, tell the user rather than finding out from `API_ACCESS_DISABLED`. Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON` with `renewableAt`, the date it becomes renewable; nothing is charged, so tell the user that date rather than retrying. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
     cost_cents: z
