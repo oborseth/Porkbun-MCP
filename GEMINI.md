@@ -27,6 +27,8 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   the user its `payUrl`. Open it for `INSUFFICIENT_FUNDS`'s `usdcAmountToCover`
   (Coinbase keeps ~1%). Guide:
   https://porkbun.com/llms/guides/pay-with-usdc-x402
+- To pay for one purchase by card from the user's Stripe Link wallet, pass `pay_with_card: true`, pay the
+  returned `payUrl` with Link's CLI, then repeat the call with `card_payment_id` (charged only on success).
 - To pay for one purchase directly in USDC instead of from credit, pass `pay_with_usdc: true`;
   if the result is `PAYMENT_REQUIRED`, pay its `x402Url` with a wallet tool (or have the user pay
   `payUrl`), then repeat the call with `usdc_checkout_id`.

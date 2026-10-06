@@ -96,7 +96,12 @@ export const FUNDING_LOCAL =
 const PAY_WITH_USDC_NOTE =
   "\n\n**Buying for a new or unfunded account:** the whole path, including what only the human can do, is at https://porkbun.com/llms/guides/buy-a-domain-from-an-agent. **Paying directly in USDC (no account credit needed):** set `pay_with_usdc: true`. If this server has a wallet configured (PORKBUN_X402_PRIVATE_KEY, local installs only), the payment is signed and the purchase completes in this one call. Otherwise the result is `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`, and nothing is charged: pay the `x402Url` with a wallet tool that pays x402 URLs (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`), or have the user pay the `payUrl` page, then call this tool again with the same arguments plus `usdc_checkout_id`. Tell the user the dollar amount first. If the purchase fails after payment, the payment is NOT returned to the wallet: it stays on the Porkbun account as credit (the error says `keptAsCredit: true` with the new balance), so retry without pay_with_usdc to buy from that credit.";
 
+const PAY_WITH_CARD_NOTE =
+  "\n\n**Paying directly by card, with a hold (no account credit needed):** set `pay_with_card: true` when the user pays with Stripe Link. The result is `status: PAYMENT_REQUIRED` with a `payUrl` and a `cardPaymentId`; nothing is charged. Pay the `payUrl` with an MPP wallet tool (Link's CLI: `link-cli mpp pay <payUrl> -X POST --context \"...\"`, context at least 100 characters; the user approves in Link). That only authorizes the card. Then call this tool again with the same arguments plus `card_payment_id`: if the purchase succeeds the card is charged, and if it fails the hold is released and nothing is charged.";
+
 const PAY_WITH_USDC_PARAMS = {
+  pay_with_card: z.boolean().optional().describe("Pay for this purchase by card from the user's Stripe Link agent wallet (MPP), with a hold: charged only if the purchase succeeds. Tell the user the amount first."),
+  card_payment_id: z.string().optional().describe("The cardPaymentId from an earlier PAYMENT_REQUIRED (pay_with_card), once its payUrl has been paid. Send it with the same arguments as that call."),
   pay_with_usdc: z.boolean().optional().describe("Pay for this purchase directly in USDC on Base (x402) instead of from account credit. Tell the user the amount first."),
   usdc_checkout_id: z.string().optional().describe("The checkoutId from an earlier PAYMENT_REQUIRED result, once its x402Url or payUrl has been paid. Send it with the same arguments as that call."),
 };
@@ -107,8 +112,35 @@ function isPaymentRequired(x: unknown): x is PaymentRequired {
 
 /** POST a purchase, paying from credit or, when asked, directly in USDC. */
 async function purchase(config: PorkbunConfig, path: string, body: Record<string, unknown>, args: Record<string, unknown>, idempotent: boolean): Promise<unknown> {
-  if (body.dryRun || (!args.pay_with_usdc && !args.usdc_checkout_id)) {
+  if (body.dryRun || (!args.pay_with_usdc && !args.usdc_checkout_id && !args.pay_with_card && !args.card_payment_id)) {
     return await call(config, path, { method: "POST", body, idempotent });
+  }
+
+  // By card (Stripe MPP): a link to pay from the user's Link wallet, then a
+  // confirm that captures the hold if the purchase succeeds.
+  if (args.pay_with_card || args.card_payment_id) {
+    body.payWith = "card";
+    if (args.card_payment_id) {
+      body.cardPaymentId = String(args.card_payment_id);
+      return await call(config, path, { method: "POST", body, idempotent: true });
+    }
+    const opened = await callWithPayment(config, path, { method: "POST", body, idempotencyKey: randomUUID(), allowPaymentRequired: true });
+    if (!isPaymentRequired(opened)) return opened;
+    const c = opened.data as PaymentRequired["data"] & { cardPaymentId?: string };
+    const cents = typeof c.amount_cents === "number" ? c.amount_cents : 0;
+    return {
+      status: "PAYMENT_REQUIRED",
+      method: "card",
+      amount_cents: cents,
+      amount: `$${(cents / 100).toFixed(2)}`,
+      cardPaymentId: c.cardPaymentId,
+      payUrl: c.payUrl,
+      expiresAt: c.expiresAt,
+      howToPay:
+        `Nothing has been charged yet. Pay the payUrl from the user's Stripe Link agent wallet over MPP ` +
+        `(for example \`link-cli mpp pay <payUrl> -X POST --context "..."\`; the user approves in Link). That only authorizes $${(cents / 100).toFixed(2)} on the card. ` +
+        `Then call this tool again with the same arguments plus card_payment_id: "${c.cardPaymentId}". The card is charged only if the purchase succeeds; if it fails the hold is released.`,
+    };
   }
 
   body.payWith = "usdc";
@@ -750,7 +782,7 @@ const buy_closeout: Tool = {
     "`cost_cents` must equal `totalPrice` from get_closeout exactly \u2014 any other value is refused, so you cannot accidentally charge a price the user did not agree to. Use dry_run with cost 0 to quote without charging. " +
     "**The domain is reserved, not delivered.** The provider releases it over the following days, so do not tell the user it is in their account: poll list_domains or watch the domain.registered webhook. " +
     "Every post-charge failure refunds automatically and reports refunded:true. Losing the race to another buyer (CLOSEOUT_UNAVAILABLE) is not worth retrying on the same name \u2014 closeouts are first-come at a fixed price. " +
-    "CLOSEOUT_NOT_ELIGIBLE means support has blocked this account from auctions and closeouts over past-due invoices or an auction terms violation \u2014 do not retry, tell the user to contact support. There is no account-age or order-history requirement: eligibility is the same as registering a domain, plus verified email and phone." + PAY_WITH_USDC_NOTE,
+    "CLOSEOUT_NOT_ELIGIBLE means support has blocked this account from auctions and closeouts over past-due invoices or an auction terms violation \u2014 do not retry, tell the user to contact support. There is no account-age or order-history requirement: eligibility is the same as registering a domain, plus verified email and phone." + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to buy, e.g. `example.com`"),
     cost_cents: z.number().int().nonnegative().optional().describe("Exact totalPrice from get_closeout. Use 0 only with dry_run. Required." + CENTS_EXAMPLE),
@@ -1083,7 +1115,7 @@ const DNS_RECORD_TYPES = [
 const register_domain: Tool = {
   name: "register_domain",
   description:
-    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE,
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z
       .string()
@@ -1118,7 +1150,7 @@ const register_domain: Tool = {
 const renew_domain: Tool = {
   name: "renew_domain",
   description:
-    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE,
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
     cost_cents: z
@@ -1146,7 +1178,7 @@ const renew_domain: Tool = {
 const transfer_domain: Tool = {
   name: "transfer_domain",
   description:
-    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost_cents` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE,
+    "**Spends account credit, or pays directly in USDC (`pay_with_usdc`).** Initiates a transfer of an external domain into Porkbun. Requires the auth/EPP code from the losing registrar, and `cost_cents` must match the current transfer price from `check_domain`. Poll with `get_transfer_status`. Most transfers finish well inside the five-day worst case \u2014 two thirds within 24 hours \u2014 so do not promise the user a week. .uk and a few TLDs do not support inbound API transfers. Idempotency-safe.\n\n**Set `hold_for_dns_setup` unless the user has no DNS to preserve.** A transfer carries only the delegation, so a domain that moves before its records exist at Porkbun goes dark. Holding charges the transfer but parks it until you release it: hold \u2192 prepare_transfer \u2192 import_dns_records \u2192 start_transfer. Nothing releases a held transfer on a timer.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to transfer in, e.g. `example.com`"),
     cost_cents: z
@@ -1661,7 +1693,7 @@ const list_hosting_plans: Tool = {
 const create_hosting: Tool = {
   name: "create_hosting",
   description:
-    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost_cents` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials." + PAY_WITH_USDC_NOTE,
+    "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the price in `acknowledged_cost_cents` (300 monthly / 3000 yearly) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials." + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
     sku: z

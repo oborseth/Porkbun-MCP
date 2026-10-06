@@ -74,7 +74,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 
 | Tool | Description |
 |---|---|
-| `register_domain` | Register a new domain — call `check_domain` first to confirm price. Pays from credit, or directly in USDC with `pay_with_usdc` |
+| `register_domain` | Register a new domain — call `check_domain` first to confirm price. Pays from credit, directly in USDC (`pay_with_usdc`), or by card with a hold (`pay_with_card`) |
 | `renew_domain` | Renew an existing domain |
 | `transfer_domain` | Initiate an inbound transfer (returns transferId; takes 5-7 days) |
 | `get_transfer_setup` | Where a held inbound transfer is and what it is waiting on |
@@ -302,6 +302,10 @@ The server speaks JSON-RPC 2.0 over stdio. Smoke test from a shell:
 - **without it** (and always on the hosted connector, which holds no one's key), the tool returns `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`. Pay the `x402Url` with a wallet tool (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`) or have the user pay the `payUrl` page, then call the same tool again with `usdc_checkout_id`.
 
 If a purchase fails after payment, the payment is not sent back to the wallet: it stays on the Porkbun account as credit (the error says so, with the new balance), ready to retry from credit or spend on anything else. Guide: [Pay with USDC (x402)](https://porkbun.com/llms/guides/pay-with-usdc-x402).
+
+## Paying for purchases by card, with a hold (Stripe MPP)
+
+The same five tools take `pay_with_card: true` for a user with a Stripe Link agent wallet. The tool returns `status: PAYMENT_REQUIRED` with a single-use `payUrl` and a `cardPaymentId`; pay the link with an MPP wallet tool (`link-cli mpp pay <payUrl> -X POST --context "..."`; the user approves in Link), which only **authorizes** the card. Call the same tool again with `card_payment_id`: the card is charged if the purchase succeeds, and the hold is released (nothing charged) if it fails. Guide: [Pay with the user's card (MPP)](https://porkbun.com/llms/guides/pay-with-card-mpp).
 
 ## Money parameters are in cents, and say so
 
