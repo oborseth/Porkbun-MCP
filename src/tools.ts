@@ -1153,7 +1153,7 @@ const register_domain: Tool = {
 const renew_domain: Tool = {
   name: "renew_domain",
   description:
-    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON`. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
+    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Renews an existing domain in the authenticated account. The `cost_cents` parameter must exactly match the current renewal price returned by `check_domain` (in cents). The domain must be opted in to API access (per-domain or global toggle in account settings). Domains registered within the last 30 days, or already renewed within the last 30 days, cannot be renewed yet — the API returns `RENEWAL_TOO_SOON` with `renewableAt`, the date it becomes renewable; nothing is charged, so tell the user that date rather than retrying. Premium domain renewals are not supported via API. Idempotency-safe: retries within 24 hours don't double-charge.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain name to renew, e.g. `example.com`. Must already be in your account."),
     cost_cents: z
