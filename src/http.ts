@@ -380,6 +380,7 @@ const server = http.createServer(async (req, res) => {
 
     const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), {
       exclude: profile.exclude,
+      omitParams: profile.omitParams,
       hosted: true,
       describe: (name, description) => describeFor(profile, name, description),
       instructions: profile.instructions,

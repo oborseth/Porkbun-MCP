@@ -1,4 +1,4 @@
-import { FUNDING_LOCAL } from "./tools.js";
+import { FUNDING_LOCAL, PAY_DIRECT_PARAMS, PAY_DIRECT_OPENING, PAY_WITH_CARD_NOTE, PAY_WITH_USDC_NOTE } from "./tools.js";
 
 /**
  * Tool profiles for the hosted connector, one per URL path.
@@ -32,6 +32,12 @@ export interface Profile {
   exclude: Set<string>;
   /** Replaces the shared funding paragraph on the purchase tools that remain. */
   funding?: string;
+  /**
+   * Tool parameters this path does not offer (left out of the input schemas),
+   * with the description text that explains them. The directory version buys
+   * from credit only, so paying a purchase directly by card or USDC is hidden.
+   */
+  omitParams?: string[];
   /** Appended to any remaining tool whose text names a tool this profile leaves out. */
   note?: string;
   /** Whole-description replacements, where appending a note is not enough. */
@@ -92,7 +98,7 @@ const MONEY_ADJACENT = ["cancel_transfer", "update_auto_renew"];
 const HELD_FOR_REVIEW = ["list_invoices", "get_invoice", "get_invoice_pdf", "send_phone_verification_code", "confirm_phone_verification"];
 
 const FUNDING_NO_TOPUPS =
-  "**Money comes from prepaid account credit.** The purchase itself charges the credit balance, never a card. If the balance is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). On this connection, adding money is the account holder's step: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. Auto top-up, which they can set in their API settings (https://porkbun.com/account/api), refills the balance from their saved card on its own next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08).";
+  "**How a purchase is paid.** From prepaid account credit by default; a card saved at Porkbun is never charged by a purchase itself. On this connection purchases are paid from credit only. If the credit is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). Adding credit is the account holder's step: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. Auto top-up, which they can set in their API settings (https://porkbun.com/account/api), refills the balance from their saved card on its own next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08).";
 
 export const PROFILES: Profile[] = [
   {
@@ -103,6 +109,7 @@ export const PROFILES: Profile[] = [
     path: "/mcp/no-topups",
     exclude: new Set([...SANDBOX, ...TOPUPS]),
     funding: FUNDING_NO_TOPUPS,
+    omitParams: PAY_DIRECT_PARAMS,
     note: "On this connection, adding account credit and changing auto top-up are done by the account holder (https://porkbun.com/account/credit and https://porkbun.com/account/api); the top-up tools named above are not available here.",
     instructions:
       "This is the directory version of Porkbun's connector. To follow the directory's rules it cannot add money to the account: there are no top-up tools (charging a saved card for credit, or changing auto top-up). Everything else works, including buying with credit already on the account. When the user wants credit added, tell them the amount and that they can add it on porkbun.com; if they want an assistant that can top up for them, that is " + FULL + ".",
@@ -133,6 +140,9 @@ export function describeFor(profile: Profile, name: string, description: string)
 
   let d = description;
   if (profile.funding && d.includes(FUNDING_LOCAL)) d = d.replace(FUNDING_LOCAL, profile.funding);
+  if (profile.omitParams?.some((p) => PAY_DIRECT_PARAMS.includes(p))) {
+    d = d.split(PAY_WITH_USDC_NOTE).join("").split(PAY_WITH_CARD_NOTE).join("").split(PAY_DIRECT_OPENING).join("");
+  }
 
   if (profile.redactNote && profile.redactKeys?.some((k) => new RegExp(`\\b${k}\\b`, "i").test(d))) {
     d += `\n\n${profile.redactNote}`;
