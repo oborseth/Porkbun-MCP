@@ -382,6 +382,10 @@
       "description": "Buy an email hosting mailbox and set it up."
     },
     {
+      "name": "renew_mailbox",
+      "description": "Renew an email hosting mailbox for a year now."
+    },
+    {
       "name": "set_email_password",
       "description": "Change the password of an email hosting mailbox."
     },

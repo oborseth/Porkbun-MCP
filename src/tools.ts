@@ -1648,7 +1648,7 @@ const MAILBOX_DNS_NOTE =
 const list_mailboxes: Tool = {
   name: "list_mailboxes",
   description:
-    "List a domain's email hosting mailboxes (real inboxes at the domain, read over IMAP/POP or webmail), with `status`, `address`, whether each is the free `trial`, and `expires`. A mailbox with `status: PENDINGSETUP` and `address: null` is already paid for, or is the free trial mailbox every domain registration includes: `setup_mailbox` gives it an address for free. Also returns the `price` of buying another mailbox and the mail client settings.",
+    "List a domain's email hosting mailboxes (real inboxes at the domain, read over IMAP/POP or webmail), with `status`, `address`, whether each is the free `trial`, and `expires`. A mailbox with `status: PENDINGSETUP` and `address: null` is already paid for, or is the free trial mailbox every domain registration includes: `setup_mailbox` gives it an address for free. Each mailbox also shows `autoRenews` and its `renewalPrice` (`renew_mailbox` adds a year now). Also returns the `price` of buying another mailbox and the mail client settings.",
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
@@ -1704,6 +1704,29 @@ const create_mailbox: Tool = {
     if (args.confirm_dns_changes) body.confirmDnsChanges = true;
     if (args.dry_run) body.dryRun = true;
     return await purchase(config, `/email/createMailbox/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
+  },
+};
+
+const renew_mailbox: Tool = {
+  name: "renew_mailbox",
+  description:
+    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Add a year to an email hosting mailbox now, at its `renewalPrice` from `list_mailboxes` ($36.00, or a legacy price for mailboxes that still qualify). Set-up mailboxes already renew on their own when due (`autoRenews: true`), so use this when the user wants to pay early or keep a trial mailbox. Name the mailbox with `mailbox_id` or `address`. Tell the user the price first; `cost_cents` must match, and `dry_run: true` with `cost_cents: 0` quotes it and shows the new expiry (`expiresAfter`).\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the mailbox is on."),
+    mailbox_id: z.number().int().optional().describe("The mailbox `id` from `list_mailboxes`."),
+    address: z.string().optional().describe("Or the mailbox address (`me` or `me@example.com`)."),
+    cost_cents: z.number().int().min(0).describe("The mailbox's `renewalPrice`, e.g. 3600." + CENTS_EXAMPLE),
+    dry_run: z.boolean().optional().describe("If true, quote and validate without renewing."),
+    ...PAY_WITH_USDC_PARAMS,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { cost: Number(args.cost_cents), agreeToTerms: "yes" };
+    if (args.mailbox_id) body.mailboxId = Number(args.mailbox_id);
+    if (args.address) body.address = String(args.address);
+    if (args.dry_run) body.dryRun = true;
+    return await purchase(config, `/email/renewMailbox/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
   },
 };
 
@@ -2652,6 +2675,7 @@ export const tools: Tool[] = [
   list_mailboxes,
   setup_mailbox,
   create_mailbox,
+  renew_mailbox,
   set_email_password,
   // write — glue records
   create_glue_record,

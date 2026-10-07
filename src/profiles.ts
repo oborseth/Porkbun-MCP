@@ -77,7 +77,7 @@ const FULL = "the full Porkbun server, which the user can add themselves as a cu
 // A hosted connection is always a live key, so the sandbox tools never apply.
 const SANDBOX = ["create_sandbox_key", "sandbox_topup", "sandbox_reset", "sandbox_trigger_webhook"];
 const TOPUPS = ["top_up_account_credit", "configure_auto_topup", "top_up_with_usdc", "get_usdc_topup_status", "top_up_with_card_mpp"];
-const PURCHASES = ["register_domain", "renew_domain", "transfer_domain", "buy_closeout", "create_hosting", "create_mailbox"];
+const PURCHASES = ["register_domain", "renew_domain", "transfer_domain", "buy_closeout", "create_hosting", "create_mailbox", "renew_mailbox"];
 // Tools whose whole output is a secret: the certificate private key, a
 // WordPress application password, and a webhook signing secret (create and
 // rotate exist only to hand one out). Other webhook tools stay, with the
