@@ -199,7 +199,7 @@ const ping: Tool = {
 const check_domain: Tool = {
   name: "check_domain",
   description:
-    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. For a domain already in the user's account the result has `inYourAccount: true`: the top-level `price` is still the registration price, and the renewal price is `additional.renewal.price` (use that, or a `renew_domain` dry run, before renewing). Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
+    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. An internationalized name (IDN) also returns `idnLanguages`, the languages its registry accepts; `register_domain` needs one of them as `idn_language`. For a domain already in the user's account the result has `inYourAccount: true`: the top-level `price` is still the registration price, and the renewal price is `additional.renewal.price` (use that, or a `renew_domain` dry run, before renewing). Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
   inputSchema: {
     domain: z
       .string()
@@ -1120,12 +1120,16 @@ const DNS_RECORD_TYPES = [
 const register_domain: Tool = {
   name: "register_domain",
   description:
-    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
+    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Registers a new domain on the authenticated Porkbun account. The `cost_cents` parameter must exactly match the current registration price returned by `check_domain` (in cents) — Porkbun rejects mismatched quotes. Workflow: call `check_domain` first to get availability + price, confirm the spend with the user, then call this. The order is idempotency-safe: retries within 24 hours via the same Idempotency-Key return the original response without re-charging. Premium domains, .uk, and a handful of registry-specific TLDs cannot be registered via API and must be done on the website. The account's email and phone number must be verified. A single API registration cannot exceed $100 (`ORDER_TOO_LARGE`); above that the user has to register on the website. **Internationalized names (IDNs, e.g. `café.com` or `xn--caf-dma.com`) need `idn_language`**: `check_domain` lists the accepted ones as `idnLanguages`; without it the call returns `IDN_LANGUAGE_REQUIRED` with that list and nothing is charged.\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z
       .string()
       .min(3)
-      .describe("Fully qualified domain name to register, e.g. `example.com`"),
+      .describe("Fully qualified domain name to register, e.g. `example.com`. An internationalized name may be given in Unicode (`café.com`) or punycode."),
+    idn_language: z
+      .string()
+      .optional()
+      .describe("For an internationalized domain name only: the language it is written in, as a `code` (or `name`) from the `idnLanguages` that `check_domain` returns for it, e.g. `FRE` for French under .com. Ask the user if the language is not obvious from the name. Ignored for plain ASCII names."),
     cost_cents: z
       .number()
       .int()
@@ -1148,6 +1152,7 @@ const register_domain: Tool = {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), agreeToTerms: "yes" };
     if (args.dry_run) body.dryRun = true;
+    if (args.idn_language) body.idnLanguage = String(args.idn_language);
     return await purchase(config, `/domain/create/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
   },
 };
