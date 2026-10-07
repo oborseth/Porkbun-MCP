@@ -48,6 +48,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `list_dnssec_records` | List DNSSEC DS records published at the registry |
 | `list_url_forwards` | List URL forwarding rules for a domain (incl. exact `redirectType`: 301/302/307/masked) |
 | `list_email_forwards` | List email forwards on a domain (address → mailbox), with limits and whether forwarding MX is in place |
+| `list_mailboxes` | List email hosting mailboxes (including ones waiting to be set up), the price of another, and mail client settings |
 | `list_glue_records` | List glue records (host-to-IP mappings) for a domain |
 | `list_transfers` | List in-progress and recent inbound transfers |
 | `get_transfer_status` | Get status of a specific inbound transfer |
@@ -105,6 +106,8 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `delete_url_forward` | Delete a URL forwarding rule by ID |
 | `create_email_forward` | Forward an address at the domain to another mailbox; asks first (`DNS_CHANGE_CONFIRMATION_REQUIRED`) before replacing another mail service's MX or rewriting SPF |
 | `delete_email_forward` | Delete an email forward; the last one also removes the forwarding MX/SPF |
+| `setup_mailbox` | Set up a waiting email hosting mailbox (paid, or the free trial every registration includes); generates the password unless one is given |
+| `set_email_password` | Change a mailbox's password |
 | `create_glue_record` | Create a glue record (host-to-IP mapping at the registry) |
 | `update_glue_record` | Replace the IP list for a glue record |
 | `delete_glue_record` | Delete a glue record by host |
@@ -115,6 +118,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 |---|---|
 | `list_hosting_plans` | List API-provisionable hosting products + plans, with price (cents), interval, trial length, features |
 | `create_hosting` | Provision hosting for a domain by `sku` (from `list_hosting_plans`) — first provision per domain is a 15-day free trial that auto-renews at the plan price; re-provision after deprovision is charged to account credit (one free trial per domain). Switches the domain to Porkbun NS (gated by `agree_to_nameserver_change`); requires `acknowledged_cost`. `dry_run` supported |
+| `create_mailbox` | Buy an email hosting mailbox ($36/yr, renews yearly) and set it up in one call; `cost_cents` must match, `dry_run` quotes; paid from credit or with `pay_with_card` / `pay_with_usdc` |
 | `get_hosting` | Get hosting status for a domain (plan, trial, expiry, auto-renew) |
 | `deploy_site` | Upload static files (base64, ≤10MB/call) to a domain's hosting |
 | `list_hosting_files` | List files under a path in a domain's hosting |
@@ -299,7 +303,7 @@ The server speaks JSON-RPC 2.0 over stdio. Smoke test from a shell:
 
 ## Paying for purchases directly in USDC (x402)
 
-`register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout` and `create_hosting` take `pay_with_usdc: true`, which skips account credit entirely. The API answers with an x402 payment requirement (USDC on Base, the exact price), and:
+`register_domain`, `renew_domain`, `transfer_domain`, `buy_closeout`, `create_hosting` and `create_mailbox` take `pay_with_usdc: true`, which skips account credit entirely. The API answers with an x402 payment requirement (USDC on Base, the exact price), and:
 
 - **with `PORKBUN_X402_PRIVATE_KEY` set**, this server signs it and the purchase completes in the same tool call. It only signs terms that are exactly the quoted price in USDC on Base, and never above `PORKBUN_X402_MAX_CENTS`;
 - **without it** (and always on the hosted connector, which holds no one's key), the tool returns `status: PAYMENT_REQUIRED` with a `checkoutId`, an `x402Url` and a `payUrl`. Pay the `x402Url` with a wallet tool (for example Coinbase's `awal x402 pay <x402Url> --scheme auth-capture`) or have the user pay the `payUrl` page, then call the same tool again with `usdc_checkout_id`.

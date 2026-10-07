@@ -77,17 +77,17 @@ const FULL = "the full Porkbun server, which the user can add themselves as a cu
 // A hosted connection is always a live key, so the sandbox tools never apply.
 const SANDBOX = ["create_sandbox_key", "sandbox_topup", "sandbox_reset", "sandbox_trigger_webhook"];
 const TOPUPS = ["top_up_account_credit", "configure_auto_topup", "top_up_with_usdc", "get_usdc_topup_status", "top_up_with_card_mpp"];
-const PURCHASES = ["register_domain", "renew_domain", "transfer_domain", "buy_closeout", "create_hosting"];
+const PURCHASES = ["register_domain", "renew_domain", "transfer_domain", "buy_closeout", "create_hosting", "create_mailbox"];
 // Tools whose whole output is a secret: the certificate private key, a
 // WordPress application password, and a webhook signing secret (create and
 // rotate exist only to hand one out). Other webhook tools stay, with the
 // secret field redacted (redactKeys below). OpenAI's app review asks that tool responses
 // exclude auth secrets, so the directory listings' path leaves them out. They stay
 // on /mcp, where the user added the server themselves.
-const SECRETS = ["get_ssl_bundle", "create_wp_credentials", "create_webhook", "rotate_webhook_secret"];
+const SECRETS = ["get_ssl_bundle", "create_wp_credentials", "create_webhook", "rotate_webhook_secret", "setup_mailbox"];
 // Takes a domain-transfer authorization (EPP) code, a credential. No transfer can
 // be started on the directory path anyway (transfer_domain is a purchase).
-const CREDENTIAL_INPUTS = ["update_transfer_auth_code"];
+const CREDENTIAL_INPUTS = ["update_transfer_auth_code", "set_email_password"];
 // Money movement and future charges, left out of the directory path to be safe:
 // cancel_transfer refunds a paid order, and update_auto_renew turning renewal on
 // authorises charges at expiry (close to "initiating a subscription").
@@ -95,7 +95,7 @@ const MONEY_ADJACENT = ["cancel_transfer", "update_auto_renew"];
 // Invoice tools (0.39.0) are read-only, but held off the directory path while
 // the ChatGPT review of it is still open: its tool list is what was submitted.
 // Move them onto /mcp/no-purchases once that review has concluded.
-const HELD_FOR_REVIEW = ["list_invoices", "get_invoice", "get_invoice_pdf", "send_phone_verification_code", "confirm_phone_verification", "list_email_forwards", "create_email_forward", "delete_email_forward"];
+const HELD_FOR_REVIEW = ["list_invoices", "get_invoice", "get_invoice_pdf", "send_phone_verification_code", "confirm_phone_verification", "list_email_forwards", "create_email_forward", "delete_email_forward", "list_mailboxes"];
 
 const FUNDING_NO_TOPUPS =
   "**How a purchase is paid.** From prepaid account credit by default; a card saved at Porkbun is never charged by a purchase itself. On this connection purchases are paid from credit only. If the credit is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). Adding credit is the account holder's step: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. Auto top-up, which they can set in their API settings (https://porkbun.com/account/api), refills the balance from their saved card on its own next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08).";

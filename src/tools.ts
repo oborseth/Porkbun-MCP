@@ -1638,6 +1638,92 @@ const delete_email_forward: Tool = {
   },
 };
 
+// ─── Email hosting (mailboxes) ──────────────────────────────────────────────
+
+const MAILBOX_PASSWORD_NOTE =
+  "Leave `password` out and Porkbun generates a strong one and returns it ONCE in `password`: give it to the user straight away, it is not shown again (it can be changed later with `set_email_password`). If you pass one, it needs 12-72 characters with an upper case letter, a lower case letter, a number and a special character.";
+const MAILBOX_DNS_NOTE =
+  "A mailbox needs Porkbun's MX records and SPF include at the domain apex (the same records as email forwarding), and the call puts them in place. **If that would delete MX records for another mail service or rewrite the domain's SPF record, it returns `DNS_CHANGE_CONFIRMATION_REQUIRED` with `dnsChanges` and changes (and charges) nothing: tell the user what will change, and only with their OK call again with `confirm_dns_changes: true`.** The answer includes `clientSettings` (IMAP/SMTP hosts and ports) for setting up a mail app. DKIM and DMARC are set up on the website. Needs a verified account email and phone.";
+
+const list_mailboxes: Tool = {
+  name: "list_mailboxes",
+  description:
+    "List a domain's email hosting mailboxes (real inboxes at the domain, read over IMAP/POP or webmail), with `status`, `address`, whether each is the free `trial`, and `expires`. A mailbox with `status: PENDINGSETUP` and `address: null` is already paid for, or is the free trial mailbox every domain registration includes: `setup_mailbox` gives it an address for free. Also returns the `price` of buying another mailbox and the mail client settings.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/email/getMailboxes/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const setup_mailbox: Tool = {
+  name: "setup_mailbox",
+  description:
+    "Give a waiting mailbox (already paid for, or the free trial that comes with a domain registration) its address and password. Free. If none is waiting the result is `NO_PENDING_MAILBOX`: buy one with `create_mailbox` (with the user's OK on the price). " + MAILBOX_PASSWORD_NOTE + " " + MAILBOX_DNS_NOTE,
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the mailbox is on, e.g. `example.com`."),
+    address: z.string().min(1).describe("The mailbox address: the part before the @ (`me`) or the whole address. 1-30 characters: letters, digits and + . - _"),
+    password: z.string().optional().describe("Optional. Omit to have a strong password generated and returned once."),
+    mailbox_id: z.number().int().optional().describe("Which waiting mailbox, from `list_mailboxes`, when there are several."),
+    confirm_dns_changes: z.boolean().optional().describe("Set only after the user agreed to the DNS changes a `DNS_CHANGE_CONFIRMATION_REQUIRED` result described."),
+    dry_run: z.boolean().optional().describe("If true, validate and report the DNS changes without setting anything up."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { address: String(args.address) };
+    if (args.password) body.password = String(args.password);
+    if (args.mailbox_id) body.mailboxId = Number(args.mailbox_id);
+    if (args.confirm_dns_changes) body.confirmDnsChanges = true;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/email/setupMailbox/${encodeURIComponent(domain)}`, { method: "POST", body });
+  },
+};
+
+const create_mailbox: Tool = {
+  name: "create_mailbox",
+  description:
+    "**Spends account credit" + PAY_DIRECT_OPENING + ".** Buy one email hosting mailbox ($36.00 a year, renewing automatically; the current price is `price` in `list_mailboxes`) and set it up in the same call. Check `list_mailboxes` first: if a mailbox is already waiting (the free trial every registration includes), `setup_mailbox` is free. Tell the user the price and that it renews yearly before buying. `cost_cents` must equal the price; `dry_run: true` with `cost_cents: 0` quotes it and checks everything without charging. If the charge succeeds but setup does not, the result says `setupComplete: false` with a `mailboxId`: finish with `setup_mailbox`, do not buy again. " + MAILBOX_PASSWORD_NOTE + " " + MAILBOX_DNS_NOTE + "\n\n" + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain for the mailbox, e.g. `example.com`."),
+    address: z.string().min(1).describe("The mailbox address: the part before the @ (`me`) or the whole address."),
+    cost_cents: z.number().int().min(0).describe("The mailbox price, 3600 for $36.00 a year. Must match exactly." + CENTS_EXAMPLE),
+    password: z.string().optional().describe("Optional. Omit to have a strong password generated and returned once."),
+    confirm_dns_changes: z.boolean().optional().describe("Set only after the user agreed to the DNS changes a `DNS_CHANGE_CONFIRMATION_REQUIRED` result described."),
+    dry_run: z.boolean().optional().describe("If true, validate everything and return a preview without buying."),
+    ...PAY_WITH_USDC_PARAMS,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { address: String(args.address), cost: Number(args.cost_cents), agreeToTerms: "yes" };
+    if (args.password) body.password = String(args.password);
+    if (args.confirm_dns_changes) body.confirmDnsChanges = true;
+    if (args.dry_run) body.dryRun = true;
+    return await purchase(config, `/email/createMailbox/${encodeURIComponent(domain)}`, body, args, !args.dry_run);
+  },
+};
+
+const set_email_password: Tool = {
+  name: "set_email_password",
+  description:
+    "Change the password of an email hosting mailbox (an active one, from `list_mailboxes`). The new password needs 12-72 characters with an upper case letter, a lower case letter, a number and a special character. Only change a password the user asked to change, and give the new one to them.",
+  inputSchema: {
+    email_address: z.string().min(3).describe("The mailbox's full address, e.g. `me@example.com`."),
+    password: z.string().min(12).describe("The new password."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    return await call(config, "/email/setPassword", {
+      method: "POST",
+      body: { emailAddress: String(args.email_address).toLowerCase(), password: String(args.password) },
+    });
+  },
+};
+
 // ─── Nameservers ────────────────────────────────────────────────────────────
 
 const update_nameservers: Tool = {
@@ -2563,6 +2649,10 @@ export const tools: Tool[] = [
   list_email_forwards,
   create_email_forward,
   delete_email_forward,
+  list_mailboxes,
+  setup_mailbox,
+  create_mailbox,
+  set_email_password,
   // write — glue records
   create_glue_record,
   update_glue_record,
