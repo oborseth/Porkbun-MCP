@@ -258,16 +258,18 @@ By default, API access is opt-in per domain. To use the API to manage all your d
 
 ### Recommended: scope the key to your agent
 
-Each API key supports two optional restrictions, set via the gear icon next to the key in [porkbun.com/account/api](https://porkbun.com/account/api):
+Each API key supports three optional restrictions, set via the gear icon next to the key in [porkbun.com/account/api](https://porkbun.com/account/api):
 
 - **Allowed IPs** — one entry per line; supports bare IPv4/IPv6 plus CIDR ranges (`198.51.100.0/24`, `2001:db8::/32`). Requests from other IPs fail with HTTP 403 `IP_NOT_ALLOWED` before any other check runs.
 - **Allowed domains** — one entry per line, exact match. Operations against domains not in the list fail with HTTP 403 `DOMAIN_NOT_ALLOWED`.
+- **Permissions** — Full access, **Read-only**, **Manage, but no purchases**, or custom scopes (`read`, `dns`, `domains`, `email`, `hosting`, `purchase`, `funding`, `account`). A tool call outside them fails with HTTP 403 `INSUFFICIENT_SCOPE` and changes nothing; `ping` shows the key's `scopes`.
 
 Empty fields = no restriction (matches current behavior). When you give an MCP server a key, the recommended pattern is:
 
 1. Create a fresh key dedicated to the agent (not your master key).
 2. List the specific domains the agent should manage.
-3. If you know the agent's egress IP, list it too.
+3. Give it only the permissions it needs (often **Manage, but no purchases**).
+4. If you know the agent's egress IP, list it too.
 
 The blast radius of an accidentally-leaked key drops to "operations on these domains from this IP" instead of "anything on the account."
 
