@@ -3,7 +3,7 @@ import type { PorkbunConfig } from "./api.js";
 import { tools } from "./tools.js";
 
 export const SERVER_NAME = "porkbun-mcp";
-export const SERVER_VERSION = "0.45.6";
+export const SERVER_VERSION = "0.46.0";
 
 // Human-readable display title for each tool, derived from its snake_case name
 // (domain acronyms kept upper-case). Every tool in the Connectors Directory must

@@ -1579,6 +1579,65 @@ const delete_url_forward: Tool = {
   },
 };
 
+// ─── Email forwarding ───────────────────────────────────────────────────────
+
+const list_email_forwards: Tool = {
+  name: "list_email_forwards",
+  description:
+    "List the email forwards on a domain: each `address` at the domain and the `forwardTo` mailbox it is delivered to (one address can forward to several). Also returns `limits` (`used` / `max`, 20 by default) and `dnsConfigured`, whether the domain's apex MX records in the Porkbun zone point at Porkbun forwarding. If the domain uses other nameservers, forwarding only works once those point MX at Porkbun too.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/email/getForwards/${encodeURIComponent(domain)}`, { method: "GET" });
+  },
+};
+
+const create_email_forward: Tool = {
+  name: "create_email_forward",
+  description:
+    "Forward an address at the domain (e.g. `info@example.com`) to another mailbox. Free, up to the domain's limit. No catch-all or wildcard forwards, and an address that is an email hosting mailbox cannot also be a forward. Setting up forwarding puts Porkbun's MX records (and SPF include) at the domain apex. **If that would delete MX records for another mail service or rewrite the domain's SPF record, the call returns `DNS_CHANGE_CONFIRMATION_REQUIRED` with `dnsChanges` listing exactly what would change, and nothing is changed: tell the user (deleting another provider's MX stops that mail service receiving), and only with their OK call again with `confirm_dns_changes: true`.** Use `dry_run: true` to preview, including whether confirmation will be needed.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the address belongs to, e.g. `example.com`"),
+    address: z.string().min(1).describe("The address to forward: the part before the @ (`info`) or the whole address (`info@example.com`)."),
+    forward_to: z.string().min(3).describe("The mailbox to deliver to, e.g. `me@gmail.com`."),
+    confirm_dns_changes: z
+      .boolean()
+      .optional()
+      .describe("Set only after the user has agreed to the DNS changes a `DNS_CHANGE_CONFIRMATION_REQUIRED` result described."),
+    dry_run: z.boolean().optional().describe("If true, validate and report the DNS changes without making any."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { address: String(args.address), forwardTo: String(args.forward_to) };
+    if (args.confirm_dns_changes) body.confirmDnsChanges = true;
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/email/addForward/${encodeURIComponent(domain)}`, { method: "POST", body });
+  },
+};
+
+const delete_email_forward: Tool = {
+  name: "delete_email_forward",
+  description:
+    "Delete one email forward, named by its `address` and `forward_to` (from `list_email_forwards`; an address can forward to several mailboxes, so both are needed). When it was the domain's last forward and there are no email hosting mailboxes, Porkbun's forwarding MX and SPF records are removed too (`dnsRecordsRemoved: true`), so mail to the domain stops being accepted.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain the forward belongs to."),
+    address: z.string().min(1).describe("The forwarded address, `info` or `info@example.com`."),
+    forward_to: z.string().min(3).describe("The destination mailbox of the forward to delete."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    return await call(config, `/email/deleteForward/${encodeURIComponent(domain)}`, {
+      method: "POST",
+      body: { address: String(args.address), forwardTo: String(args.forward_to) },
+    });
+  },
+};
+
 // ─── Nameservers ────────────────────────────────────────────────────────────
 
 const update_nameservers: Tool = {
@@ -2501,6 +2560,9 @@ export const tools: Tool[] = [
   // write — URL forwarding
   create_url_forward,
   delete_url_forward,
+  list_email_forwards,
+  create_email_forward,
+  delete_email_forward,
   // write — glue records
   create_glue_record,
   update_glue_record,

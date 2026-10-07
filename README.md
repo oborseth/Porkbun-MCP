@@ -47,6 +47,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `import_dns_records` | Bulk-create records from a supplied list or a live scan; idempotent, already-present records are skipped |
 | `list_dnssec_records` | List DNSSEC DS records published at the registry |
 | `list_url_forwards` | List URL forwarding rules for a domain (incl. exact `redirectType`: 301/302/307/masked) |
+| `list_email_forwards` | List email forwards on a domain (address → mailbox), with limits and whether forwarding MX is in place |
 | `list_glue_records` | List glue records (host-to-IP mappings) for a domain |
 | `list_transfers` | List in-progress and recent inbound transfers |
 | `get_transfer_status` | Get status of a specific inbound transfer |
@@ -91,7 +92,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `update_nameservers` | Replace the nameserver list for a domain (full replace, not append) |
 | `update_contacts` | Edit domain contacts — any subset of registrant/admin/tech/billing; a registrant change fires the new-owner notice email. On address-validated TLDs (`.de`/`.nrw`/`.uk`/`.us`/`.ca`/`.au`/`.eu`/`.in`/`.nz` families) it validates the registrant address — resolve with `address_validation_choice`. A `.au` registrant name/org change is a website-only ownership trade. |
 
-**DNS / DNSSEC / URL-forwarding / glue writes (free)**
+**DNS / DNSSEC / URL- and email-forwarding / glue writes (free)**
 
 | Tool | Description |
 |---|---|
@@ -102,6 +103,8 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `delete_dnssec_record` | Remove a DNSSEC DS record by key tag |
 | `create_url_forward` | Create a URL forwarding rule (permanent/temporary/masked; optional `redirect_type` 301/302/307/masked) |
 | `delete_url_forward` | Delete a URL forwarding rule by ID |
+| `create_email_forward` | Forward an address at the domain to another mailbox; asks first (`DNS_CHANGE_CONFIRMATION_REQUIRED`) before replacing another mail service's MX or rewriting SPF |
+| `delete_email_forward` | Delete an email forward; the last one also removes the forwarding MX/SPF |
 | `create_glue_record` | Create a glue record (host-to-IP mapping at the registry) |
 | `update_glue_record` | Replace the IP list for a glue record |
 | `delete_glue_record` | Delete a glue record by host |
