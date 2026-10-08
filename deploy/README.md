@@ -146,8 +146,10 @@ address.
 ## Tools and paths
 
 One server, three URL paths, defined in `src/profiles.ts`. Every path shares the
-OAuth server, the tokens and the API; only the offered tool list differs, and
-the API enforces none of it (a token works on any path).
+OAuth server and the API; the offered tool list differs, and since October 2026 the
+sign-in on a restricted path can only grant matching key permissions (no `purchase`
+or `funding` on `/mcp/no-purchases`, no `funding` on `/mcp/no-topups`), which the
+API enforces. Connections made before then keep full access until they reconnect.
 
 | Path | Tools | Leaves out | For |
 |---|---|---|---|

@@ -6,9 +6,12 @@ import { FUNDING_LOCAL, PAY_DIRECT_PARAMS, PAY_DIRECT_OPENING, PAY_WITH_CARD_NOT
  * The directories that list MCP apps restrict what a listed app may do, and a
  * listing points at a fixed URL. So each restricted path serves the same server
  * minus what its listing forbids, while /mcp stays the full set for everyone who
- * adds the URL themselves. The API does not enforce any of this: a connection's
- * token is the same whichever path issued it. These paths only decide which
- * tools an assistant is offered.
+ * adds the URL themselves. The path decides which tools an assistant is offered,
+ * and, since October 2026, also caps what the sign-in can grant: the consent page
+ * (web app, OauthServerLib::connectionPermissionOptions) only offers permissions
+ * without purchase and funding on /mcp/no-purchases, and never funding on
+ * /mcp/no-topups, and the API enforces them on the connection's key (api.scopes).
+ * Connections made before then keep full access until they reconnect.
  *
  * - /mcp               everything (minus the sandbox-only tools, as always)
  * - /mcp/no-topups     no listing today (Claude moved to no-purchases); was for the
