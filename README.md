@@ -159,6 +159,8 @@ Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and 
 
 | Tool | Description |
 |---|---|
+| `request_api_key` | Start creating a live API key the account holder approves in the browser (optionally with only some permissions); returns the approval link |
+| `retrieve_api_key` | After approval, collect the new key pair once |
 | `create_sandbox_key` | **No credentials needed** — instantly mint a throwaway sandbox key pair (`pk1_sb_`/`sk1_sb_`, $1000 fake credit) so an agent can start testing before it has any keys |
 | `sandbox_topup` | Sandbox only — grant fake account credit (default $1000) so paid ops can keep being exercised after funds run out |
 | `sandbox_reset` | Sandbox only — wipe the sandbox account's domains/DNS/orders/credit and re-grant $1000, for a clean slate between test runs |

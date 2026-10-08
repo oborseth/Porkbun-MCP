@@ -1,5 +1,5 @@
 import { z, type ZodRawShape } from "zod";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes, createHash } from "node:crypto";
 import { call, callPublic, callWithPayment, fetchDoc, type PorkbunConfig, type PaymentRequired, PorkbunApiError } from "./api.js";
 import { signX402Payment, x402WalletConfigured } from "./x402.js";
 
@@ -547,6 +547,52 @@ const top_up_account_credit: Tool = {
 };
 
 // ─── Sandbox controls (only usable with a sandbox key, pk1_sb_…) ──────────────
+
+// ─── Live API keys (the browser-approved key handoff) ────────────────────────
+
+const SCOPE_NAMES = ["read", "dns", "domains", "email", "hosting", "purchase", "funding", "account"] as const;
+
+const request_api_key: Tool = {
+  name: "request_api_key",
+  description:
+    "Start creating a new LIVE Porkbun API key that the account holder approves in their browser (no credentials needed to call this). Returns `authUrl`: give it to the user to open, sign in and approve. Then call `retrieve_api_key` with the `requestToken` and `codeVerifier` from this result to receive the new key pair, once. Ask for only the permissions the work needs with `scopes` (any of read, dns, domains, email, hosting, purchase, funding, account; `read` is always included): for example `[\"dns\"]` for DNS work, or everything except `purchase` and `funding` to manage without buying. Leave `scopes` out only if the key must buy. The user sees the requested permissions on the approval page and may grant less, never more, so check `ping` on the new key. The link is valid for 30 minutes. For a throwaway test key with fake credit, use `create_sandbox_key` instead.",
+  inputSchema: {
+    name: z.string().min(1).max(255).describe("A name the user will recognise on the approval page and in their key list, e.g. `Claude Code - mcp testing`."),
+    scopes: z.array(z.enum(SCOPE_NAMES)).optional().describe("Permissions for the key. Omit for full access (including buying)."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    // PKCE: the verifier stays with the agent; only its hash goes to Porkbun, and the
+    // secret key is later released only to whoever holds the verifier.
+    const codeVerifier = randomBytes(40).toString("base64url");
+    const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
+    const body: Record<string, unknown> = { name: String(args.name), codeChallenge, codeChallengeMethod: "S256" };
+    if (Array.isArray(args.scopes) && args.scopes.length) body.scopes = args.scopes;
+    const res = (await callPublic(config, "/apikey/request", body)) as Record<string, unknown>;
+    if (res && res.status === "SUCCESS") {
+      return {
+        ...res,
+        codeVerifier,
+        nextStep: `Ask the user to open authUrl, sign in and approve (they may grant less than requested). Then call retrieve_api_key with requestToken and codeVerifier. Keep codeVerifier private: it is what releases the secret key.`,
+      };
+    }
+    return res;
+  },
+};
+
+const retrieve_api_key: Tool = {
+  name: "retrieve_api_key",
+  description:
+    "Collect the API key the user approved after `request_api_key`. Returns the public key (`apikey`, pk1_...) and the secret key (`secretapikey`, sk1_...) exactly once; store them securely right away (for example as PORKBUN_API_KEY / PORKBUN_SECRET_API_KEY in the MCP server's config, never in a committed file). Until the user approves, the answer says the request is still pending: wait and try again. This server keeps using the credentials it was started with; to switch to the new key, update its configuration and restart or reconnect it.",
+  inputSchema: {
+    request_token: z.string().min(10).describe("`requestToken` from request_api_key."),
+    code_verifier: z.string().min(20).describe("`codeVerifier` from request_api_key."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    return await callPublic(config, "/apikey/retrieve", { requestToken: String(args.request_token), codeVerifier: String(args.code_verifier) });
+  },
+};
 
 const create_sandbox_key: Tool = {
   name: "create_sandbox_key",
@@ -2650,6 +2696,8 @@ export const tools: Tool[] = [
   list_wp_credentials,
   delete_wp_credentials,
   delete_hosting,
+  request_api_key,
+  retrieve_api_key,
   create_sandbox_key,
   sandbox_topup,
   sandbox_reset,
