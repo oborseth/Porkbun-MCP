@@ -199,7 +199,7 @@ const ping: Tool = {
 const check_domain: Tool = {
   name: "check_domain",
   description:
-    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. An internationalized name (IDN) also returns `idnLanguages`, the languages its registry accepts; `register_domain` needs one of them as `idn_language`. For a domain already in the user's account the result has `inYourAccount: true`: the top-level `price` is still the registration price, and the renewal price is `additional.renewal.price` (use that, or a `renew_domain` dry run, before renewing). Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
+    "Check whether a single domain is available for registration and what it costs. Returns availability (`avail: yes|no`), registration price, renewal price, transfer price, and (for premium domains) extended pricing details. Pricing is in USD. An internationalized name (IDN) also returns `idnLanguages`, the languages its registry accepts; `register_domain` needs one of them as `idn_language`. For a domain already in the user's account the result has `inYourAccount: true`: the top-level `price` is still the registration price, and the renewal price is `additional.renewal.price` (use that, or a `renew_domain` dry run, before renewing). For a domain registered to someone else it adds `aftermarketSearch`: the name may be for sale, so call `search_aftermarket` before telling the user it is unavailable. Use this BEFORE register_domain to confirm cost — Porkbun rejects registrations whose `cost_cents` doesn't match the current quote. **Checking more than one name? Use `check_domains` instead** — it takes up to 25 in a single call and draws on a separate, more generous budget (200 domains/minute against 10 checks/10s here), because Porkbun chunks checks per registry and a batch costs less than the same names one at a time.",
   inputSchema: {
     domain: z
       .string()
@@ -839,6 +839,35 @@ const search_closeouts: Tool = {
     if (priceMax !== undefined) qs.set("priceMax", String(priceMax));
     const q = qs.toString();
     return await call(config, `/closeout/search${q ? "?" + q : ""}`, { method: "GET" });
+  },
+};
+
+const search_aftermarket: Tool = {
+  name: "search_aftermarket",
+  description:
+    "Find registered domains that are FOR SALE on the aftermarket: Afternic, Sedo, Atom, NameBright and DAX listings and auctions, plus Porkbun Marketplace, merged to the lowest price per name. Use it when check_domain says a name is taken (`aftermarketSearch` in its result), or to browse names for sale by keyword. " +
+    "`query` is a keyword (`coffee`) or a full domain (`coffee.com`); for a full domain, `exactMatch` holds its listing if it has one, and related listings follow. " +
+    "**Read `saleType` before quoting a price:** `buy_now` means `price` is the price; `make_offer` means `price` is only the seller's minimum offer; `auction` means `price` is the current bid. Prices are integer cents and are the current listed price; the binding price is set at checkout. " +
+    "**You cannot buy these through the API.** Tell the user the price and what it means, and give them the listing's `buyUrl` to buy (or bid) on porkbun.com; the name arrives by transfer from the seller, usually within a few days. " +
+    "A cold search can take a few seconds; 20 searches a minute per account.",
+  inputSchema: {
+    query: z.string().min(1).describe("A keyword or a full domain."),
+    tld: z.string().optional().describe("Only listings on this TLD."),
+    sale_type: z.enum(["buy_now", "make_offer", "auction"]).optional().describe("Only this kind of listing."),
+    price_min_cents: z.number().int().nonnegative().optional().describe("Minimum price." + CENTS_EXAMPLE),
+    price_max_cents: z.number().int().nonnegative().optional().describe("Maximum price." + CENTS_EXAMPLE),
+    limit: z.number().int().positive().max(200).optional().describe("Listings to return, max 200. Default 50."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    const qs = new URLSearchParams();
+    qs.set("query", String(args.query).trim());
+    if (args.tld !== undefined) qs.set("tld", String(args.tld));
+    if (args.sale_type !== undefined) qs.set("saleType", String(args.sale_type));
+    if (args.price_min_cents !== undefined) qs.set("priceMin", String(args.price_min_cents));
+    if (args.price_max_cents !== undefined) qs.set("priceMax", String(args.price_max_cents));
+    if (args.limit !== undefined) qs.set("limit", String(args.limit));
+    return await call(config, `/aftermarket/search?${qs.toString()}`, { method: "GET" });
   },
 };
 
@@ -2690,6 +2719,7 @@ export const tools: Tool[] = [
   get_nameservers,
   list_dns_records,
   search_closeouts,
+  search_aftermarket,
   get_closeout,
   buy_closeout,
   get_transfer_setup,
