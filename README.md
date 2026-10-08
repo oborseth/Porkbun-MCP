@@ -24,7 +24,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `check_domain` | Check availability and pricing for a single domain |
 | `get_registration_requirements` | TLD registration requirements as JSON Schema — is it API-registerable, the create payload, and registry eligibility fields (.us nexus, .ca legal type, …) |
 | `get_pricing` | Get registration/renewal/transfer pricing for all TLDs (no auth needed) |
-| `list_marketplace` | Browse the Porkbun aftermarket — filter by TLD, max price, name substring |
+| `list_marketplace` | Browse Porkbun Marketplace (names Porkbun customers list themselves); filter by TLD, max price, name substring. For every aftermarket at once, use `search_aftermarket` |
 | `search_closeouts` | Search expired-domain closeouts; filter by age, price, TLD, name length; sort by registration date |
 | `search_aftermarket` | Find taken names that are for sale (Afternic, Sedo, Atom, NameBright, DAX, Porkbun Marketplace), with price, sale type and a link to buy on porkbun.com |
 | `get_closeout` | One closeout plus its binding total (closeout price + the renewal/transfer year) |
