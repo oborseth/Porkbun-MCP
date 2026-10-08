@@ -256,6 +256,8 @@ For the local server, most MCP-aware editors use the same `mcpServers` config bl
 
 Create API keys at [porkbun.com/account/api](https://porkbun.com/account/api). You'll need both the public key (`pk1_…`) and the secret key (`sk1_…`).
 
+Or let the assistant get one: the server starts without keys, and `request_api_key` (no credentials needed) returns a link where you approve a new key, optionally with only some permissions; `retrieve_api_key` then hands the assistant the key pair once. Put it in the config below and restart the server.
+
 By default, API access is opt-in per domain. To use the API to manage all your domains, enable the "Opt In All Domains" toggle in the same settings page. Otherwise you'll need to enable API access for each domain individually under Domain Management.
 
 ### Recommended: scope the key to your agent
@@ -279,8 +281,8 @@ The blast radius of an accidentally-leaked key drops to "operations on these dom
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `PORKBUN_API_KEY` | for live ops | Your Porkbun public API key. Omit to use only the credential-free documentation tools. |
-| `PORKBUN_SECRET_API_KEY` | for live ops | Your Porkbun secret API key. Omit to use only the credential-free documentation tools. |
+| `PORKBUN_API_KEY` | for live ops | Your Porkbun public API key. Omit to use only the credential-free tools (documentation, `create_sandbox_key`, `request_api_key` / `retrieve_api_key`). |
+| `PORKBUN_SECRET_API_KEY` | for live ops | Your Porkbun secret API key. Omit to use only the credential-free tools (documentation, `create_sandbox_key`, `request_api_key` / `retrieve_api_key`). |
 | `PORKBUN_BASE_URL` | no | Override the API base URL (e.g. for testing against `api-betamax.porkbun.com/api/json/v3`) |
 | `PORKBUN_DOCS_BASE` | no | Override the docs host used by the `*_doc(s)` tools (default `https://porkbun.com`) |
 | `PORKBUN_X402_PRIVATE_KEY` | no | Private key (`0x…`) of a Base wallet holding USDC. Lets the purchase tools pay directly with `pay_with_usdc: true` in one call. Use a wallet holding only what you are willing to spend. |

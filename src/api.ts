@@ -126,9 +126,12 @@ export async function callWithPayment<T = unknown>(
   // go through here. Fail with a clear, actionable message rather than a 401.
   if (!config.bearerToken && (!config.apiKey || !config.secretApiKey)) {
     throw new Error(
-      "This tool needs Porkbun API credentials. Set PORKBUN_API_KEY and PORKBUN_SECRET_API_KEY " +
-        "(create keys at https://porkbun.com/account/api). The documentation tools — search_docs, " +
-        "read_doc, list_doc_topics — work without credentials."
+      "This tool needs Porkbun API credentials. Set PORKBUN_API_KEY and PORKBUN_SECRET_API_KEY. " +
+        "To get a key without leaving this conversation, call request_api_key (the user approves it in " +
+        "their browser, optionally with limited permissions), then retrieve_api_key, then restart this " +
+        "server with the new key; or create one at https://porkbun.com/account/api. For a test key with " +
+        "fake credit, call create_sandbox_key. These, and the documentation tools (search_docs, read_doc, " +
+        "list_doc_topics), work without credentials."
     );
   }
 
