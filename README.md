@@ -37,6 +37,8 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 | `top_up_with_card_mpp` | A payment link an agent pays with the user's card over MPP (Stripe Link agent wallet); credit lands immediately |
 | `send_phone_verification_code` | Texts (or calls) a code to the phone on the account, to clear `VERIFICATION_REQUIRED` |
 | `confirm_phone_verification` | Verifies the phone with the code the user received |
+| `send_email_verification_code` | Emails a code to the address on the account, to clear `VERIFICATION_REQUIRED` |
+| `confirm_email_verification` | Verifies the email with the code from that email |
 | `list_invoices` | The account's invoices, newest first: date, paid/refunded state, net total, domains, and a link to each on porkbun.com |
 | `get_invoice` | One invoice as data: bill-to, payment method, lines with terms and expiry dates, and totals |
 | `get_invoice_pdf` | The invoice PDF as an embedded file, plus a 15-minute download link that works without signing in |
@@ -185,7 +187,7 @@ Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and 
 | `resend_webhook` | Re-queue a past delivery (reuses the original event id) |
 | `delete_webhook` | Delete a webhook endpoint |
 
-Porkbun POSTs a signed JSON payload to your endpoint when subscribed events occur (`domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, `dns.record.created|updated|deleted`). Verify the `X-Porkbun-Signature` header — it's `sha256=` + HMAC-SHA256 of `{timestamp}.{rawBody}` keyed by the endpoint secret, where `{timestamp}` is the `X-Porkbun-Webhook-Timestamp` header.
+Porkbun POSTs a signed JSON payload to your endpoint when subscribed events occur (`domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, `dns.record.created|updated|deleted`, `cloudflare.connect.completed|failed`, `account.verification.code_sent|completed`; fields per event: https://porkbun.com/llms/webhooks). Verify the `X-Porkbun-Signature` header — it's `sha256=` + HMAC-SHA256 of `{timestamp}.{rawBody}` keyed by the endpoint secret, where `{timestamp}` is the `X-Porkbun-Webhook-Timestamp` header.
 
 ## Claude plugin
 

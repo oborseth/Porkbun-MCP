@@ -84,7 +84,7 @@ function pickCents(args: Record<string, unknown>, name: string, legacy: string, 
 // (the Claude apps, for one) will not charge a card on a user's behalf, and they
 // need a correct next step too.
 export const FUNDING_LOCAL =
-  "**How a purchase is paid.** From prepaid account credit by default; a card saved at Porkbun is never charged by a purchase itself. Or directly, for this one purchase: `pay_with_card: true` (the user's card from their Stripe Link agent wallet, held and charged only if the purchase succeeds) or `pay_with_usdc: true` (USDC on Base over x402). If the credit is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall`, **`topUpAvailable`** and `usdcAmountToCover` (`dry_run: true` reports the same without charging). Ways forward, simplest first, always telling the user the dollar amount and getting their OK: (1) if they use Stripe Link, retry this exact call with `pay_with_card: true`; (2) if you can pay x402 (a wallet tool, or this server has PORKBUN_X402_PRIVATE_KEY), retry with `pay_with_usdc: true`; (3) when `topUpAvailable` is true a card is saved: `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount), then retry; (4) add credit with `top_up_with_card_mpp` (Link) or `top_up_with_usdc` (for `usdcAmountToCover`, which allows for Coinbase's ~1% fee), then retry; (5) the user adds credit at https://porkbun.com/account/credit. If a purchase fails with VERIFICATION_REQUIRED, `send_phone_verification_code` then `confirm_phone_verification` verifies the phone without leaving the conversation. Suggest `configure_auto_topup` if they want credit refilled automatically. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not move money on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
+  "**How a purchase is paid.** From prepaid account credit by default; a card saved at Porkbun is never charged by a purchase itself. Or directly, for this one purchase: `pay_with_card: true` (the user's card from their Stripe Link agent wallet, held and charged only if the purchase succeeds) or `pay_with_usdc: true` (USDC on Base over x402). If the credit is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance`, `shortfall`, **`topUpAvailable`** and `usdcAmountToCover` (`dry_run: true` reports the same without charging). Ways forward, simplest first, always telling the user the dollar amount and getting their OK: (1) if they use Stripe Link, retry this exact call with `pay_with_card: true`; (2) if you can pay x402 (a wallet tool, or this server has PORKBUN_X402_PRIVATE_KEY), retry with `pay_with_usdc: true`; (3) when `topUpAvailable` is true a card is saved: `top_up_account_credit` (`amount_cents` at least `topUpAmountToCover`, or omit it for their configured amount), then retry; (4) add credit with `top_up_with_card_mpp` (Link) or `top_up_with_usdc` (for `usdcAmountToCover`, which allows for Coinbase's ~1% fee), then retry; (5) the user adds credit at https://porkbun.com/account/credit. If a purchase fails with VERIFICATION_REQUIRED, the phone (`send_phone_verification_code` then `confirm_phone_verification`) and the email (`send_email_verification_code` then `confirm_email_verification`) can both be verified without leaving the conversation, the user reading out each code. Suggest `configure_auto_topup` if they want credit refilled automatically. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08). If you do not move money on a user's behalf, hand it back instead: tell them the shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry once they have.";
 
 // ─── Paying for a purchase directly in USDC (x402) ─────────────────────────
 // The purchase tools (register, renew, transfer, buy_closeout, create_hosting)
@@ -366,13 +366,37 @@ const send_phone_verification_code: Tool = {
 const confirm_phone_verification: Tool = {
   name: "confirm_phone_verification",
   description:
-    "Verify the account's phone number with the code the user received from `send_phone_verification_code`. On success, retry what failed with VERIFICATION_REQUIRED; `emailVerified: false` in the response means the email still needs verifying, which the user does by clicking the link in the verification email (resendable from account settings on porkbun.com). PHONE_CODE_INVALID means a wrong or expired code: check it with the user, or send a new one.",
+    "Verify the account's phone number with the code the user received from `send_phone_verification_code`. On success, retry what failed with VERIFICATION_REQUIRED; `emailVerified: false` in the response means the email still needs verifying: `send_email_verification_code`, then `confirm_email_verification` with the code the user reads out (or they click the link in that email). PHONE_CODE_INVALID means a wrong or expired code: check it with the user, or send a new one.",
   inputSchema: {
     code: z.string().min(4).max(12).describe("The code the user received, exactly as texted (case does not matter)."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/account/verifyPhone/confirm", { method: "POST", body: { code: String(args.code) } });
+  },
+};
+
+const send_email_verification_code: Tool = {
+  name: "send_email_verification_code",
+  description:
+    "Email a verification code to the email address on the user's Porkbun account, to clear VERIFICATION_REQUIRED (purchases and top-ups need a verified email and phone). It is the usual verification email: a link plus a code. Then ask the user for the code in that email (or read it, if you have access to that inbox) and call `confirm_email_verification`; the user clicking the link works too. The address on the account is used (or a new address waiting for verification); it cannot be chosen or changed here, and the code is never returned to you: it only proves the address because it arrives there. A second request within 10 minutes returns `codeAlreadySent`; the earlier code stays valid for 3 days. Guide: https://porkbun.com/llms/guides/verify-the-account",
+  inputSchema: {},
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config) => {
+    return await call(config, "/account/verifyEmail/send", { method: "POST", body: {} });
+  },
+};
+
+const confirm_email_verification: Tool = {
+  name: "confirm_email_verification",
+  description:
+    "Verify the account's email address with the code from the verification email (`send_email_verification_code`, or any verification email from the last 3 days). On success, retry what failed with VERIFICATION_REQUIRED; `phoneVerified: false` means the phone still needs `send_phone_verification_code`. EMAIL_CODE_INVALID means a wrong or expired code, or one from an older email: check it against the newest email, or send a new one.",
+  inputSchema: {
+    code: z.string().min(4).max(128).describe("The verification code from the email, exactly as written."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) => {
+    return await call(config, "/account/verifyEmail/confirm", { method: "POST", body: { code: String(args.code).trim() } });
   },
 };
 
@@ -651,6 +675,10 @@ const sandbox_trigger_webhook: Tool = {
         "dns.record.created",
         "dns.record.updated",
         "dns.record.deleted",
+        "cloudflare.connect.completed",
+        "cloudflare.connect.failed",
+        "account.verification.code_sent",
+        "account.verification.completed",
       ])
       .describe("The webhook event type to emit."),
     domain: z.string().optional().describe("Domain used in the sample payload (default example.com)."),
@@ -2100,7 +2128,7 @@ const delete_hosting: Tool = {
 const get_webhook_event_types: Tool = {
   name: "get_webhook_event_types",
   description:
-    "List the event types you can subscribe a webhook endpoint to. Returns event-type strings like `domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, and `dns.record.created|updated|deleted`. Use these values (or `*` for all, or a prefix wildcard like `dns.*`) when calling create_webhook.",
+    "List the event types you can subscribe a webhook endpoint to. Returns event-type strings like `domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, `dns.record.created|updated|deleted`, `cloudflare.connect.completed|failed` and `account.verification.code_sent|completed`. What each event sends: https://porkbun.com/llms/webhooks. Use these values (or `*` for all, or a prefix wildcard like `dns.*`) when calling create_webhook.",
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
@@ -2649,6 +2677,8 @@ export const tools: Tool[] = [
   top_up_with_card_mpp,
   send_phone_verification_code,
   confirm_phone_verification,
+  send_email_verification_code,
+  confirm_email_verification,
   get_usdc_topup_status,
   list_invoices,
   get_invoice,
