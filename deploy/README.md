@@ -2,7 +2,9 @@
 
 The remote MCP endpoint that ChatGPT and Claude connect to. Same tools as the
 npm package, served over Streamable HTTP, authenticated per request with an
-OAuth token issued by porkbun.com (`/oauth2/*`). Stateless: any number of
+OAuth token issued by porkbun.com (`/oauth2/*`), or, for agent platforms that
+cannot do OAuth, the customer's own API key pair (`X-API-Key` +
+`X-Secret-API-Key`, or `Authorization: Bearer pk1_…:sk1_…`). Stateless: any number of
 instances can run behind the ALB, and a restart drops no sessions.
 
 ```
@@ -88,9 +90,9 @@ Each request on an MCP path also logs an `mcp_event {json}` line: `path`,
 `ua` (a coarse family: chatgpt, claude, cursor, vscode, ...; never the raw
 string), `proto` (MCP-Protocol-Version), `conn` (an anonymous connection id
 that survives token refresh: porkbun.com's `/ping` returns a keyed hash of the
-connection's API key for connector tokens), and `reason` for rejected requests
-(`no_token`, `invalid_token`, `bad_json`, `too_large`, `method_GET`, or the
-transport's error message). Never tokens, tool arguments or results.
+connection's API key), `auth` (`oauth` or `api_key`), and `reason` for rejected
+requests (`no_token`, `invalid_token`, `invalid_api_key`, `bad_json`, `too_large`, `method_GET`, or the
+transport's error message). Never tokens, keys, tool arguments or results.
 
 The unit is sandboxed (read-only filesystem, no home, no new privileges, 768 MB
 memory cap) and restarts on failure, giving up after 10 crashes in a minute so
@@ -125,7 +127,8 @@ curl -s https://porkbun.com/.well-known/oauth-authorization-server
    because the server reaches the API over IPv4 (see Networking above).
 3. **The API recognises connector traffic (done).** `$config['mcpConnectorIps']`
    in the web app lists the EIP. A request from there that authenticates with a
-   connector token (`pbo_at_…`) skips the IP-based fraud signals (IPQS would
+   connector token (`pbo_at_…`), or with a key pair plus the `X-Porkbun-Connector: 1`
+   header the server adds on key-pair calls, skips the IP-based fraud signals (IPQS would
    score this AWS address as a proxy and block real orders over $50; email,
    account, domain and address signals still run), can never be blocked by
    `badIps`, and is labelled as connector traffic in terms-agreement records,

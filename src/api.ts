@@ -16,6 +16,13 @@ export interface PorkbunConfig {
    * resolves it to the connection's own key.
    */
   bearerToken?: string;
+  /**
+   * Set by the hosted connector when it calls the API with a customer's own key
+   * pair. Adds `X-Porkbun-Connector: 1`, which the API honours only from the
+   * connector's own address, so the shared connector IP is not scored as the
+   * customer's.
+   */
+  viaConnector?: boolean;
 }
 
 export function loadConfig(): PorkbunConfig {
@@ -169,6 +176,7 @@ export async function callWithPayment<T = unknown>(
       headers["Idempotency-Key"] = randomUUID();
     }
   }
+  if (config.viaConnector) headers["X-Porkbun-Connector"] = "1";
   Object.assign(headers, opts.headers ?? {});
 
   const res = await fetch(url, { method, headers, body });

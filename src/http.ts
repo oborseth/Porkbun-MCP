@@ -19,6 +19,7 @@
  * inside a tool call, which would surface as an error message instead of a
  * silent refresh.
  */
+import { createHash } from "node:crypto";
 import dns from "node:dns";
 import http from "node:http";
 import net from "node:net";
@@ -110,6 +111,63 @@ async function tokenIsValid(token: string): Promise<{ ok: boolean; conn: string 
   }
 }
 
+// ── API key pairs ────────────────────────────────────────────────────────────
+// For agent platforms that cannot complete OAuth but can send a fixed header:
+// the customer's own key pair, as X-API-Key + X-Secret-API-Key or
+// `Authorization: Bearer pk1_…:sk1_…`. The key's own limits (permissions, allowed
+// domains, spend caps) apply exactly as on the REST API. Validated with /ping like
+// a token; cached under a hash so the secret is never a map key.
+const keyCache = new Map<string, { until: number; conn: string | null }>();
+
+type KeyPair = { apiKey: string; secretApiKey: string };
+
+function keyPairFrom(req: http.IncomingMessage, bearer: string | null): KeyPair | null {
+  const h = (n: string) => {
+    const v = req.headers[n];
+    return typeof v === "string" ? v.trim() : "";
+  };
+  let apiKey = h("x-api-key");
+  let secretApiKey = h("x-secret-api-key");
+  if ((!apiKey || !secretApiKey) && bearer) {
+    const m = /^(pk1_[A-Za-z0-9_]+):(sk1_[A-Za-z0-9_]+)$/.exec(bearer);
+    if (m) [apiKey, secretApiKey] = [m[1], m[2]];
+  }
+  if (!/^pk1_[A-Za-z0-9_]{8,200}$/.test(apiKey) || !/^sk1_[A-Za-z0-9_]{8,200}$/.test(secretApiKey)) return null;
+  return { apiKey, secretApiKey };
+}
+
+async function keyPairIsValid(k: KeyPair): Promise<{ ok: boolean; conn: string | null }> {
+  const id = createHash("sha256").update(k.apiKey + "\n" + k.secretApiKey).digest("hex");
+  const cached = keyCache.get(id);
+  if (cached && cached.until > Date.now()) return { ok: true, conn: cached.conn };
+  try {
+    const res = await fetch(`${baseConfig.baseUrl}/ping`, {
+      method: "POST",
+      headers: {
+        "X-API-Key": k.apiKey,
+        "X-Secret-API-Key": k.secretApiKey,
+        "X-Porkbun-Connector": "1",
+        "Content-Type": "application/json",
+        "User-Agent": `${baseConfig.userAgent} (hosted)`,
+      },
+      body: "{}",
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = (await res.json().catch(() => ({}))) as { status?: string; credentialsValid?: boolean; connectionId?: string };
+    const ok = res.ok && data.status === "SUCCESS" && data.credentialsValid !== false;
+    const conn = typeof data.connectionId === "string" && /^[a-f0-9]{8,64}$/.test(data.connectionId) ? data.connectionId : null;
+    if (ok) {
+      keyCache.set(id, { until: Date.now() + TOKEN_CACHE_MS, conn });
+      if (keyCache.size > 50_000) keyCache.clear();
+    } else {
+      keyCache.delete(id);
+    }
+    return { ok, conn };
+  } catch {
+    throw new Error("upstream");
+  }
+}
+
 // ── HTTP plumbing ────────────────────────────────────────────────────────────
 
 function send(res: http.ServerResponse, status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -189,6 +247,8 @@ interface UsageEvent {
   ua: string;
   proto?: string;
   conn?: string | null;
+  /** oauth (connector token) or api_key (the customer's own key pair). */
+  auth?: string;
   reason?: string;
   errors?: { code?: number; message?: string }[];
 }
@@ -313,15 +373,17 @@ const server = http.createServer(async (req, res) => {
     };
 
     const token = bearerFrom(req);
-    if (!token) {
+    const keys = token && token.startsWith("pbo_at_") ? null : keyPairFrom(req, token);
+    if (!token && !keys) {
       ev.reason = "no_token";
       return unauthorized(res, false, profile);
     }
-    if (!token.startsWith("pbo_at_")) return unauthorized(res, true, profile);
+    if (!keys && token && !token.startsWith("pbo_at_")) return unauthorized(res, true, profile);
+    ev.auth = keys ? "api_key" : "oauth";
 
     let valid: boolean;
     try {
-      const check = await tokenIsValid(token);
+      const check = keys ? await keyPairIsValid(keys) : await tokenIsValid(token!);
       valid = check.ok;
       ev.conn = check.conn;
     } catch {
@@ -329,7 +391,7 @@ const server = http.createServer(async (req, res) => {
       return send(res, 503, { error: "temporarily_unavailable" }, { "Retry-After": "5" });
     }
     if (!valid) {
-      ev.reason = "invalid_token";
+      ev.reason = keys ? "invalid_api_key" : "invalid_token";
       return unauthorized(res, true, profile);
     }
 
@@ -378,7 +440,9 @@ const server = http.createServer(async (req, res) => {
       return origEnd(chunk, ...rest);
     };
 
-    const mcp = buildServer(() => ({ ...baseConfig, bearerToken: token }), {
+    const mcp = buildServer(() => (keys
+      ? { ...baseConfig, apiKey: keys.apiKey, secretApiKey: keys.secretApiKey, viaConnector: true }
+      : { ...baseConfig, bearerToken: token! }), {
       exclude: profile.exclude,
       omitParams: profile.omitParams,
       hosted: true,
