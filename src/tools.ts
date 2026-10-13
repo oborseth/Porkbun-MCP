@@ -824,7 +824,7 @@ const search_closeouts: Tool = {
     start: z.number().int().nonnegative().optional().describe("Paging offset. Default 0."),
     limit: z.number().int().positive().max(500).optional().describe("Rows per page, max 500. Default 100."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const qs = new URLSearchParams();
     const map: Record<string, string> = {
@@ -878,7 +878,7 @@ const get_closeout: Tool = {
     "Always call this before buy_closeout: totalPrice is what you must pass as `cost_cents`, and it cannot be derived from search results because a name already at Porkbun is renewed while anything else is transferred in, and those price differently. " +
     "`available: false` means somebody already claimed it. Quote the user totalPrice, never the search `price`.",
   inputSchema: { domain: z.string().min(3).describe("Domain offered as a closeout, e.g. `example.com`") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/closeout/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -911,7 +911,7 @@ const get_transfer_setup: Tool = {
   description:
     "Report where a held inbound transfer is and what it is waiting on: whether it is held at PENDINGDNS, whether its DNS zone exists, how many records it holds, what the domain currently delegates to, and the next step. Use this to resume a no-downtime transfer instead of tracking that state yourself.",
   inputSchema: { domain: z.string().min(3).describe("Domain with a pending inbound transfer, e.g. `example.com`") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/domain/getTransferSetup/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -921,7 +921,7 @@ const prepare_transfer: Tool = {
   description:
     "Create the Porkbun DNS zone for a domain whose inbound transfer is held, so records can be added before the domain moves. Step 2 of the no-downtime sequence (transfer_domain with hold_for_dns_setup, prepare_transfer, import_dns_records, start_transfer). Returns the Porkbun nameservers. The zone is created deliberately, not as a side effect of the first record write, which is why this call exists.",
   inputSchema: { domain: z.string().min(3).describe("Domain with a held inbound transfer.") },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) =>
     await call(config, `/domain/prepareTransfer/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body: {}, idempotent: true }),
 };
@@ -1091,7 +1091,7 @@ const list_marketplace: Tool = {
       .optional()
       .describe("Page size (no-filter mode only). Default 1000, max 5000."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.query !== undefined) body.query = args.query;
@@ -1570,7 +1570,7 @@ const create_dnssec_record: Tool = {
     keyDataAlgo: z.string().optional().describe("DNSKEY algorithm (optional)."),
     keyDataPubKey: z.string().optional().describe("Base64-encoded public key (optional)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -1640,7 +1640,7 @@ const create_url_forward: Tool = {
       .optional()
       .describe("Subdomain prefix to forward. Empty/omitted = the apex (root domain). Examples: `www`, `shop`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -2255,7 +2255,7 @@ const test_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id to send a test event to."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/webhook/test", { method: "POST", body: { id: args.id } });
   },
@@ -2319,7 +2319,7 @@ const resend_webhook: Tool = {
   inputSchema: {
     id: z.number().int().positive().describe("The delivery id to resend (from list_webhook_deliveries)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     return await call(config, "/webhook/resend", { method: "POST", body: { id: args.id } });
   },
