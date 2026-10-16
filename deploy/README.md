@@ -2,7 +2,8 @@
 
 The remote MCP endpoint that ChatGPT and Claude connect to. Same tools as the
 npm package, served over Streamable HTTP, authenticated per request with an
-OAuth token issued by porkbun.com (`/oauth2/*`), or, for agent platforms that
+OAuth token issued by porkbun.com (`/oauth2/*`; public PKCE clients, or confidential clients
+with a secret for platforms that require one), or, for agent platforms that
 cannot do OAuth, the customer's own API key pair (`X-API-Key` +
 `X-Secret-API-Key`, or `Authorization: Bearer pk1_…:sk1_…`). Stateless: any number of
 instances can run behind the ALB, and a restart drops no sessions.
