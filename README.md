@@ -164,7 +164,7 @@ Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and 
 |---|---|
 | `request_api_key` | Start creating a live API key the account holder approves in the browser (optionally with only some permissions); returns the approval link |
 | `retrieve_api_key` | After approval, collect the new key pair once |
-| `create_sandbox_key` | **No credentials needed** — instantly mint a throwaway sandbox key pair (`pk1_sb_`/`sk1_sb_`, $1000 fake credit) so an agent can start testing before it has any keys |
+| `create_sandbox_key` | **No credentials needed** — instantly mint a throwaway sandbox key pair (`pk1_sb_`/`sk1_sb_`, $1000 fake credit) so an agent can start testing before it has any keys. Optional `scopes` (e.g. `["dns"]`) mints a restricted key to test a least-privilege setup |
 | `sandbox_topup` | Sandbox only — grant fake account credit (default $1000) so paid ops can keep being exercised after funds run out |
 | `sandbox_reset` | Sandbox only — wipe the sandbox account's domains/DNS/orders/credit and re-grant $1000, for a clean slate between test runs |
 | `sandbox_trigger_webhook` | Sandbox only — fire a sample signed webhook event of any type (incl. cron-driven `domain.expiring`) to your registered endpoints, to test your handler + signature verification on demand |
