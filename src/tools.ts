@@ -2450,7 +2450,7 @@ const get_cloudflare_connection: Tool = {
   description:
     "Check whether this Porkbun account is connected to a Cloudflare account, and which one. THIS IS THE POLL TARGET for the connect flow. Connecting is a HUMAN action: Cloudflare's consent screen must be completed in a browser and the authorization is bound to the Porkbun web session that starts it, so it cannot be driven over the API. When `connected` is false the response includes a `connectUrl` — show that URL to the user, ask them to authorize, then call this tool again every few seconds until `connected` is true. Everything else in the Cloudflare flow is fully automatable once this is true.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config) => await call(config, `/cloudflare/getConnection`, { method: "GET" }),
 };
 
@@ -2459,7 +2459,7 @@ const list_cloudflare_inventory: Tool = {
   description:
     "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers, uses Porkbun hosting, etc). Read this BEFORE queueing so you can tell the user what will move and what won't. Works even when the Cloudflare account isn't connected yet, so you can plan while the user authorizes.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config) => await call(config, `/cloudflare/inventory`, { method: "GET" }),
 };
 
@@ -2471,7 +2471,7 @@ const connect_domains_to_cloudflare: Tool = {
     domains: z.array(z.string()).min(1).max(500).describe("Domain names to move into the customer's Cloudflare account."),
     dry_run: z.boolean().optional().describe("Preview the per-domain verdicts without queueing anything."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { domains: (args.domains as string[]).map((d) => String(d).toLowerCase()) };
     if (args.dry_run) body.dryRun = true;
@@ -2484,7 +2484,7 @@ const get_cloudflare_queue: Tool = {
   description:
     "List every Cloudflare move this account has requested, with per-domain status and message. Use this to poll progress after connect_domains_to_cloudflare. Queue rows are never deleted, so this is also the audit trail of past moves.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config) => await call(config, `/cloudflare/getQueue`, { method: "GET" }),
 };
 
@@ -2493,7 +2493,7 @@ const get_cloudflare_domain_status: Tool = {
   description:
     "Get the Cloudflare move status for ONE domain, including the Cloudflare zone id once created and the nameservers Porkbun replaced (kept so the move can be undone). Returns NOT_QUEUED if the domain has never been queued.",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     await call(config, `/cloudflare/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2506,7 +2506,7 @@ const retry_cloudflare_domain: Tool = {
     domain: z.string().min(3).describe("Domain to re-queue."),
     dry_run: z.boolean().optional().describe("Validate without re-queueing."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
@@ -2522,7 +2522,7 @@ const rollback_cloudflare_domain: Tool = {
     domain: z.string().min(3).describe("Domain whose move should be undone."),
     dry_run: z.boolean().optional().describe("Validate without changing nameservers."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
@@ -2535,7 +2535,7 @@ const disconnect_cloudflare: Tool = {
   description:
     "Remove this account's stored Cloudflare connection. Domains already moved stay on Cloudflare and keep resolving — this only stops Porkbun making further changes on the customer's behalf. Reconnecting requires the human browser authorization again, so confirm before calling.",
   inputSchema: { dry_run: z.boolean().optional().describe("Validate without disconnecting.") },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
@@ -2548,7 +2548,7 @@ const get_cloudflare_records: Tool = {
   description:
     "List a domain's LIVE DNS records as Cloudflare holds them, each with its orange-cloud (`proxied`) state and whether it is `proxiable` at all. Once a domain has moved to Cloudflare THIS is the authoritative record set — list_dns_records reads the Porkbun zone, which is no longer answering queries for it. Returns ZONE_NOT_READY if the zone does not exist yet.",
   inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     await call(config, `/cloudflare/getRecords/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2563,7 +2563,7 @@ const set_cloudflare_proxy: Tool = {
     records: z.array(z.string()).optional().describe('Optional: limit to these names. "@" = apex; bare labels are expanded (e.g. ["@","www"]).'),
     dry_run: z.boolean().optional().describe("Preview which records would change, without changing them."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { enabled: !!args.enabled };
     if (args.records) body.records = args.records;
@@ -2577,7 +2577,7 @@ const preview_cloudflare_move: Tool = {
   description:
     "Show exactly which DNS records would be copied into Cloudflare for a domain, and which would be dropped, WITHOUT queueing anything. Use this to tell a user what a move will do to their DNS before committing. Records are always created DNS-only (grey cloud); proxying is a separate step via set_cloudflare_proxy.",
   inputSchema: { domain: z.string().min(3).describe("Domain to preview.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     await call(config, `/cloudflare/preview/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2587,7 +2587,7 @@ const get_cloudflare_zone: Tool = {
   description:
     "Get what CLOUDFLARE currently says about a domain's zone (status, paused, its nameservers, activation date) rather than what Porkbun's queue row remembers. These drift: if someone repoints the nameservers elsewhere after the move, the Porkbun row still says done while Cloudflare has stopped serving the domain. The response includes the live public nameservers and a `nameserversDrifted` boolean so you don't have to diff them yourself.",
   inputSchema: { domain: z.string().min(3).describe("Domain whose Cloudflare zone to inspect.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     await call(config, `/cloudflare/getZone/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2597,7 +2597,7 @@ const get_cloudflare_zone_settings: Tool = {
   description:
     "Read the Cloudflare zone settings that matter after a move: ssl mode, always_use_https, automatic_https_rewrites, min_tls_version, development_mode, cache_level. Warns when SSL mode is `off` or `flexible`, which means Cloudflare fetches the origin over plain HTTP while visitors still see a padlock. If this returns CLOUDFLARE_REAUTHORIZE_REQUIRED the customer's Cloudflare connection predates this permission — show them the connectUrl and ask them to reconnect (one click; domains already moved are unaffected).",
   inputSchema: { domain: z.string().min(3).describe("Domain whose zone settings to read.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     await call(config, `/cloudflare/getZoneSettings/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
@@ -2616,7 +2616,7 @@ const set_cloudflare_zone_settings: Tool = {
     cache_level: z.enum(["aggressive", "basic", "simplified"]).optional(),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     for (const k of ["ssl", "always_use_https", "automatic_https_rewrites", "min_tls_version", "development_mode", "cache_level"]) {
@@ -2643,7 +2643,7 @@ const create_cloudflare_record: Tool = {
     data: z.record(z.string(), z.any()).optional().describe("Structured value for SRV/CAA/etc, shaped as Cloudflare documents it."),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const { domain, dry_run, ...rest } = args as Record<string, unknown>;
     const body: Record<string, unknown> = { ...rest };
@@ -2669,7 +2669,7 @@ const edit_cloudflare_record: Tool = {
     data: z.record(z.string(), z.any()).optional(),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const { domain, record_id, dry_run, ...rest } = args as Record<string, unknown>;
     const body: Record<string, unknown> = { ...rest };
@@ -2687,7 +2687,7 @@ const delete_cloudflare_record: Tool = {
     record_id: z.string().describe("Cloudflare record id from get_cloudflare_records."),
     dry_run: z.boolean().optional(),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.dry_run) body.dryRun = true;
