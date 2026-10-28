@@ -272,15 +272,21 @@ const get_registration_requirements: Tool = {
 const list_domains: Tool = {
   name: "list_domains",
   description:
-    "List domains in the authenticated Porkbun account. Returns one page (up to 1000) with metadata: expire date, auto-renew, security lock, WHOIS privacy, API access opt-in, and notLocal flag.\n\nFilters (all optional):\n- `domain`: exact match. Returns 0 or 1.\n- `name_contains`: substring search on domain name.\n- `tlds`: limit to these TLDs (no leading dot).\n- `expiring_within_days`: only domains expiring within N days. Useful for renewal automation.\n- `auto_renew`: 'yes' or 'no'.\n- `api_access`: 'yes' or 'no'. Filter to domains an API key can actually operate on — eliminates `API_ACCESS_DISABLED` errors downstream.\n- `sort_name`: 'domain' | 'tld' | 'create_date' | 'expire_date'. Default expire_date.\n- `sort_direction`: 'asc' | 'desc'. Default asc.\n\nFor a single domain by name, use `get_domain` instead — cleaner shape and 404-on-not-found semantics.",
+    "List domains in the authenticated Porkbun account. Returns one page (up to 1000) with metadata: expire date, auto-renew, security lock, WHOIS privacy, API access opt-in, and notLocal flag.\n\nFilters (all optional):\n- `domain`: exact match. Returns 0 or 1.\n- `name_contains`: substring search on domain name.\n- `tlds`: limit to these TLDs (no leading dot).\n- `expiring_within_days`: only domains expiring within N days. Useful for renewal automation.\n- `added_after` / `added_before`: when the domain joined this account at Porkbun, by registration or transfer (`addedDate`). Pass the newest `addedDate` already seen as `added_after` to fetch only new domains.\n- `created_after` / `created_before`: registry creation date (`createDate`); a transferred-in domain keeps its original one.\n- `expires_after` / `expires_before`: expiry window by date.\n- `auto_renew`: 'yes' or 'no'.\n- `api_access`: 'yes' or 'no'. Filter to domains an API key can actually operate on — eliminates `API_ACCESS_DISABLED` errors downstream.\n- `sort_name`: 'domain' | 'tld' | 'create_date' | 'added_date' | 'expire_date'. Default expire_date.\n\nDates are YYYY-MM-DD or YYYY-MM-DD HH:MM:SS, UTC. *_after includes the moment, *_before excludes it.\n- `sort_direction`: 'asc' | 'desc'. Default asc.\n\nFor a single domain by name, use `get_domain` instead — cleaner shape and 404-on-not-found semantics.",
   inputSchema: {
     domain: z.string().optional().describe("Exact domain match — returns 0 or 1 result."),
     name_contains: z.string().optional().describe("Case-insensitive substring on the full domain name."),
     tlds: z.array(z.string()).optional().describe("Limit to these TLDs (no leading dot). Example: ['com', 'io']"),
     expiring_within_days: z.number().int().min(0).optional().describe("Only domains expiring within this many days from now."),
+    added_after: z.string().optional().describe("Only domains added to the account (registered or transferred in) at or after this date/date-time, UTC."),
+    added_before: z.string().optional().describe("Only domains added to the account before this date/date-time, UTC."),
+    created_after: z.string().optional().describe("Only domains whose registry creation date is at or after this date/date-time, UTC."),
+    created_before: z.string().optional().describe("Only domains whose registry creation date is before this date/date-time, UTC."),
+    expires_after: z.string().optional().describe("Only domains expiring at or after this date/date-time, UTC."),
+    expires_before: z.string().optional().describe("Only domains expiring before this date/date-time, UTC."),
     auto_renew: z.enum(["yes", "no"]).optional().describe("Filter to domains with auto-renew on or off."),
     api_access: z.enum(["yes", "no"]).optional().describe("Filter to domains opted in to API access."),
-    sort_name: z.enum(["domain", "tld", "create_date", "expire_date"]).optional().describe("Sort field."),
+    sort_name: z.enum(["domain", "tld", "create_date", "added_date", "expire_date"]).optional().describe("Sort field."),
     sort_direction: z.enum(["asc", "desc"]).optional().describe("Sort direction."),
     start: z.number().int().min(0).optional().describe("Pagination offset. Default 0."),
     include_labels: z.boolean().optional().describe("Include user-defined domain labels in the response."),
@@ -291,6 +297,10 @@ const list_domains: Tool = {
     if (args.domain) params.set("domain", String(args.domain));
     if (args.name_contains) params.set("nameContains", String(args.name_contains));
     if (args.expiring_within_days !== undefined) params.set("expiringWithinDays", String(args.expiring_within_days));
+    const dateFilters: Record<string, string> = { added_after: "addedAfter", added_before: "addedBefore", created_after: "createdAfter", created_before: "createdBefore", expires_after: "expiresAfter", expires_before: "expiresBefore" };
+    for (const [arg, param] of Object.entries(dateFilters)) {
+      if (args[arg]) params.set(param, String(args[arg]));
+    }
     if (args.auto_renew) params.set("autoRenew", String(args.auto_renew));
     if (args.api_access) params.set("apiAccess", String(args.api_access));
     if (args.sort_name) params.set("sortName", String(args.sort_name));
