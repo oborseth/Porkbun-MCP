@@ -2183,7 +2183,7 @@ const get_webhook_event_types: Tool = {
 const list_webhooks: Tool = {
   name: "list_webhooks",
   description:
-    "List the webhook endpoints registered on the authenticated account. Each endpoint includes its id, URL, subscribed events, status (ACTIVE|DISABLED), consecutive failure count, last success/failure timestamps, last error, and signing secret. Porkbun POSTs a signed JSON payload to each endpoint when subscribed events occur; deliveries are signed with the endpoint's secret via HMAC-SHA256 over `{timestamp}.{rawBody}` and sent in the `X-Porkbun-Signature` header.",
+    "List the webhook endpoints registered on the authenticated account. Each endpoint includes its id, URL, subscribed events, status (ACTIVE|DISABLED), consecutive failure count, last success/failure timestamps, last error, and (for keys with full access or the account scope; omitted for read-only keys) its signing secret. Porkbun POSTs a signed JSON payload to each endpoint when subscribed events occur; deliveries are signed with the endpoint's secret via HMAC-SHA256 over `{timestamp}.{rawBody}` and sent in the `X-Porkbun-Signature` header.",
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
@@ -2194,7 +2194,7 @@ const list_webhooks: Tool = {
 const get_webhook: Tool = {
   name: "get_webhook",
   description:
-    "Fetch a single webhook endpoint by its numeric id, including its signing secret and delivery health (consecutive failures, last success/failure).",
+    "Fetch a single webhook endpoint by its numeric id, with its delivery health (consecutive failures, last success/failure) and, for keys with full access or the account scope, its signing secret (omitted for read-only keys).",
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id (from list_webhooks or create_webhook)."),
   },
