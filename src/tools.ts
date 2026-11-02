@@ -2015,7 +2015,7 @@ const create_hosting: Tool = {
 const get_hosting: Tool = {
   name: "get_hosting",
   description:
-    "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting. When ACTIVE, deploy_site publishes site files to it.",
+    "Get the hosting on a domain (product, plan, status, trial, expiry, auto-renew), or null if there is none. For Secure Static Hosting, deploy_site publishes files once it is ACTIVE. For a Cloud for WordPress site, `wordpress.site` adds the PHP version and the versions available, the WordPress version setting, SSL, storage used, search visibility, any staging copy, and recent background jobs (`operations`, e.g. a restore in progress).",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
@@ -2916,6 +2916,103 @@ const update_link_in_bio_settings: Tool = {
   },
 };
 
+
+// ─── Cloud for WordPress site management (API 3.69) ─────────────────────────
+
+const WP_DOMAIN = z.string().min(3).describe("Domain of the Cloud for WordPress site, e.g. `example.com`.");
+const WP_DRY_RUN = z.boolean().optional().describe("Validate and preview without changing anything.");
+const WP_STAGING = z.boolean().optional().describe("true: act on the site's staging copy instead of the live site.");
+const wpPost = (config: Parameters<Tool["handler"]>[0], endpoint: string, domain: unknown, body: Record<string, unknown>, dryRun: unknown) =>
+  call(config, `/hosting/${endpoint}/${encodeURIComponent(String(domain).toLowerCase())}`, { method: "POST", idempotent: true, body: dryRun ? { ...body, dryRun: true } : body });
+
+const set_wordpress_php_version: Tool = {
+  name: "set_wordpress_php_version",
+  description:
+    "Change the PHP version a Cloud for WordPress site runs. `version` must be one of `wordpress.site.availablePhpVersions` from get_hosting. Takes effect within a minute or two; if the site misbehaves, switch back the same way. Confirm with the user first.",
+  inputSchema: { domain: WP_DOMAIN, version: z.string().describe("e.g. `8.3`, from availablePhpVersions."), dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "setPhpVersion", args.domain, { version: args.version }, args.dry_run),
+};
+
+const set_wordpress_version: Tool = {
+  name: "set_wordpress_version",
+  description:
+    "Set a Cloud for WordPress site's WordPress version: `latest` follows releases; `previous` holds one major release back, the escape hatch when an update breaks the site (it then gets no newer releases until set back to `latest`). No pinned version numbers. Takes a few minutes.",
+  inputSchema: { domain: WP_DOMAIN, version: z.enum(["latest", "previous"]), dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "setWordPressVersion", args.domain, { version: args.version }, args.dry_run),
+};
+
+const reissue_wordpress_ssl: Tool = {
+  name: "reissue_wordpress_ssl",
+  description:
+    "Restart SSL certificate issuance for a Cloud for WordPress site (the domain and its www. host) when `wordpress.site.ssl.issued` stays false. The domain must point at the site. Once per 5 minutes per site.",
+  inputSchema: { domain: WP_DOMAIN, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "reissueSsl", args.domain, {}, args.dry_run),
+};
+
+const set_wordpress_search_visibility: Tool = {
+  name: "set_wordpress_search_visibility",
+  description:
+    "Show or hide a Cloud for WordPress site from search engines. `visible: false` asks them not to index it (WordPress \"discourage search engines\"), useful while a site is being built; `true` allows indexing again.",
+  inputSchema: { domain: WP_DOMAIN, visible: z.boolean(), dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "setSearchVisibility", args.domain, { visible: Boolean(args.visible) }, args.dry_run),
+};
+
+const list_wordpress_backups: Tool = {
+  name: "list_wordpress_backups",
+  description:
+    "List a Cloud for WordPress site's backups, newest first: automatic file backups daily and database backups hourly, kept 30 days, plus up to one on-demand backup of each type. Returns the newest `limit` (default 100; on-demand ones always included) and the `total`. Each has an `id` for restore_wordpress_backup (one files id + one database id) or delete_wordpress_backup.",
+  inputSchema: {
+    domain: WP_DOMAIN,
+    staging: WP_STAGING,
+    limit: z.number().int().min(1).max(1000).optional().describe("How many to return. Default 100."),
+    type: z.enum(["files", "database"]).optional(),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.staging) body.staging = true;
+    if (args.limit) body.limit = args.limit;
+    if (args.type) body.type = args.type;
+    return call(config, `/hosting/backups/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body });
+  },
+};
+
+const create_wordpress_backup: Tool = {
+  name: "create_wordpress_backup",
+  description:
+    "Take an on-demand backup of a Cloud for WordPress site's files and database now, e.g. before a risky change. Only one on-demand backup of each type can exist: delete the old one first (otherwise BACKUP_FAILED, \"Quota Reached\"). It appears in list_wordpress_backups when finished, usually within a few minutes.",
+  inputSchema: { domain: WP_DOMAIN, staging: WP_STAGING, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "createBackup", args.domain, args.staging ? { staging: true } : {}, args.dry_run),
+};
+
+const delete_wordpress_backup: Tool = {
+  name: "delete_wordpress_backup",
+  description: "Delete an on-demand backup of a Cloud for WordPress site by `id` (from list_wordpress_backups). Automatic backups cannot be deleted. Confirm with the user first.",
+  inputSchema: { domain: WP_DOMAIN, id: z.string().describe("Backup id from list_wordpress_backups."), staging: WP_STAGING, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "deleteBackup", args.domain, { id: args.id, ...(args.staging ? { staging: true } : {}) }, args.dry_run),
+};
+
+const restore_wordpress_backup: Tool = {
+  name: "restore_wordpress_backup",
+  description:
+    "REPLACE a Cloud for WordPress site's files and database with one files backup (`fs_id`) and one database backup (`db_id`) from list_wordpress_backups; anything changed since is lost. Run it with `dry_run: true` first and confirm the exact backup dates with the user. The restore is queued: the site is unavailable for a few minutes and the account holder is emailed when it finishes. Poll get_hosting (`wordpress.site.operations`) until its state is `done`.",
+  inputSchema: {
+    domain: WP_DOMAIN,
+    fs_id: z.string().describe("A files backup id."),
+    db_id: z.string().describe("A database backup id."),
+    staging: WP_STAGING,
+    dry_run: WP_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "restoreBackup", args.domain, { fsId: args.fs_id, dbId: args.db_id, ...(args.staging ? { staging: true } : {}) }, args.dry_run),
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -2983,6 +3080,14 @@ export const tools: Tool[] = [
   delete_wp_credentials,
   delete_hosting,
   update_hosting_auto_renew,
+  set_wordpress_php_version,
+  set_wordpress_version,
+  reissue_wordpress_ssl,
+  set_wordpress_search_visibility,
+  list_wordpress_backups,
+  create_wordpress_backup,
+  delete_wordpress_backup,
+  restore_wordpress_backup,
   // Link in Bio
   get_link_in_bio,
   create_link_in_bio,

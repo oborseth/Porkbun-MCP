@@ -140,6 +140,10 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `create_wp_credentials` | Mint a WordPress **Application Password** (returned once) so an agent can drive the site via `/wp-json/` with HTTP Basic. Defaults to a dedicated least-privilege `editor` user; `administrator` requires an explicit acknowledgement (it can install plugins = run code) |
 | `list_wp_credentials` | List application passwords on the site (metadata only — passwords can't be re-read) |
 | `delete_wp_credentials` | Revoke an application password by uuid, or all of them |
+| `set_wordpress_php_version` / `set_wordpress_version` | Change the PHP version, or move WordPress to the latest or previous release |
+| `reissue_wordpress_ssl` / `set_wordpress_search_visibility` | Restart a stuck certificate; show or hide the site from search engines |
+| `list_wordpress_backups` / `create_wordpress_backup` / `delete_wordpress_backup` | Backups (automatic daily files + hourly database, and one on-demand of each) |
+| `restore_wordpress_backup` | Replace the site with a files + database backup pair (queued; poll `get_hosting`) |
 
 **Link in Bio** (a single page of links on a domain)
 

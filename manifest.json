@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.57.0",
+  "version": "0.58.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks — all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -308,6 +308,38 @@
     {
       "name": "update_hosting_auto_renew",
       "description": "Turn auto-renew on or off for a domain's paid hosting."
+    },
+    {
+      "name": "set_wordpress_php_version",
+      "description": "Change a WordPress site's PHP version."
+    },
+    {
+      "name": "set_wordpress_version",
+      "description": "Set a WordPress site to the latest or previous WordPress release."
+    },
+    {
+      "name": "reissue_wordpress_ssl",
+      "description": "Restart SSL issuance for a WordPress site."
+    },
+    {
+      "name": "set_wordpress_search_visibility",
+      "description": "Show or hide a WordPress site from search engines."
+    },
+    {
+      "name": "list_wordpress_backups",
+      "description": "List a WordPress site's backups."
+    },
+    {
+      "name": "create_wordpress_backup",
+      "description": "Take an on-demand backup of a WordPress site."
+    },
+    {
+      "name": "delete_wordpress_backup",
+      "description": "Delete an on-demand backup of a WordPress site."
+    },
+    {
+      "name": "restore_wordpress_backup",
+      "description": "Restore a WordPress site from a backup."
     },
     {
       "name": "get_link_in_bio",
