@@ -129,6 +129,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
 | `make_hosting_dir` | Create a directory (and missing parents) in a domain's hosting (deploy auto-creates dirs in a file path) |
 | `delete_hosting` | Deprovision (cancel) hosting for a domain |
+| `update_hosting_auto_renew` | Turn auto-renew off (the plan runs to its end date; a paid Link in Bio falls back to free) or back on |
 
 **Cloud for WordPress**
 

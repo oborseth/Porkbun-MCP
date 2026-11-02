@@ -2158,12 +2158,30 @@ const delete_wp_credentials: Tool = {
 const delete_hosting: Tool = {
   name: "delete_hosting",
   description:
-    "Deprovision (cancel) Secure Static Hosting for a domain; teardown is scheduled by Porkbun. Note: the domain has already used its one free trial, so provisioning it again later will be charged (no second free trial).",
+    "Deprovision (cancel) hosting on a domain now; teardown is scheduled by Porkbun. A paid Link in Bio page is not removed: it moves to the free plan with its content kept. Note: the domain has already used its one free trial, so provisioning it again later will be charged (no second free trial). To let a plan run to the end of its term instead, use update_hosting_auto_renew with auto_renew false.",
   inputSchema: { domain: z.string().min(3).describe("Domain to deprovision hosting for.") },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/delete/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true });
+  },
+};
+
+const update_hosting_auto_renew: Tool = {
+  name: "update_hosting_auto_renew",
+  description:
+    "Turn auto-renew on or off for a domain's paid hosting (Secure Static Hosting, Cloud for WordPress or Link in Bio), the same switch as on the website. Off: the plan stays active until its expireDate and is not charged again (a trial ends without a charge); after that the hosting is removed, except a paid Link in Bio page, which moves to the free plan with its content kept. On: it renews at the plan price. The response's `message` says what happens next; tell the user. Free plans never renew (NOT_SUPPORTED_FOR_PRODUCT). get_hosting shows the current setting.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose hosting this is."),
+    auto_renew: z.boolean().describe("true to renew automatically, false to let the plan end at its expireDate."),
+    dry_run: z.boolean().optional().describe("Validate and preview without changing anything."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const domain = String(args.domain).toLowerCase();
+    const body: Record<string, unknown> = { autoRenew: Boolean(args.auto_renew) };
+    if (args.dry_run) body.dryRun = true;
+    return await call(config, `/hosting/updateAutoRenew/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body });
   },
 };
 
@@ -2964,6 +2982,7 @@ export const tools: Tool[] = [
   list_wp_credentials,
   delete_wp_credentials,
   delete_hosting,
+  update_hosting_auto_renew,
   // Link in Bio
   get_link_in_bio,
   create_link_in_bio,
