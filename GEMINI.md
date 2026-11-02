@@ -13,6 +13,9 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   steps for uploading through the dashboard. Check `get_hosting` first (it must
   be ACTIVE), list existing files with `list_hosting_files`, say which files will
   be replaced, and get the user's OK.
+- **Link in Bio pages:** check `get_link_in_bio` first (many .com domains already
+  have a free page), then edit it with the `*_link_in_bio` tools. A paid plan
+  (`create_hosting` with a `PIXIELINKS` sku) keeps the existing content.
 - **DNS changes:** read the current records with `list_dns_records` first, say
   exactly what you will change, and ask before writing. Run `preflight_domain`
   before changing nameservers or enabling DNSSEC. Mistakes can be undone from a
