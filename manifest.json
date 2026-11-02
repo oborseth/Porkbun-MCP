@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.55.0",
+  "version": "0.56.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
-  "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks \u2014 all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
+  "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks — all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
     "name": "Porkbun LLC",
     "email": "support@porkbun.com",
@@ -52,7 +52,7 @@
     "api_key": {
       "type": "string",
       "title": "Porkbun API Key",
-      "description": "Your Porkbun API key (starts with pk1_). Optional \u2014 the documentation, mock, and sandbox-key tools work without it; add it to manage real domains. Create one at https://porkbun.com/account/api.",
+      "description": "Your Porkbun API key (starts with pk1_). Optional — the documentation, mock, and sandbox-key tools work without it; add it to manage real domains. Create one at https://porkbun.com/account/api.",
       "sensitive": true,
       "required": false
     },
@@ -87,7 +87,7 @@
     },
     {
       "name": "list_marketplace",
-      "description": "Browse domains for sale on the Porkbun marketplace (aftermarket \u2014 domains owned by other users, not new registrations)."
+      "description": "Browse domains for sale on the Porkbun marketplace (aftermarket — domains owned by other users, not new registrations)."
     },
     {
       "name": "search_closeouts",
@@ -263,11 +263,11 @@
     },
     {
       "name": "list_hosting_plans",
-      "description": "List the hosting plans provisionable via the API, with price (cents \u2014 pass as `acknowledged_cost` to create_hosting), interval, trial length, and features."
+      "description": "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost` to create_hosting), interval, trial length, and features."
     },
     {
       "name": "create_hosting",
-      "description": "Provision hosting for a domain in the account \u2014 Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`."
+      "description": "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`."
     },
     {
       "name": "get_hosting",
@@ -306,6 +306,46 @@
       "description": "Deprovision (cancel) Secure Static Hosting for a domain; teardown is scheduled by Porkbun."
     },
     {
+      "name": "get_link_in_bio",
+      "description": "Read a domain's Link in Bio page: plan, URL, profile, links, socials, appearance."
+    },
+    {
+      "name": "create_link_in_bio",
+      "description": "Turn on a free Link in Bio page on a domain."
+    },
+    {
+      "name": "update_link_in_bio_profile",
+      "description": "Set a Link in Bio page's title, bio and avatar."
+    },
+    {
+      "name": "add_link_in_bio_link",
+      "description": "Add a link, featured link or category heading to a Link in Bio page."
+    },
+    {
+      "name": "edit_link_in_bio_link",
+      "description": "Edit or hide a Link in Bio link."
+    },
+    {
+      "name": "delete_link_in_bio_link",
+      "description": "Delete a Link in Bio link."
+    },
+    {
+      "name": "reorder_link_in_bio_links",
+      "description": "Reorder the links on a Link in Bio page."
+    },
+    {
+      "name": "update_link_in_bio_socials",
+      "description": "Set a Link in Bio page's social icons."
+    },
+    {
+      "name": "update_link_in_bio_appearance",
+      "description": "Change a Link in Bio page's preset, fonts, buttons and colours."
+    },
+    {
+      "name": "update_link_in_bio_settings",
+      "description": "Set a Link in Bio page's content warning and analytics IDs."
+    },
+    {
       "name": "request_api_key",
       "description": "Start creating a new live API key that the account holder approves in their browser."
     },
@@ -315,7 +355,7 @@
     },
     {
       "name": "create_sandbox_key",
-      "description": "Instantly create a free SANDBOX API key \u2014 NO credentials or approval needed (works before you have any keys)."
+      "description": "Instantly create a free SANDBOX API key — NO credentials or approval needed (works before you have any keys)."
     },
     {
       "name": "sandbox_topup",
@@ -331,7 +371,7 @@
     },
     {
       "name": "mock_call",
-      "description": "Get a schema-accurate EXAMPLE response for any API endpoint with NO credentials \u2014 nothing to set up."
+      "description": "Get a schema-accurate EXAMPLE response for any API endpoint with NO credentials — nothing to set up."
     },
     {
       "name": "preflight_domain",

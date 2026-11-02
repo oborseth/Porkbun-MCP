@@ -12,7 +12,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 **No install: use the hosted connector.** Porkbun runs this server at `https://mcp.porkbun.com/mcp`. Add that URL as a custom connector in ChatGPT or Claude (or `claude mcp add --transport http porkbun https://mcp.porkbun.com/mcp` in Claude Code), sign in to Porkbun and approve. No API key to copy. (An app that asks for an OAuth client ID and secret can register one at `https://porkbun.com/oauth2/register` with `token_endpoint_auth_method: client_secret_post`. A client that can't do OAuth can send the account's API key pair as `X-API-Key` + `X-Secret-API-Key` headers instead, or as a single secret, `Authorization: Bearer pk1_…:sk1_…`, if it can store only one.) Steps per client: [Connect ChatGPT or Claude](https://porkbun.com/llms/guides/connect-chatgpt-or-claude). How it is deployed: [`deploy/README.md`](deploy/README.md). The ChatGPT and Claude directory listings use a narrower variant, `/mcp/no-purchases` (no tool that spends money or returns a secret); it changes which tools are offered, not what a connection may do.
 
-> **Status:** full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks; current version on the npm badge above). Also runs **hosted** at `https://mcp.porkbun.com/mcp` for ChatGPT and Claude, with sign-in instead of API keys (clients that can't do OAuth can send an API key pair). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
+> **Status:** full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks; current version on the npm badge above). Also runs **hosted** at `https://mcp.porkbun.com/mcp` for ChatGPT and Claude, with sign-in instead of API keys (clients that can't do OAuth can send an API key pair). Provisions **Cloud for WordPress** and mints WordPress REST API credentials so an agent can manage the site it just created. Builds and edits **Link in Bio** pages. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
 ## What's included
 
@@ -139,6 +139,19 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `create_wp_credentials` | Mint a WordPress **Application Password** (returned once) so an agent can drive the site via `/wp-json/` with HTTP Basic. Defaults to a dedicated least-privilege `editor` user; `administrator` requires an explicit acknowledgement (it can install plugins = run code) |
 | `list_wp_credentials` | List application passwords on the site (metadata only — passwords can't be re-read) |
 | `delete_wp_credentials` | Revoke an application password by uuid, or all of them |
+
+**Link in Bio** (a single page of links on a domain)
+
+Most .com domains registered at Porkbun come with a free page. `create_link_in_bio` turns on a free one (50 links); `create_hosting` with `PIXIELINKSM1` / `PIXIELINKSY1` buys a paid plan (1000 links, scheduling, animation, passcode protection, analytics IDs) and upgrades a free page in place, content included. Edits show up at once in the page and in the editor on porkbun.com.
+
+| Tool | Description |
+|---|---|
+| `get_link_in_bio` | The page: URL, plan and what it allows, profile, links with ids, socials, appearance, settings |
+| `create_link_in_bio` | Turn on a free page served on the domain |
+| `update_link_in_bio_profile` | Title, bio, avatar |
+| `add_link_in_bio_link` / `edit_link_in_bio_link` / `delete_link_in_bio_link` | Links, featured links and category headings; hide, schedule, animate or protect a link |
+| `reorder_link_in_bio_links` | Set the display order |
+| `update_link_in_bio_socials` / `update_link_in_bio_appearance` / `update_link_in_bio_settings` | Social icons; preset, fonts, buttons, colours; content warning and analytics IDs |
 
 **Cloudflare connect** (move domains to the customer's own Cloudflare account)
 

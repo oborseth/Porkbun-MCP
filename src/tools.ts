@@ -1994,7 +1994,7 @@ const create_hosting: Tool = {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
     sku: z
       .string()
-      .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) / `PIXIESECURESTATICY2` ($30.00/yr). Cloud for WordPress: `CLOUDWORDPRESSM1` ($12.00/mo) / `CLOUDWORDPRESSY1` ($120.00/yr) and the Pro/Business tiers."),
+      .describe("The hosting plan SKU to provision. Discover the provisionable SKUs (and each one's price/interval/trial) via list_hosting_plans, then pass the row's `sku`. Secure Static Hosting: `PIXIESECURESTATICM2` ($3.00/mo) / `PIXIESECURESTATICY2` ($30.00/yr). Cloud for WordPress: `CLOUDWORDPRESSM1` ($12.00/mo) / `CLOUDWORDPRESSY1` ($120.00/yr) and the Pro/Business tiers. Link in Bio: `PIXIELINKSM1` ($3.00/mo) / `PIXIELINKSY1` ($30.00/yr); over a free Link in Bio page this upgrades it and keeps its content, then edit it with the *_link_in_bio tools."),
     acknowledged_cost_cents: z.number().int().optional().describe("The chosen plan's price — take the `price` field of the SAME row you took `sku` from in list_hosting_plans (e.g. 300 static monthly, 3000 static yearly, 1200 WordPress Starter monthly, 12000 WordPress Starter yearly). Must match exactly or the call is rejected — this confirms the human was told the cost. Required." + CENTS_EXAMPLE),
     acknowledged_cost: legacyCents("acknowledged_cost_cents"),
     agree_to_terms: z.literal("yes").describe('Must be "yes".'),
@@ -2705,6 +2705,199 @@ const delete_cloudflare_record: Tool = {
   },
 };
 
+
+// ─── Link in Bio ─────────────────────────────────────────────────────────────
+// A single page of links on a domain (EASY_LINKS, edited on porkbun.com too). Free page:
+// create_link_in_bio. Paid plans: create_hosting with sku PIXIELINKSM1 / PIXIELINKSY1.
+
+const LIB_DOMAIN = z.string().min(3).describe("Domain whose Link in Bio page this is, e.g. `example.com`.");
+const LIB_DRY_RUN = z.boolean().optional().describe("Validate and preview without changing anything.");
+const libPost = (config: Parameters<Tool["handler"]>[0], endpoint: string, domain: unknown, body: Record<string, unknown>, dryRun: unknown) =>
+  call(config, `/linkinbio/${endpoint}/${encodeURIComponent(String(domain).toLowerCase())}`, { method: "POST", idempotent: true, body: dryRun ? { ...body, dryRun: true } : body });
+
+const LIB_LINK_FIELDS = {
+  type: z.enum(["link", "featured", "category"]).optional().describe("`link` (default), `featured` (shown larger) or `category` (a heading with no url)."),
+  title: z.string().max(255).optional().describe("Text on the button or heading."),
+  url: z.string().max(255).optional().describe("http(s) address; a bare host gets https:// added. Not for a category."),
+  enabled: z.boolean().optional().describe("false hides the link without deleting it."),
+  start_date: z.string().nullable().optional().describe("Show the link from this time: YYYY-MM-DD or ISO 8601, UTC unless an offset is given; null clears. Paid plans only."),
+  end_date: z.string().nullable().optional().describe("Hide the link after this time; same format. Paid plans only."),
+  animation: z.enum(["pulse", "bounce", "shake"]).nullable().optional().describe("Draw attention to the link; null removes. Paid plans only."),
+  protection: z
+    .object({
+      type: z.enum(["code", "birthday", "sensitive"]),
+      value: z.string().optional().describe("The passcode for `code`; minimum age 18, 21 or 25 for `birthday`."),
+      explanation: z.string().max(255).optional().describe("Text shown to the visitor."),
+    })
+    .nullable()
+    .optional()
+    .describe("What a visitor must do before the link opens: `code` = enter a passcode (paid plans), `birthday` = confirm their age, `sensitive` = a content warning. null removes it."),
+};
+const libLinkBody = (args: Record<string, unknown>) => {
+  const body: Record<string, unknown> = {};
+  for (const k of ["type", "title", "url", "enabled", "animation", "protection"]) if (args[k] !== undefined) body[k] = args[k];
+  if (args.start_date !== undefined) body.startDate = args.start_date;
+  if (args.end_date !== undefined) body.endDate = args.end_date;
+  return body;
+};
+
+const get_link_in_bio: Tool = {
+  name: "get_link_in_bio",
+  description:
+    "Read a domain's Link in Bio page (a single page of links, the kind people put in an Instagram or TikTok profile): its public `url` (the domain itself, or `<domain-with-dashes>.l.ink` for the free page most .com domains registered at Porkbun come with), `plan` and `features` (what the plan allows), `profile`, `links` in display order with their `id`s, `socials`, `appearance` and `settings`. Call it before editing. LINKINBIO_NOT_FOUND means there is no page: offer create_link_in_bio (free) or create_hosting with a PIXIELINKS sku (paid).",
+  inputSchema: { domain: LIB_DOMAIN },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => call(config, `/linkinbio/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
+};
+
+const create_link_in_bio: Tool = {
+  name: "create_link_in_bio",
+  description:
+    "Turn on a FREE Link in Bio page served on the domain itself (up to 50 links; no scheduling, animation, passcode protection or analytics IDs). Nothing is charged. It starts with a placeholder title, bio and link: replace them with update_link_in_bio_profile, edit_link_in_bio_link and add_link_in_bio_link. The page needs Porkbun nameservers: if the domain uses others the call returns NAMESERVER_CHANGE_REQUIRED, so ask the user and resend with `agree_to_nameserver_change: true`. Replaces a free WordPress preview on the domain, never real hosting. Check get_link_in_bio first: many .com domains already have a free page. For 1000 links and every feature, a paid plan is bought with create_hosting (sku PIXIELINKSM1 $3/mo or PIXIELINKSY1 $30/yr), which upgrades a free page and keeps its content.",
+  inputSchema: {
+    domain: LIB_DOMAIN,
+    agree_to_nameserver_change: z.boolean().optional().describe("Allow switching the domain to Porkbun nameservers (needed when it uses others). Ask the user first."),
+    dry_run: LIB_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => libPost(config, "create", args.domain, args.agree_to_nameserver_change ? { agreeToNameserverChange: true } : {}, args.dry_run),
+};
+
+const update_link_in_bio_profile: Tool = {
+  name: "update_link_in_bio_profile",
+  description:
+    "Set a Link in Bio page's `title` (up to 100 characters), `bio` (up to 500) and/or `avatar` (a base64 JPEG or PNG up to 5 MB; a data: URL works; null removes it). Only the fields sent change; an empty title or bio removes it.",
+  inputSchema: {
+    domain: LIB_DOMAIN,
+    title: z.string().max(100).optional(),
+    bio: z.string().max(500).optional(),
+    avatar: z.string().nullable().optional().describe("Base64 JPEG or PNG, or null to remove the avatar."),
+    dry_run: LIB_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    for (const k of ["title", "bio", "avatar"]) if (args[k] !== undefined) body[k] = args[k];
+    return libPost(config, "updateProfile", args.domain, body, args.dry_run);
+  },
+};
+
+const add_link_in_bio_link: Tool = {
+  name: "add_link_in_bio_link",
+  description:
+    "Add a link, featured link or category heading to a Link in Bio page. Goes to the bottom unless `position: \"top\"`. Returns the new link with its `id`. Fields marked paid-only return FEATURE_NOT_IN_PLAN on the free on-domain plan and nothing is saved. Errors: LINK_LIMIT_REACHED (50 free / 1000 paid), DUPLICATE_LINK (another link has the same title and URL).",
+  inputSchema: {
+    domain: LIB_DOMAIN,
+    ...LIB_LINK_FIELDS,
+    title: z.string().min(1).max(255).describe("Text on the button or heading."),
+    position: z.enum(["bottom", "top"]).optional().describe("Where to add it. Default bottom."),
+    dry_run: LIB_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    const body = libLinkBody(args);
+    if (args.position) body.position = args.position;
+    return libPost(config, "addLink", args.domain, body, args.dry_run);
+  },
+};
+
+const edit_link_in_bio_link: Tool = {
+  name: "edit_link_in_bio_link",
+  description:
+    "Change a Link in Bio link (`id` from get_link_in_bio): only the fields sent change. `enabled: false` hides it without deleting it. Paid-only fields (start_date, end_date, animation, passcode protection) return FEATURE_NOT_IN_PLAN on the free on-domain plan.",
+  inputSchema: { domain: LIB_DOMAIN, id: z.number().int().describe("Link id from get_link_in_bio."), ...LIB_LINK_FIELDS, dry_run: LIB_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => libPost(config, "editLink", args.domain, { id: args.id, ...libLinkBody(args) }, args.dry_run),
+};
+
+const delete_link_in_bio_link: Tool = {
+  name: "delete_link_in_bio_link",
+  description:
+    "Delete a link from a Link in Bio page for good, with its image, animation and protection. To hide it instead, use edit_link_in_bio_link with `enabled: false`. Confirm with the user first.",
+  inputSchema: { domain: LIB_DOMAIN, id: z.number().int().describe("Link id from get_link_in_bio."), dry_run: LIB_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => libPost(config, "deleteLink", args.domain, { id: args.id }, args.dry_run),
+};
+
+const reorder_link_in_bio_links: Tool = {
+  name: "reorder_link_in_bio_links",
+  description: "Reorder a Link in Bio page: `ids` lists every link id on the page (from get_link_in_bio), once each, in the new order.",
+  inputSchema: { domain: LIB_DOMAIN, ids: z.array(z.number().int()).min(1).describe("Every link id, in display order."), dry_run: LIB_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => libPost(config, "reorderLinks", args.domain, { ids: args.ids }, args.dry_run),
+};
+
+const update_link_in_bio_socials: Tool = {
+  name: "update_link_in_bio_socials",
+  description:
+    "Set a Link in Bio page's social icons: `socials` maps email, instagram, facebook, tiktok, youtube, twitter, linkedin to a handle or profile URL (\"\" or null removes one); `location` puts them at the top or bottom. Only the keys sent change.",
+  inputSchema: {
+    domain: LIB_DOMAIN,
+    location: z.enum(["top", "bottom"]).optional(),
+    socials: z.record(z.string(), z.string().nullable()).optional().describe('e.g. {"instagram": "janebakes", "email": "jane@example.com"}'),
+    dry_run: LIB_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.location) body.location = args.location;
+    if (args.socials) body.socials = args.socials;
+    return libPost(config, "updateSocials", args.domain, body, args.dry_run);
+  },
+};
+
+const LIB_COLOR = z.string().nullable().optional().describe("Hex colour like #1b5a8a; null resets to the default.");
+const update_link_in_bio_appearance: Tool = {
+  name: "update_link_in_bio_appearance",
+  description:
+    "Change how a Link in Bio page looks. `preset` applies a ready-made look; the colours fine-tune it (`page_background_mode: gradient` blends page_background_color into page_background_color_2). Only the fields sent change; null resets one to the default.",
+  inputSchema: {
+    domain: LIB_DOMAIN,
+    preset: z.enum(["classic", "ocean", "midnight", "paper", "forest", "sunset"]).nullable().optional(),
+    font_family: z.enum(["inter", "poppins", "lora", "mono", "serif"]).nullable().optional(),
+    button_style: z.enum(["classic", "pill", "floating", "hardShadow"]).nullable().optional(),
+    radius: z.number().int().min(0).max(50).nullable().optional().describe("Button corner radius in pixels."),
+    page_background_mode: z.enum(["solid", "gradient"]).nullable().optional(),
+    text_align: z.enum(["left", "center", "right"]).nullable().optional(),
+    page_background_color: LIB_COLOR,
+    page_background_color_2: LIB_COLOR,
+    page_color: LIB_COLOR,
+    box_background_color: LIB_COLOR,
+    border_color: LIB_COLOR,
+    dry_run: LIB_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const map: Record<string, string> = {
+      preset: "preset", font_family: "fontFamily", button_style: "buttonStyle", radius: "radius", page_background_mode: "pageBackgroundMode",
+      text_align: "textAlign", page_background_color: "pageBackgroundColor", page_background_color_2: "pageBackgroundColor2",
+      page_color: "pageColor", box_background_color: "boxBackgroundColor", border_color: "borderColor",
+    };
+    const body: Record<string, unknown> = {};
+    for (const [arg, field] of Object.entries(map)) if (args[arg] !== undefined) body[field] = args[arg];
+    return libPost(config, "updateAppearance", args.domain, body, args.dry_run);
+  },
+};
+
+const update_link_in_bio_settings: Tool = {
+  name: "update_link_in_bio_settings",
+  description:
+    "Set a Link in Bio page's `sensitive_content` (a `generic` warning or an age check of 18, 21 or 25 shown before the page; null turns it off) and, on paid plans, `analytics`: googleAnalyticsId, facebookPixelId, twitterPixelId, tikTokPixelId, utmSource, utmMedium (\"\" removes one). The mailing-list signup form is set up on porkbun.com only.",
+  inputSchema: {
+    domain: LIB_DOMAIN,
+    sensitive_content: z.enum(["generic", "18", "21", "25"]).nullable().optional(),
+    analytics: z.record(z.string(), z.string()).optional().describe('e.g. {"googleAnalyticsId": "G-ABC123"}'),
+    dry_run: LIB_DRY_RUN,
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.sensitive_content !== undefined) body.sensitiveContent = args.sensitive_content;
+    if (args.analytics) body.analytics = args.analytics;
+    return libPost(config, "updateSettings", args.domain, body, args.dry_run);
+  },
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -2771,6 +2964,17 @@ export const tools: Tool[] = [
   list_wp_credentials,
   delete_wp_credentials,
   delete_hosting,
+  // Link in Bio
+  get_link_in_bio,
+  create_link_in_bio,
+  update_link_in_bio_profile,
+  add_link_in_bio_link,
+  edit_link_in_bio_link,
+  delete_link_in_bio_link,
+  reorder_link_in_bio_links,
+  update_link_in_bio_socials,
+  update_link_in_bio_appearance,
+  update_link_in_bio_settings,
   request_api_key,
   retrieve_api_key,
   create_sandbox_key,
