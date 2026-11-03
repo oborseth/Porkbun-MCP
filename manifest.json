@@ -422,6 +422,10 @@
       "description": "Collect the approved API key pair, once."
     },
     {
+      "name": "revoke_api_key",
+      "description": "Revoke the API key this server is using."
+    },
+    {
       "name": "create_sandbox_key",
       "description": "Instantly create a free SANDBOX API key — NO credentials or approval needed (works before you have any keys)."
     },
