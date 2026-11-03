@@ -3013,6 +3013,94 @@ const restore_wordpress_backup: Tool = {
   handler: async (config, args) => wpPost(config, "restoreBackup", args.domain, { fsId: args.fs_id, dbId: args.db_id, ...(args.staging ? { staging: true } : {}) }, args.dry_run),
 };
 
+
+// ─── Cloud for WordPress staging (API 3.70) ─────────────────────────────────
+
+const WP_PAIR = {
+  fs_id: z.string().optional().describe("Optional: build from this files backup of the live site (with db_id), from list_wordpress_backups."),
+  db_id: z.string().optional().describe("Optional: the database backup to go with fs_id."),
+};
+const wpPairBody = (args: Record<string, unknown>) => (args.fs_id || args.db_id ? { fsId: args.fs_id, dbId: args.db_id } : {});
+
+const get_wordpress_staging: Tool = {
+  name: "get_wordpress_staging",
+  description:
+    "Get a Cloud for WordPress site's staging copy: URL, status (PROVISIONING / ACTIVE), the latest job and its state, password protection with the password, outbound email/API blocking, and environment type. `staging` is null when there is none. Poll it after create/reset/publish/delete.",
+  inputSchema: { domain: WP_DOMAIN },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => call(config, `/hosting/getStaging/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST" }),
+};
+
+const create_wordpress_staging: Tool = {
+  name: "create_wordpress_staging",
+  description:
+    "Create a private staging copy of a Cloud for WordPress site on a *.stagebun.com address, to try changes safely: from the live site, or from a backup pair (fs_id + db_id). One per site. It starts password protected (password in the response), with outgoing email blocked. Takes a few minutes; poll get_wordpress_staging until status is ACTIVE.",
+  inputSchema: { domain: WP_DOMAIN, ...WP_PAIR, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "createStaging", args.domain, wpPairBody(args), args.dry_run),
+};
+
+const reset_wordpress_staging: Tool = {
+  name: "reset_wordpress_staging",
+  description: "Rebuild a staging site from the live site (or a backup pair); everything changed on staging is lost. Queued; poll get_wordpress_staging. Confirm with the user first.",
+  inputSchema: { domain: WP_DOMAIN, ...WP_PAIR, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "resetStaging", args.domain, wpPairBody(args), args.dry_run),
+};
+
+const publish_wordpress_staging: Tool = {
+  name: "publish_wordpress_staging",
+  description:
+    "REPLACE the live site's files and database with the staging site's. A fresh on-demand backup of live is taken first (replacing any existing on-demand backup), so it can be undone with restore_wordpress_backup. Takes several minutes; poll get_wordpress_staging. Always confirm with the user first.",
+  inputSchema: { domain: WP_DOMAIN, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "publishStaging", args.domain, {}, args.dry_run),
+};
+
+const delete_wordpress_staging: Tool = {
+  name: "delete_wordpress_staging",
+  description: "Delete a Cloud for WordPress site's staging copy and its backups. The live site is not affected. Confirm with the user first.",
+  inputSchema: { domain: WP_DOMAIN, dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "deleteStaging", args.domain, {}, args.dry_run),
+};
+
+const set_wordpress_staging_password: Tool = {
+  name: "set_wordpress_staging_password",
+  description:
+    "Staging password protection: `enabled` turns the password page on or off, `password` (4-64 characters) changes it. Turning it off makes a copy of the live site public (still marked not to be indexed). Returns the current password.",
+  inputSchema: { domain: WP_DOMAIN, enabled: z.boolean().optional(), password: z.string().min(4).max(64).optional(), dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.enabled !== undefined) body.enabled = args.enabled;
+    if (args.password !== undefined) body.password = args.password;
+    return wpPost(config, "setStagingGate", args.domain, body, args.dry_run);
+  },
+};
+
+const set_wordpress_staging_outbound: Tool = {
+  name: "set_wordpress_staging_outbound",
+  description:
+    "Block or allow outbound traffic from a staging site: `block_email` stops it emailing real customers, `block_api_requests` stops outbound WordPress HTTP requests (payment gateways, CRMs, webhooks). New staging sites block email and allow API requests. Ask before unblocking email.",
+  inputSchema: { domain: WP_DOMAIN, block_email: z.boolean().optional(), block_api_requests: z.boolean().optional(), dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    if (args.block_email !== undefined) body.blockEmail = args.block_email;
+    if (args.block_api_requests !== undefined) body.blockApiRequests = args.block_api_requests;
+    return wpPost(config, "setStagingGuard", args.domain, body, args.dry_run);
+  },
+};
+
+const set_wordpress_staging_environment: Tool = {
+  name: "set_wordpress_staging_environment",
+  description: "Set a staging site's WP_ENVIRONMENT_TYPE to `staging` (default) or `production`. Production may make plugins act live (payments, email); use it only to test production behaviour.",
+  inputSchema: { domain: WP_DOMAIN, type: z.enum(["staging", "production"]), dry_run: WP_DRY_RUN },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => wpPost(config, "setStagingEnvironment", args.domain, { type: args.type }, args.dry_run),
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -3088,6 +3176,14 @@ export const tools: Tool[] = [
   create_wordpress_backup,
   delete_wordpress_backup,
   restore_wordpress_backup,
+  get_wordpress_staging,
+  create_wordpress_staging,
+  reset_wordpress_staging,
+  publish_wordpress_staging,
+  delete_wordpress_staging,
+  set_wordpress_staging_password,
+  set_wordpress_staging_outbound,
+  set_wordpress_staging_environment,
   // Link in Bio
   get_link_in_bio,
   create_link_in_bio,

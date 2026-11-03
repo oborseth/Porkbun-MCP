@@ -144,6 +144,9 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `reissue_wordpress_ssl` / `set_wordpress_search_visibility` | Restart a stuck certificate; show or hide the site from search engines |
 | `list_wordpress_backups` / `create_wordpress_backup` / `delete_wordpress_backup` | Backups (automatic daily files + hourly database, and one on-demand of each) |
 | `restore_wordpress_backup` | Replace the site with a files + database backup pair (queued; poll `get_hosting`) |
+| `get_wordpress_staging` / `create_wordpress_staging` / `reset_wordpress_staging` / `delete_wordpress_staging` | A private staging copy on *.stagebun.com (queued; poll get_wordpress_staging) |
+| `publish_wordpress_staging` | Replace the live site with staging (backs up live first) |
+| `set_wordpress_staging_password` / `set_wordpress_staging_outbound` / `set_wordpress_staging_environment` | Staging password, outbound email/API blocking, environment type |
 
 **Link in Bio** (a single page of links on a domain)
 
