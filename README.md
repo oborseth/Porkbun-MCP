@@ -186,6 +186,9 @@ Use a **sandbox API key** (public key prefixed `pk1_sb_`, secret `sk1_sb_`) and 
 | `request_api_key` | Start creating a live API key the account holder approves in the browser (optionally with only some permissions); returns the approval link |
 | `retrieve_api_key` | After approval, collect the new key pair once |
 | `revoke_api_key` | Permanently revoke the key this server is using (only that key) |
+| `share_site_access` | Let someone else and their AI agent run one domain's website: returns an approval link; once the account holder approves on porkbun.com, a one-time share link, QR code, share code and handoff prompt |
+| `list_site_shares` | Site shares and their status; the link, code and handoff prompt for approved ones |
+| `revoke_site_share` | End a site share (a claimed key stops working within seconds) |
 | `create_sandbox_key` | **No credentials needed** — instantly mint a throwaway sandbox key pair (`pk1_sb_`/`sk1_sb_`, $1000 fake credit) so an agent can start testing before it has any keys. Optional `scopes` (e.g. `["dns"]`) mints a restricted key to test a least-privilege setup |
 | `sandbox_topup` | Sandbox only — grant fake account credit (default $1000) so paid ops can keep being exercised after funds run out |
 | `sandbox_reset` | Sandbox only — wipe the sandbox account's domains/DNS/orders/credit and re-grant $1000, for a clean slate between test runs |

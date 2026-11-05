@@ -3114,6 +3114,46 @@ const revoke_api_key: Tool = {
   handler: async (config, args) => call(config, "/apikey/revoke", { method: "POST", body: args.dry_run ? { confirm: "revoke", dryRun: true } : { confirm: "revoke" } }),
 };
 
+const share_site_access: Tool = {
+  name: "share_site_access",
+  description:
+    "Ask to let someone else, and the AI agent they use, run ONE domain's website (Cloud for WordPress, static hosting or Link in Bio) without giving them the account. Nothing is shared by this call: it returns an `approveUrl` that the account holder must open on porkbun.com and approve. Give them that link and say so plainly. After they approve, that page shows a share link, a QR code, a share code and a handoff prompt to send to the other person, and list_site_shares returns the same for this share. What the other person gets: the `site` permission on that domain only. They can run the site (WordPress via create_wp_credentials, files, Link in Bio, backups and restores, staging, PHP/WordPress versions, SSL), but cannot buy, cancel the hosting, change DNS, or see the rest of the account. The link works once, within `claim_hours` of approval. The account holder is emailed when it is claimed and can end it with revoke_site_share or by deleting the key at https://porkbun.com/account/api.",
+  inputSchema: {
+    domain: z.string().min(3).describe("The domain whose website to share, e.g. `example.com`. It must have hosting or a Link in Bio page."),
+    shared_with: z.string().min(1).max(60).describe("Who it is for, e.g. `Sarah`. Shown to the account holder when approving and to the other person on the share page."),
+    claim_hours: z.number().int().min(1).max(168).optional().describe("How long the link works once approved, 1-168 hours (default 24)."),
+    dry_run: z.boolean().optional().describe("Check the domain can be shared without creating anything."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { domain: String(args.domain).toLowerCase(), sharedWith: args.shared_with };
+    if (args.claim_hours !== undefined) body.claimHours = args.claim_hours;
+    if (args.dry_run) body.dryRun = true;
+    return call(config, "/apikey/share", { method: "POST", body });
+  },
+};
+
+const list_site_shares: Tool = {
+  name: "list_site_shares",
+  description:
+    "List this account's site shares (share_site_access): domain, who it is for, and `status`: PENDING (waiting for the account holder to approve), ACTIVE (approved, link not used yet), CLAIMED (the other person connected), REVOKED or EXPIRED. For an ACTIVE share it also returns `shareUrl`, `qrCodeUrl`, `shareCode` and `handoffPrompt` to pass on. Those are only returned to keys allowed to hand them out (full access or the `account` permission). Each share has an `id` for revoke_site_share.",
+  inputSchema: {},
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config) => call(config, "/apikey/shares", { method: "GET" }),
+};
+
+const revoke_site_share: Tool = {
+  name: "revoke_site_share",
+  description:
+    "End a site share by `id` (from list_site_shares). If the link has not been used, it stops working. If the other person already connected, their key is disabled and their app or agent loses access within seconds. Confirm with the user first.",
+  inputSchema: {
+    id: z.number().int().describe("The share id from list_site_shares."),
+    dry_run: z.boolean().optional().describe("Show what would be revoked, without revoking it."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => call(config, "/apikey/revokeShare", { method: "POST", body: args.dry_run ? { id: args.id, dryRun: true } : { id: args.id } }),
+};
+
 export const tools: Tool[] = [
   // read — global / account
   ping,
@@ -3211,6 +3251,9 @@ export const tools: Tool[] = [
   request_api_key,
   retrieve_api_key,
   revoke_api_key,
+  share_site_access,
+  list_site_shares,
+  revoke_site_share,
   create_sandbox_key,
   sandbox_topup,
   sandbox_reset,

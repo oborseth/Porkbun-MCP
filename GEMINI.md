@@ -18,6 +18,9 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   `publish_wordpress_staging` replace the live site: dry-run and confirm first.
 - **Revoking:** `revoke_api_key` revokes the key this server uses, only that one;
   confirm with the user, since every tool stops working afterwards.
+- **Sharing a site:** `share_site_access` shares nothing until the account holder
+  approves the returned `approveUrl` on porkbun.com; then `list_site_shares` has the
+  link, QR code, share code and handoff prompt to pass on. One domain, site only.
 - **Link in Bio pages:** check `get_link_in_bio` first (many .com domains already
   have a free page), then edit it with the `*_link_in_bio` tools. A paid plan
   (`create_hosting` with a `PIXIELINKS` sku) keeps the existing content.
