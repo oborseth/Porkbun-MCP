@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.59.0",
+  "version": "0.60.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks — all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -267,11 +267,11 @@
     },
     {
       "name": "create_hosting",
-      "description": "Provision hosting for a domain in the account — Secure Static Hosting OR Cloud for WordPress (a managed WordPress site), chosen by `sku`."
+      "description": "Provision hosting for a domain — Secure Static Hosting, Cloud for WordPress, or a paid Link in Bio page, chosen by `sku`."
     },
     {
       "name": "get_hosting",
-      "description": "Get Secure Static Hosting status for a domain (plan, server, trial, expiry, auto-renew), or null if the domain has no hosting."
+      "description": "Get the hosting on a domain (product, plan, status, trial, expiry, auto-renew), or null if there is none."
     },
     {
       "name": "deploy_site",
@@ -303,7 +303,7 @@
     },
     {
       "name": "delete_hosting",
-      "description": "Deprovision (cancel) Secure Static Hosting for a domain; teardown is scheduled by Porkbun."
+      "description": "Deprovision (cancel) hosting on a domain; a paid Link in Bio page drops to the free plan."
     },
     {
       "name": "update_hosting_auto_renew",
