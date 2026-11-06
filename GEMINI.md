@@ -13,6 +13,8 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   steps for uploading through the dashboard. Check `get_hosting` first (it must
   be ACTIVE), list existing files with `list_hosting_files`, say which files will
   be replaced, and get the user's OK.
+- **Editing WordPress content:** `wordpress_request` (pages, posts, menus; read with
+  `context=edit` first) and `wordpress_upload_media` (images). No password needed.
 - **WordPress changes:** take a backup first (`create_wordpress_backup`) or work on
   a staging copy (`create_wordpress_staging`). `restore_wordpress_backup` and
   `publish_wordpress_staging` replace the live site: dry-run and confirm first.

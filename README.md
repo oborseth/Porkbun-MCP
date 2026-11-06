@@ -137,6 +137,8 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 
 | Tool | Description |
 |---|---|
+| `wordpress_request` | Edit a Cloud for WordPress site's content: any WordPress REST API call (pages, posts, menus, settings), run inside the site with no password; editor by default, administrator on request |
+| `wordpress_upload_media` | Add an image or file to the site's media library from a URL or base64 |
 | `create_wp_credentials` | Mint a WordPress **Application Password** (returned once) so an agent can drive the site via `/wp-json/` with HTTP Basic. Defaults to a dedicated least-privilege `editor` user; `administrator` requires an explicit acknowledgement (it can install plugins = run code) |
 | `list_wp_credentials` | List application passwords on the site (metadata only — passwords can't be re-read) |
 | `delete_wp_credentials` | Revoke an application password by uuid, or all of them |

@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.61.0",
+  "version": "0.62.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks — all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -288,6 +288,14 @@
     {
       "name": "make_hosting_dir",
       "description": "Create a directory (and any missing parent directories) at `path` in a domain's Secure Static Hosting space."
+    },
+    {
+      "name": "wordpress_request",
+      "description": "Edit a WordPress site's pages, posts, menus and settings: one REST API call run inside the site, no password needed."
+    },
+    {
+      "name": "wordpress_upload_media",
+      "description": "Add an image or file to a WordPress site's media library from a URL or base64."
     },
     {
       "name": "create_wp_credentials",

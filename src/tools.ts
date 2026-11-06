@@ -2015,7 +2015,7 @@ const create_hosting: Tool = {
 const get_hosting: Tool = {
   name: "get_hosting",
   description:
-    "Get the hosting on a domain (product, plan, status, trial, expiry, auto-renew), or null if there is none. For Secure Static Hosting, deploy_site publishes files once it is ACTIVE. For a Cloud for WordPress site: to change its content (pages, posts, images, settings), call create_wp_credentials next and use the WordPress REST API it unlocks; `wordpress.site` adds the PHP version and the versions available, the WordPress version setting, SSL, storage used, search visibility, any staging copy, and recent background jobs (`operations`, e.g. a restore in progress).",
+    "Get the hosting on a domain (product, plan, status, trial, expiry, auto-renew), or null if there is none. For Secure Static Hosting, deploy_site publishes files once it is ACTIVE. For a Cloud for WordPress site: to change its content (pages, posts, images, settings), use wordpress_request and wordpress_upload_media; `wordpress.site` adds the PHP version and the versions available, the WordPress version setting, SSL, storage used, search visibility, any staging copy, and recent background jobs (`operations`, e.g. a restore in progress).",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
@@ -2093,10 +2093,68 @@ const make_hosting_dir: Tool = {
   },
 };
 
+const wordpress_request: Tool = {
+  name: "wordpress_request",
+  description:
+    "EDIT A CLOUD FOR WORDPRESS SITE'S CONTENT: pages, posts, menus, categories, comments, site title and anything else in the WordPress REST API. This is the tool to use when the user asks to change what is on their WordPress site. It runs one REST call inside the site, so no password or extra setup is needed. `path` is the REST route without /wp-json, e.g.:\n" +
+    "- list pages: GET /wp/v2/pages with query {\"_fields\": \"id,title,link,status\"}\n" +
+    "- read a page to edit it: GET /wp/v2/pages/12 with query {\"context\": \"edit\"} (content.raw is the block markup to change)\n" +
+    "- update it: POST /wp/v2/pages/12 with body {\"content\": \"...\"} (send the whole new content, keeping the <!-- wp:... --> block comments)\n" +
+    "- new post: POST /wp/v2/posts with body {\"title\": \"...\", \"content\": \"...\", \"status\": \"draft\"} (draft first, publish when the user says so)\n" +
+    "- menus: /wp/v2/navigation, /wp/v2/menu-items; search: GET /wp/v2/search?search=...\n" +
+    "It acts as the `porkbun-agent` WordPress editor by default (pages, posts, media, comments). Site settings (title, tagline, homepage), plugins, themes and users need `as_administrator: true` with `acknowledge_full_access: true`; ask the user first. Use _fields and per_page to keep answers small. Show the user what will change before overwriting a page, and offer create_wordpress_backup before big edits. Images: upload with wordpress_upload_media, then use its id or url. WordPress's own errors come back as WP_REST_ERROR with httpStatus and its message.",
+  inputSchema: {
+    domain: z.string().min(3).describe("The domain of the Cloud for WordPress site, e.g. `example.com`."),
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional().describe("HTTP method (default GET). POST updates an existing item when the path has its id."),
+    path: z.string().min(2).describe("REST route, e.g. `/wp/v2/pages` or `/wp/v2/posts/42`. No query string: use `query`."),
+    query: z.record(z.string(), z.any()).optional().describe("Query parameters, e.g. {\"per_page\": 10, \"context\": \"edit\", \"_fields\": \"id,title\"}."),
+    body: z.record(z.string(), z.any()).optional().describe("JSON body for POST/PUT/PATCH."),
+    embed: z.boolean().optional().describe("Include linked resources (_embed), e.g. the featured image."),
+    as_administrator: z.boolean().optional().describe("Act as the site administrator (settings, plugins, themes, users). Needs acknowledge_full_access."),
+    acknowledge_full_access: z.boolean().optional().describe("Confirms the user agreed to administrator-level changes."),
+    dry_run: z.boolean().optional().describe("For writes: check the request without sending it to WordPress."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = { path: args.path };
+    if (args.method) body.method = args.method;
+    if (args.query) body.query = args.query;
+    if (args.body) body.body = args.body;
+    if (args.embed) body.embed = true;
+    if (args.as_administrator) body.asAdministrator = true;
+    if (args.acknowledge_full_access) body.acknowledgeFullAccess = true;
+    if (args.dry_run) body.dryRun = true;
+    return call(config, `/hosting/wpRequest/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body });
+  },
+};
+
+const wordpress_upload_media: Tool = {
+  name: "wordpress_upload_media",
+  description:
+    "Add an image (or other file) to a Cloud for WordPress site's media library, from a public URL (WordPress downloads it) or from base64 `data` with a `filename`. Returns the attachment `id` (use as `featured_media` on a post or page via wordpress_request) and its `url` (use in page content). Set `alt_text` to describe the image for accessibility. Up to about 10 MB.",
+  inputSchema: {
+    domain: z.string().min(3).describe("The domain of the Cloud for WordPress site."),
+    url: z.string().optional().describe("Public https:// address of the file. Use this or data."),
+    data: z.string().optional().describe("The file as base64 (a data: URL works). Use this or url."),
+    filename: z.string().optional().describe("File name with extension, e.g. `storefront.jpg`. Required with data."),
+    title: z.string().optional().describe("Media title."),
+    alt_text: z.string().optional().describe("Alt text describing the image."),
+    caption: z.string().optional().describe("Caption."),
+    post_id: z.number().int().optional().describe("Attach it to this post or page id."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+  handler: async (config, args) => {
+    const body: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries({ url: args.url, data: args.data, filename: args.filename, title: args.title, altText: args.alt_text, caption: args.caption, postId: args.post_id }))
+      if (v !== undefined) body[k] = v;
+    return call(config, `/hosting/wpUploadMedia/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body });
+  },
+};
+
 const create_wp_credentials: Tool = {
   name: "create_wp_credentials",
   description:
-    "The way to EDIT a Cloud for WordPress site's content: pages, posts, media, menus, users and settings. Use it whenever the user asks to change what is on their WordPress site (text, images, a new page, a blog post). The other WordPress tools only manage the hosting (backups, staging, versions, SSL); they cannot change content. Mints a WordPress Application Password for the site so you can drive it over the WP REST API at https://<domain>/wp-json/ using HTTP Basic auth. The password is returned ONCE (WordPress stores only a hash) — save it immediately. Defaults to a dedicated least-privilege `porkbun-agent` user with the `editor` role (created on first use), which can manage content but cannot install code. `role: \"administrator\"` grants FULL site control including plugin installation (i.e. arbitrary code execution on the site) and therefore requires `acknowledge_full_access: true` — only request it if the user explicitly asked for admin-level access. The site must be provisioned and ACTIVE (poll get_hosting) — this works on any Cloud for WordPress site in the account however it was provisioned, but free $0 preview sites are excluded. Revoke any time with delete_wp_credentials. Rate limit: 20 mints per account per hour.",
+    "For agents that make their own HTTP requests (scripts, Claude Code): WordPress REST API credentials for a Cloud for WordPress site. To edit content from here, use wordpress_request and wordpress_upload_media instead: they need no credentials. Mints a WordPress Application Password for the site so you can drive it over the WP REST API at https://<domain>/wp-json/ using HTTP Basic auth. The password is returned ONCE (WordPress stores only a hash) — save it immediately. Defaults to a dedicated least-privilege `porkbun-agent` user with the `editor` role (created on first use), which can manage content but cannot install code. `role: \"administrator\"` grants FULL site control including plugin installation (i.e. arbitrary code execution on the site) and therefore requires `acknowledge_full_access: true` — only request it if the user explicitly asked for admin-level access. The site must be provisioned and ACTIVE (poll get_hosting) — this works on any Cloud for WordPress site in the account however it was provisioned, but free $0 preview sites are excluded. Revoke any time with delete_wp_credentials. Rate limit: 20 mints per account per hour.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose WordPress site to mint credentials for."),
     role: z.enum(["editor", "administrator"]).optional().describe("`editor` (default) = content only, recommended for agents. `administrator` = full control incl. plugin install; requires acknowledge_full_access."),
@@ -3218,6 +3276,8 @@ export const tools: Tool[] = [
   list_hosting_files,
   delete_hosting_file,
   make_hosting_dir,
+  wordpress_request,
+  wordpress_upload_media,
   create_wp_credentials,
   list_wp_credentials,
   delete_wp_credentials,
