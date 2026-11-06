@@ -3105,7 +3105,7 @@ const set_wordpress_staging_environment: Tool = {
 const revoke_api_key: Tool = {
   name: "revoke_api_key",
   description:
-    "Permanently revoke the API key (or connection) this server is using right now, and only that one: a key cannot revoke any other. Use it when the user is finished with this key, or it may have leaked. After it succeeds every tool here stops working until a new key is configured. A key used by an OAuth-connected app (ChatGPT, Claude) disconnects that app. Confirm with the user first; `confirm` must be \"revoke\". Other keys are managed at https://porkbun.com/account/api.",
+    "Permanently revoke the API key (or connection) this server is using right now, and only that one: a key cannot revoke any other. Use it when the user is finished with this key, or it may have leaked. After it succeeds every tool here stops working until a new key is configured. A key used by an OAuth-connected app (ChatGPT, Claude) disconnects that app. On a connection someone shared with the user (a site share), this gives that access back and the owner is emailed. Confirm with the user first; `confirm` must be \"revoke\". Other keys are managed at https://porkbun.com/account/api.",
   inputSchema: {
     confirm: z.literal("revoke").describe('Must be "revoke".'),
     dry_run: z.boolean().optional().describe("Show which key would be revoked, without revoking it."),
