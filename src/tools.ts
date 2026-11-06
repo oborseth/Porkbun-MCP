@@ -3117,17 +3117,19 @@ const revoke_api_key: Tool = {
 const share_site_access: Tool = {
   name: "share_site_access",
   description:
-    "Ask to let someone else, and the AI agent they use, run ONE domain's website (Cloud for WordPress, static hosting or Link in Bio) without giving them the account. Nothing is shared by this call: it returns an `approveUrl` that the account holder must open on porkbun.com and approve. Give them that link and say so plainly. After they approve, that page shows a share link, a QR code, a share code and a handoff prompt to send to the other person, and list_site_shares returns the same for this share. What the other person gets: the `site` permission on that domain only. They can run the site (WordPress via create_wp_credentials, files, Link in Bio, backups and restores, staging, PHP/WordPress versions, SSL), but cannot buy, cancel the hosting, change DNS, or see the rest of the account. The link works once, within `claim_hours` of approval. The account holder is emailed when it is claimed and can end it with revoke_site_share or by deleting the key at https://porkbun.com/account/api.",
+    "Ask to let someone else, and the AI agent they use, run ONE domain's website (Cloud for WordPress, static hosting or Link in Bio) without giving them the account. Nothing is shared by this call: it returns an `approveUrl` that the account holder must open on porkbun.com and approve. Give them that link and say so plainly. After they approve, that page shows a share link, a QR code, a share code and a handoff prompt to send to the other person, and list_site_shares returns the same for this share. What the other person gets: the `site` permission on that domain only. They can run the site (WordPress via create_wp_credentials, files, Link in Bio, backups and restores, staging, PHP/WordPress versions, SSL), but cannot buy, cancel the hosting, change DNS, or see the rest of the account. The link works once, within `claim_hours` of approval; with `access_hours` the access then ends on its own that long after they connect (otherwise it lasts until revoked). The account holder is emailed when it is claimed and can end it with revoke_site_share or by deleting the key at https://porkbun.com/account/api.",
   inputSchema: {
     domain: z.string().min(3).describe("The domain whose website to share, e.g. `example.com`. It must have hosting or a Link in Bio page."),
     shared_with: z.string().min(1).max(60).describe("Who it is for, e.g. `Sarah`. Shown to the account holder when approving and to the other person on the share page."),
     claim_hours: z.number().int().min(1).max(168).optional().describe("How long the link works once approved, 1-168 hours (default 24)."),
+    access_hours: z.number().int().min(1).max(8760).optional().describe("How long the access itself lasts once they connect, in hours (e.g. 48 for two days). Leave out for access until it is revoked. Ask the user if they mention a time limit."),
     dry_run: z.boolean().optional().describe("Check the domain can be shared without creating anything."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { domain: String(args.domain).toLowerCase(), sharedWith: args.shared_with };
     if (args.claim_hours !== undefined) body.claimHours = args.claim_hours;
+    if (args.access_hours !== undefined) body.accessHours = args.access_hours;
     if (args.dry_run) body.dryRun = true;
     return call(config, "/apikey/share", { method: "POST", body });
   },
