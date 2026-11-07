@@ -2102,6 +2102,7 @@ const wordpress_request: Tool = {
     "- update it: POST /wp/v2/pages/12 with body {\"content\": \"...\"} (send the whole new content, keeping the <!-- wp:... --> block comments)\n" +
     "- new post: POST /wp/v2/posts with body {\"title\": \"...\", \"content\": \"...\", \"status\": \"draft\"} (draft first, publish when the user says so)\n" +
     "- menus: /wp/v2/navigation, /wp/v2/menu-items; search: GET /wp/v2/search?search=...\n" +
+    "- widgets (classic themes, e.g. a footer): GET /wp/v2/sidebars first for the real widget-area ids, then POST /wp/v2/widgets with that `sidebar` id. Without a valid `sidebar`, WordPress still answers 201 but parks the widget in Inactive widgets, so check the sidebar afterwards. Block themes have no widget areas: edit the footer template part (/wp/v2/template-parts) instead.\n" +
     "It acts as the `porkbun-agent` WordPress editor by default (pages, posts, media, comments). Site settings (title, tagline, homepage), plugins, themes and users need `as_administrator: true` with `acknowledge_full_access: true`; ask the user first. Use _fields and per_page to keep answers small. Show the user what will change before overwriting a page, and offer create_wordpress_backup before big edits. Images: upload with wordpress_upload_media, then use its id or url. WordPress's own errors come back as WP_REST_ERROR with httpStatus and its message.",
   inputSchema: {
     domain: z.string().min(3).describe("The domain of the Cloud for WordPress site, e.g. `example.com`."),
