@@ -124,7 +124,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `create_mailbox` | Buy an email hosting mailbox ($36/yr, renews yearly) and set it up in one call; `cost_cents` must match, `dry_run` quotes; paid from credit or with `pay_with_card` / `pay_with_usdc` |
 | `renew_mailbox` | Add a year to a mailbox now at its `renewalPrice` (set-up mailboxes also auto-renew); paid from credit or with `pay_with_card` / `pay_with_usdc` |
 | `get_hosting` | Get hosting status for a domain (plan, trial, expiry, auto-renew) |
-| `deploy_site` | Upload static files (base64, ≤10MB/call) to a domain's hosting |
+| `deploy_site` | Upload a site's files to its hosting: text files (HTML, CSS, JS) as plain text, images as base64, ≤10MB/call |
 | `list_hosting_files` | List files under a path in a domain's hosting |
 | `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
 | `make_hosting_dir` | Create a directory (and missing parents) in a domain's hosting (deploy auto-creates dirs in a file path) |

@@ -1978,7 +1978,7 @@ const update_contacts: Tool = {
 const list_hosting_plans: Tool = {
   name: "list_hosting_plans",
   description:
-    "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost_cents` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Covers Secure Static Hosting, Cloud for WordPress and paid Link in Bio; `product` tells them apart (`managedLinks` is Link in Bio).",
+    "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost_cents` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Covers Secure Static Hosting, Cloud for WordPress and paid Link in Bio; `product` tells them apart (`managedLinks` is Link in Bio). Each row has `displayName`, `bestFor` and `featuresText` in plain words: use them to recommend one and explain why. Rule of thumb: a site you build and keep up as files = static (cheapest; publish with deploy_site); a site the owner wants to edit themselves, or that needs plugins = WordPress (edit with wordpress_request); just a page of links = Link in Bio. Ask the user which fits if unsure.",
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
@@ -1989,7 +1989,7 @@ const list_hosting_plans: Tool = {
 const create_hosting: Tool = {
   name: "create_hosting",
   description:
-    "Provision hosting for a domain in the account — Secure Static Hosting, Cloud for WordPress (a managed WordPress site), or a paid Link in Bio page, chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the plan's price in `acknowledged_cost_cents` (from list_hosting_plans) so the human is told about the auto-renew/charge. Use `dry_run` to preview. Provisioning can be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials.\n\nA paid re-provision is a purchase like any other: " + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
+    "Provision hosting for a domain in the account — Secure Static Hosting, Cloud for WordPress (a managed WordPress site), or a paid Link in Bio page, chosen by `sku`. The domain's FIRST provision starts a 15-day FREE trial that auto-renews at the plan price ($3/mo or $30/yr) when it ends; a re-provision after deprovision is charged to account credit (one free trial per domain). Provisioning switches the domain to Porkbun nameservers if it isn't already — set `agree_to_nameserver_change: true` to allow that. You MUST echo the plan's price in `acknowledged_cost_cents` (from list_hosting_plans) so the human is told about the auto-renew/charge. Use `dry_run` to preview. The call itself can take 30 seconds or more while the site is set up; wait for it rather than retrying. Provisioning can also be async: `status` may be PENDING — poll get_hosting until ACTIVE before deploying. For a WordPress plan, the file tools (deploy_site/list_hosting_files/…) do NOT apply — manage the site through WordPress instead, using create_wp_credentials to get REST API credentials.\n\nA paid re-provision is a purchase like any other: " + FUNDING_LOCAL + PAY_WITH_USDC_NOTE + PAY_WITH_CARD_NOTE,
   inputSchema: {
     domain: z.string().min(3).describe("Domain to provision hosting for, e.g. `example.com`."),
     sku: z
@@ -2027,15 +2027,16 @@ const get_hosting: Tool = {
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
-    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, content } where `content` is the file's bytes base64-encoded. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
+    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, text } for text files (HTML, CSS, JS, SVG, JSON, TXT: send the file exactly as written, no encoding) or { path, content } with base64 for images and other binary files. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
     files: z
       .array(
         z.object({
           path: z.string().describe("Destination path, e.g. `index.html` or `assets/app.css`."),
-          content: z.string().describe("File contents, base64-encoded."),
-        })
+          text: z.string().optional().describe("The file as plain text (HTML, CSS, JS, SVG, JSON...). Use this for text files."),
+          content: z.string().optional().describe("The file base64-encoded. Use this for images and other binary files."),
+        }).refine((f) => (f.text !== undefined) !== (f.content !== undefined), { message: "Give each file either `text` or `content` (base64), not both." })
       )
       .min(1)
       .describe("Files to upload."),
@@ -2043,7 +2044,16 @@ const deploy_site: Tool = {
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
-    return await call(config, `/hosting/deploy/${encodeURIComponent(domain)}`, { method: "POST", body: { files: args.files } });
+    // Text is base64-encoded here, so the model never has to, and any API version accepts it.
+    const given = args.files as Array<{ path: string; text?: string; content?: string }>;
+    const missing = given.filter((f) => f.text === undefined && f.content === undefined).map((f) => f.path);
+    if (missing.length)
+      return { isError: true, content: [{ type: "text", text: `Nothing deployed: give each file \`text\` (text files) or \`content\` (base64). Missing for: ${missing.join(", ")}` }] };
+    const files = given.map((f) => ({
+      path: f.path,
+      content: f.text !== undefined ? Buffer.from(f.text, "utf8").toString("base64") : f.content,
+    }));
+    return await call(config, `/hosting/deploy/${encodeURIComponent(domain)}`, { method: "POST", body: { files } });
   },
 };
 
