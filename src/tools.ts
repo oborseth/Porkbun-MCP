@@ -2027,15 +2027,15 @@ const get_hosting: Tool = {
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
-    "Upload static files to a domain's Secure Static Hosting. `files` is an array of { path, text } for text files (HTML, CSS, JS, SVG, JSON, TXT: send the file exactly as written, no encoding) or { path, content } with base64 for images and other binary files. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
+    "Publish a website's files to a domain's Secure Static Hosting. TEXT FILES GO IN `text`, AS WRITTEN: for .html, .css, .js, .svg, .json, .txt and .xml send { path, text } with the file's contents exactly as you wrote them. Do NOT base64-encode text files; base64 is slow and error-prone for you and is only for binary files (images, fonts, PDFs), sent as { path, content }. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
     files: z
       .array(
         z.object({
           path: z.string().describe("Destination path, e.g. `index.html` or `assets/app.css`."),
-          text: z.string().optional().describe("The file as plain text (HTML, CSS, JS, SVG, JSON...). Use this for text files."),
-          content: z.string().optional().describe("The file base64-encoded. Use this for images and other binary files."),
+          text: z.string().optional().describe("USE THIS for HTML, CSS, JS, SVG, JSON, TXT: the file's contents exactly as written, no encoding."),
+          content: z.string().optional().describe("Only for binary files (images, fonts, PDFs): the file base64-encoded. Never use this for text files."),
         }).refine((f) => (f.text !== undefined) !== (f.content !== undefined), { message: "Give each file either `text` or `content` (base64), not both." })
       )
       .min(1)
@@ -2051,7 +2051,9 @@ const deploy_site: Tool = {
       return { isError: true, content: [{ type: "text", text: `Nothing deployed: give each file \`text\` (text files) or \`content\` (base64). Missing for: ${missing.join(", ")}` }] };
     const files = given.map((f) => ({
       path: f.path,
-      content: f.text !== undefined ? Buffer.from(f.text, "utf8").toString("base64") : f.content,
+      // Safety net: raw text sent in `content` (not valid base64) is sent as text instead of failing.
+      content: f.text !== undefined ? Buffer.from(f.text, "utf8").toString("base64")
+        : (f.content !== undefined && !/^[A-Za-z0-9+/=\s]*$/.test(f.content) ? Buffer.from(f.content, "utf8").toString("base64") : f.content),
     }));
     return await call(config, `/hosting/deploy/${encodeURIComponent(domain)}`, { method: "POST", body: { files } });
   },
