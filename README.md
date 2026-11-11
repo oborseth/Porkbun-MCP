@@ -125,6 +125,7 @@ The `list_doc_topics` / `read_doc` / `search_docs` tools let an agent ground its
 | `renew_mailbox` | Add a year to a mailbox now at its `renewalPrice` (set-up mailboxes also auto-renew); paid from credit or with `pay_with_card` / `pay_with_usdc` |
 | `get_hosting` | Get hosting status for a domain (plan, trial, expiry, auto-renew) |
 | `deploy_site` | Upload a site's files to its hosting: text files (HTML, CSS, JS) as plain text, images as base64, ≤10MB/call |
+| `read_hosting_file` | Read a static site's files back (the exact source), so an agent can change a page instead of rebuilding it |
 | `list_hosting_files` | List files under a path in a domain's hosting |
 | `delete_hosting_file` | Delete a file (or empty dir) from a domain's hosting |
 | `make_hosting_dir` | Create a directory (and missing parents) in a domain's hosting (deploy auto-creates dirs in a file path) |

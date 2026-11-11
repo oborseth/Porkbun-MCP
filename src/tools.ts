@@ -2027,7 +2027,7 @@ const get_hosting: Tool = {
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
-    "Publish a website's files to a domain's Secure Static Hosting. TEXT FILES GO IN `text`, AS WRITTEN: for .html, .css, .js, .svg, .json, .txt and .xml send { path, text } with the file's contents exactly as you wrote them. Do NOT base64-encode text files; base64 is slow and error-prone for you and is only for binary files (images, fonts, PDFs), sent as { path, content }. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
+    "Publish a website's files to a domain's Secure Static Hosting. TEXT FILES GO IN `text`, AS WRITTEN: for .html, .css, .js, .svg, .json, .txt and .xml send { path, text } with the file's contents exactly as you wrote them. Do NOT base64-encode text files; base64 is slow and error-prone for you and is only for binary files (images, fonts, PDFs), sent as { path, content }. A `path` may include directories (e.g. `assets/css/style.css`) — missing parent directories are created automatically. ≤10MB total per call (split larger sites across calls). Only static-web file types are accepted (html/css/js/images/fonts/…); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting first). To change an existing site, read the current files first with read_hosting_file and edit them, rather than rebuilding from the visible page. When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the same path are replaced.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose hosting to deploy to."),
     files: z
@@ -2057,6 +2057,18 @@ const deploy_site: Tool = {
     }));
     return await call(config, `/hosting/deploy/${encodeURIComponent(domain)}`, { method: "POST", body: { files } });
   },
+};
+
+const read_hosting_file: Tool = {
+  name: "read_hosting_file",
+  description:
+    "Read files back from a domain's Secure Static Hosting, so you can change a page without rebuilding it: read index.html, edit only what the user asked (e.g. the opening hours), show them the change, then publish it with deploy_site. Text files come back as `text` (the exact source, HTML and all, unlike fetching the live page), others as base64 `content`. Up to 20 paths per call; list_hosting_files shows what is there.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Domain whose hosting files to read."),
+    paths: z.array(z.string()).min(1).max(20).describe("File paths, e.g. [\"index.html\", \"style.css\"]."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => call(config, `/hosting/getFile/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body: { paths: args.paths } }),
 };
 
 const list_hosting_files: Tool = {
@@ -3287,6 +3299,7 @@ export const tools: Tool[] = [
   get_hosting,
   deploy_site,
   list_hosting_files,
+  read_hosting_file,
   delete_hosting_file,
   make_hosting_dir,
   wordpress_request,
