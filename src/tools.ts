@@ -3249,7 +3249,7 @@ const register_ans_agent: Tool = {
   name: "register_ans_agent",
   description:
     "Give an AI agent a verifiable name with the Agent Name Service (free): `ans://v1.0.0.<host>`, an identity certificate, DNS discovery records, a public entry in Porkbun's transparency log, and a listing in the agent directory. " +
-    "Needs: (1) the agent already serving HTTPS at `endpoint_url` with a publicly trusted certificate (Let's Encrypt is fine); its served chain is registered; " +
+    "Needs: (0) the agent host to be a domain registered at Porkbun in this account, or a subdomain of one (ANS_DOMAIN_NOT_ELIGIBLE otherwise; external domains added to the account don't count); (1) the agent already serving HTTPS at `endpoint_url` with a publicly trusted certificate (Let's Encrypt is fine); its served chain is registered; " +
     "(2) `identity_csr_pem`, a certificate request the USER makes on their own machine so the private key never leaves them: " +
     "`openssl req -new -newkey rsa:2048 -nodes -keyout identity.key -out identity.csr -subj \"/CN=<host>\" -addext \"subjectAltName=DNS:<host>,URI:ans://v<version>.<host>\"` (the version in the URI must match `version`). Never generate or ask for the private key yourself. " +
     "Returns agentId and `agentStatus: PENDING_VALIDATION` (`status` is the SUCCESS/ERROR envelope), with `dnsResults` (records published for you when the domain is on Porkbun nameservers in this account; any with published=false must be added at the user's DNS host). Then call advance_ans_agent until `agentStatus` is ACTIVE. " +
