@@ -3252,7 +3252,7 @@ const register_ans_agent: Tool = {
     "Needs: (1) the agent already serving HTTPS at `endpoint_url` with a publicly trusted certificate (Let's Encrypt is fine); its served chain is registered; " +
     "(2) `identity_csr_pem`, a certificate request the USER makes on their own machine so the private key never leaves them: " +
     "`openssl req -new -newkey rsa:2048 -nodes -keyout identity.key -out identity.csr -subj \"/CN=<host>\" -addext \"subjectAltName=DNS:<host>,URI:ans://v<version>.<host>\"` (the version in the URI must match `version`). Never generate or ask for the private key yourself. " +
-    "Returns agentId and status PENDING_VALIDATION, with `dnsResults` (records published for you when the domain is on Porkbun nameservers in this account; any with published=false must be added at the user's DNS host). Then call advance_ans_agent until ACTIVE. " +
+    "Returns agentId and `agentStatus: PENDING_VALIDATION` (`status` is the SUCCESS/ERROR envelope), with `dnsResults` (records published for you when the domain is on Porkbun nameservers in this account; any with published=false must be added at the user's DNS host). Then call advance_ans_agent until `agentStatus` is ACTIVE. " +
     "Fill `capabilities` with what the agent really does: it is what people search the directory by. Errors: ANS_SERVER_CERT_UNREACHABLE (endpoint not serving HTTPS yet), ANS_SERVER_CERT_INVALID, ANS_ALREADY_REGISTERED (register a higher version).",
   inputSchema: {
     endpoint_url: z.string().url().describe("The https:// URL the agent listens on, e.g. https://myagent.example.com/mcp. Its host is the agent host."),
@@ -3282,7 +3282,7 @@ const register_ans_agent: Tool = {
 const advance_ans_agent: Tool = {
   name: "advance_ans_agent",
   description:
-    "Move a pending ANS agent one validation round toward ACTIVE: publishes the DNS records the registry wants now and asks it to check them. Call repeatedly until `status` is ACTIVE (usually 2-4 calls). " +
+    "Move a pending ANS agent one validation round toward ACTIVE: publishes the DNS records the registry wants now and asks it to check them. Call repeatedly until `agentStatus` is ACTIVE (usually 2-4 calls). " +
     "On ANS_DNS_PENDING, wait about 30 seconds and call again; `missingRecords` lists what it is waiting for (if those are at the user's own DNS host, tell them to add them). Safe to repeat.",
   inputSchema: { agent_id: ANS_AGENT_ID, dry_run: z.boolean().optional().describe("Preview without changing anything.") },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
