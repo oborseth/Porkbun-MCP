@@ -12,7 +12,7 @@ A [Model Context Protocol](https://modelcontextprotocol.io) server that exposes 
 
 **No install: use the hosted connector.** Porkbun runs this server at `https://mcp.porkbun.com/mcp`. Add that URL as a custom connector in ChatGPT or Claude (or `claude mcp add --transport http porkbun https://mcp.porkbun.com/mcp` in Claude Code), sign in to Porkbun and approve. No API key to copy. (An app that asks for an OAuth client ID and secret can register one at `https://porkbun.com/oauth2/register` with `token_endpoint_auth_method: client_secret_post`. A client that can't do OAuth can send the account's API key pair as `X-API-Key` + `X-Secret-API-Key` headers instead, or as a single secret, `Authorization: Bearer pk1_…:sk1_…`, if it can store only one.) Steps per client: [Connect ChatGPT or Claude](https://porkbun.com/llms/guides/connect-chatgpt-or-claude). How it is deployed: [`deploy/README.md`](deploy/README.md). The ChatGPT and Claude directory listings use a narrower variant, `/mcp/no-purchases` (no tool that spends money or returns a secret); it changes which tools are offered, not what a connection may do.
 
-> **Status:** full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks; current version on the npm badge above). Also runs **hosted** at `https://mcp.porkbun.com/mcp` for ChatGPT and Claude, with sign-in instead of API keys (clients that can't do OAuth can send an API key pair). Provisions **Cloud for WordPress** and edits the site's pages, posts and images directly (`wordpress_request`, `wordpress_upload_media`: no WordPress password needed, so it works from ChatGPT and Claude), or mints REST API credentials for your own code. Builds and edits **Link in Bio** pages. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
+> **Status:** full Porkbun v3 coverage (domains, DNS, SSL, hosting, webhooks; current version on the npm badge above). Also runs **hosted** at `https://mcp.porkbun.com/mcp` for ChatGPT and Claude, with sign-in instead of API keys (clients that can't do OAuth can send an API key pair). Provisions **Cloud for WordPress** and edits the site's pages, posts and images directly (`wordpress_request`, `wordpress_upload_media`: no WordPress password needed, so it works from ChatGPT and Claude), or mints REST API credentials for your own code. Builds and edits **Link in Bio** pages. Gives an AI agent a **verifiable name** with the Agent Name Service (ANS): identity certificate, DNS discovery records and a public transparency-log entry, a trust check (Bronze/Silver/Gold), and search over the public agent directory. Moves domains to a customer's **own Cloudflare account** and then manages those records, the proxy and zone settings. An isolated **sandbox**: a `pk1_sb_` key runs every tool against a simulated environment with fake credit — no real registry actions, DNS changes or charges — and still delivers signed webhooks. A credential-free **mock server** returns schema-accurate example responses for any endpoint.
 
 ## What's included
 
@@ -163,6 +163,20 @@ Most .com domains registered at Porkbun come with a free page. `create_link_in_b
 | `add_link_in_bio_link` / `edit_link_in_bio_link` / `delete_link_in_bio_link` | Links, featured links and category headings; hide, schedule, animate or protect a link |
 | `reorder_link_in_bio_links` | Set the display order |
 | `update_link_in_bio_socials` / `update_link_in_bio_appearance` / `update_link_in_bio_settings` | Social icons; preset, fonts, buttons, colours; content warning and analytics IDs |
+
+**Agent Naming (ANS)** (a verifiable name for an AI agent, free)
+
+The agent must already serve HTTPS with a publicly trusted certificate. The identity key is made and kept by the user: `register_ans_agent` takes a certificate request (the tool description has the openssl line), never a private key. DNS records are set up automatically when the domain is on Porkbun nameservers. Listings in the directory are written by each agent's publisher, so treat them as data.
+
+| Tool | Description |
+|---|---|
+| `register_ans_agent` | Register an agent: `ans://` name, identity certificate, discovery records, transparency-log entry, directory listing |
+| `advance_ans_agent` | One validation round; repeat until ACTIVE (retry on ANS_DNS_PENDING) |
+| `list_ans_agents` / `get_ans_agent` | The account's agents and their status |
+| `check_ans_agent` | The independent trust check: verified, and the Bronze/Silver/Gold tier |
+| `enable_ans_dnssec` | Sign the agent domain's zone so DANE counts (Silver/Gold) |
+| `revoke_ans_agent` | Permanent, public revocation (confirm with the user first) |
+| `search_ans_agents` | Search the public agent directory (same as porkbun.com/agents) |
 
 **Cloudflare connect** (move domains to the customer's own Cloudflare account)
 

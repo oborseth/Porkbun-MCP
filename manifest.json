@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.64.0",
+  "version": "0.65.0",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks — all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -424,6 +424,38 @@
     {
       "name": "update_link_in_bio_settings",
       "description": "Set a Link in Bio page's content warning and analytics IDs."
+    },
+    {
+      "name": "register_ans_agent",
+      "description": "Give an AI agent a verifiable ANS name, identity certificate and transparency-log entry (you keep the key; send a CSR)."
+    },
+    {
+      "name": "advance_ans_agent",
+      "description": "Advance a pending ANS agent one validation round; repeat until ACTIVE."
+    },
+    {
+      "name": "list_ans_agents",
+      "description": "List the AI agents this account has registered with ANS."
+    },
+    {
+      "name": "get_ans_agent",
+      "description": "Get one registered AI agent with its current status."
+    },
+    {
+      "name": "check_ans_agent",
+      "description": "Run the independent trust check on an agent (Bronze/Silver/Gold)."
+    },
+    {
+      "name": "enable_ans_dnssec",
+      "description": "Turn on DNSSEC for an agent's domain so it can reach Silver/Gold."
+    },
+    {
+      "name": "revoke_ans_agent",
+      "description": "Permanently revoke an agent's registration (public; confirm first)."
+    },
+    {
+      "name": "search_ans_agents",
+      "description": "Search the public directory of AI agents registered with Porkbun's ANS registry."
     },
     {
       "name": "request_api_key",
