@@ -686,6 +686,7 @@ const sandbox_trigger_webhook: Tool = {
         "domain.registered",
         "domain.renewed",
         "domain.transfer.completed",
+        "domain.transfer.failed",
         "domain.expiring",
         "dns.record.created",
         "dns.record.updated",
@@ -2273,7 +2274,7 @@ const update_hosting_auto_renew: Tool = {
 const get_webhook_event_types: Tool = {
   name: "get_webhook_event_types",
   description:
-    "List the event types you can subscribe a webhook endpoint to. Returns event-type strings like `domain.registered`, `domain.renewed`, `domain.transfer.completed`, `domain.expiring`, `dns.record.created|updated|deleted`, `cloudflare.connect.completed|failed` and `account.verification.code_sent|completed`. What each event sends: https://porkbun.com/llms/webhooks. Use these values (or `*` for all, or a prefix wildcard like `dns.*`) when calling create_webhook.",
+    "List the event types you can subscribe a webhook endpoint to. Returns event-type strings like `domain.registered`, `domain.renewed`, `domain.transfer.completed|failed`, `domain.expiring`, `dns.record.created|updated|deleted`, `cloudflare.connect.completed|failed` and `account.verification.code_sent|completed`. What each event sends: https://porkbun.com/llms/webhooks. Use these values (or `*` for all, or a prefix wildcard like `dns.*`) when calling create_webhook.",
   inputSchema: {},
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
   handler: async (config) => {
