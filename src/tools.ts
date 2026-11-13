@@ -3266,6 +3266,7 @@ const register_ans_agent: Tool = {
     metadata_url: z.string().url().optional().describe("Capability card URL, if the agent has one."),
     agent_host: z.string().optional().describe("Override the host taken from endpoint_url. The user must control its DNS."),
     server_certificate_pem: z.string().optional().describe("Full chain (leaf first). Usually omit: the chain the endpoint serves is used."),
+    dry_run: z.boolean().optional().describe("Check the request without registering anything or writing DNS."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
@@ -3273,6 +3274,7 @@ const register_ans_agent: Tool = {
     const map: Record<string, string> = { version: "version", protocol: "protocol", display_name: "displayName", description: "description",
       capabilities: "capabilities", metadata_url: "metaDataUrl", agent_host: "agentHost", server_certificate_pem: "serverCertificatePEM" };
     for (const [k, v] of Object.entries(map)) if (args[k] !== undefined) body[v] = args[k];
+    if (args.dry_run) body.dryRun = true;
     return call(config, "/ans/register", { method: "POST", body });
   },
 };
@@ -3282,9 +3284,9 @@ const advance_ans_agent: Tool = {
   description:
     "Move a pending ANS agent one validation round toward ACTIVE: publishes the DNS records the registry wants now and asks it to check them. Call repeatedly until `status` is ACTIVE (usually 2-4 calls). " +
     "On ANS_DNS_PENDING, wait about 30 seconds and call again; `missingRecords` lists what it is waiting for (if those are at the user's own DNS host, tell them to add them). Safe to repeat.",
-  inputSchema: { agent_id: ANS_AGENT_ID },
+  inputSchema: { agent_id: ANS_AGENT_ID, dry_run: z.boolean().optional().describe("Preview without changing anything.") },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
-  handler: async (config, args) => call(config, `/ans/advance/${encodeURIComponent(String(args.agent_id))}`, { method: "POST" }),
+  handler: async (config, args) => call(config, `/ans/advance/${encodeURIComponent(String(args.agent_id))}`, { method: "POST", body: args.dry_run ? { dryRun: true } : {} }),
 };
 
 const list_ans_agents: Tool = {
@@ -3317,9 +3319,9 @@ const enable_ans_dnssec: Tool = {
   name: "enable_ans_dnssec",
   description:
     "Turn on DNSSEC for an agent's domain in one step (signs the zone and publishes the DS at the registry), so its TLSA record counts toward the silver and gold tiers. Only for domains registered at Porkbun on Porkbun nameservers in this account; ANS_DNSSEC_UNAVAILABLE otherwise. Resolvers see it within a few hours; run check_ans_agent again after that. Ask the user first: it changes how the whole domain resolves.",
-  inputSchema: { agent_id: ANS_AGENT_ID },
+  inputSchema: { agent_id: ANS_AGENT_ID, dry_run: z.boolean().optional().describe("Preview without changing anything.") },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
-  handler: async (config, args) => call(config, `/ans/enableDnssec/${encodeURIComponent(String(args.agent_id))}`, { method: "POST" }),
+  handler: async (config, args) => call(config, `/ans/enableDnssec/${encodeURIComponent(String(args.agent_id))}`, { method: "POST", body: args.dry_run ? { dryRun: true } : {} }),
 };
 
 const revoke_ans_agent: Tool = {
@@ -3331,12 +3333,15 @@ const revoke_ans_agent: Tool = {
     reason: z.enum(["CESSATION_OF_OPERATION", "KEY_COMPROMISE", "AFFILIATION_CHANGED", "SUPERSEDED", "PRIVILEGE_WITHDRAWN"]).optional()
       .describe("Default CESSATION_OF_OPERATION. KEY_COMPROMISE if the identity key leaked."),
     comments: z.string().max(200).optional(),
+    confirm: z.literal("revoke").describe('Must be "revoke": confirms the user agreed to a permanent, public revocation.'),
+    dry_run: z.boolean().optional().describe("Show which agent would be revoked, without revoking it."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
-    const body: Record<string, unknown> = {};
+    const body: Record<string, unknown> = { confirm: "revoke" };
     if (args.reason) body.reason = args.reason;
     if (args.comments) body.comments = args.comments;
+    if (args.dry_run) body.dryRun = true;
     return call(config, `/ans/revoke/${encodeURIComponent(String(args.agent_id))}`, { method: "POST", body });
   },
 };

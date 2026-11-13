@@ -20,6 +20,9 @@ signed-in user's Porkbun account: domains, DNS, hosting and related settings.
   `publish_wordpress_staging` replace the live site: dry-run and confirm first.
 - **Revoking:** `revoke_api_key` revokes the key this server uses, only that one;
   confirm with the user, since every tool stops working afterwards.
+- **Agent naming (ANS):** the user makes the identity key and CSR on their own
+  machine; `register_ans_agent` takes only the CSR. Then `advance_ans_agent` until
+  ACTIVE. `revoke_ans_agent` is permanent and public: confirm with the user first.
 - **Sharing a site:** `share_site_access` shares nothing until the account holder
   approves the returned `approveUrl` on porkbun.com; then `list_site_shares` has the
   link, QR code, share code and handoff prompt to pass on. One domain, site only.

@@ -111,7 +111,9 @@ const HELD_FOR_REVIEW = ["list_invoices", "get_invoice", "get_invoice_pdf", "sen
   // WordPress content (0.62.0): returns no secrets, so a candidate for the directory path once the review concludes.
   "wordpress_request", "wordpress_upload_media",
   // Static site file reads (0.64.0): read-only, no secrets; held only to keep the reviewed list stable.
-  "read_hosting_file"];
+  "read_hosting_file",
+  // Agent naming (0.65.0): held like the rest until the directory reviews conclude.
+  "register_ans_agent", "advance_ans_agent", "list_ans_agents", "get_ans_agent", "check_ans_agent", "enable_ans_dnssec", "revoke_ans_agent", "search_ans_agents"];
 
 const FUNDING_NO_TOPUPS =
   "**How a purchase is paid.** From prepaid account credit by default; a card saved at Porkbun is never charged by a purchase itself. On this connection purchases are paid from credit only. If the credit is short, the call fails with `INSUFFICIENT_FUNDS` carrying `cost`, `balance` and `shortfall` (`dry_run: true` reports the same without charging). Adding credit is the account holder's step: tell them the exact shortfall and that they can add it with **buy account credit** at https://porkbun.com/account/credit, then retry this exact call once they say it is done. Auto top-up, which they can set in their API settings (https://porkbun.com/account/api), refills the balance from their saved card on its own next time. Money parameters are integer cents: state amounts to the user in dollars (`cost_cents: 1108` is $11.08).";
