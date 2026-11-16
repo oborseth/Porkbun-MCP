@@ -3333,6 +3333,20 @@ const verify_ans_host: Tool = {
     call(config, `/ans/verifyHost/${encodeURIComponent(String(args.host))}` + (args.version ? `?version=${encodeURIComponent(String(args.version))}` : ""), { method: "GET" }),
 };
 
+const get_ans_identity_certificates: Tool = {
+  name: "get_ans_identity_certificates",
+  description:
+    "EXPERIMENTAL. Get a registered agent's identity certificates, newest first, INCLUDING the certificate itself — this is what you need to sign something AS the agent. " +
+    "A signature carries the leaf certificate in its JWS `x5c` header; a verifier then hashes that certificate's DER and requires the result to appear in the transparency log's attested identity certificates (see verify_ans_host). " +
+    "`x5c` is returned ready to paste into a JWS header (base64 DER, no PEM armour, no line breaks) and `signsWith` names the JWS alg the key supports (ES256 for P-256, ES384 for P-384, RS256 for RSA), so you do not have to convert or infer either. `certificatePEM`, `chainPEM` and `identityRootUrl` are there for chain building. " +
+    "Several certificates is NORMAL, not an error: rotate_ans_identity adds one and the previous stays valid until its validTo, so `newest: true` marks the current one — and it is why a verifier must check WHICH certificate signed something rather than that one is listed. " +
+    "Porkbun never holds the private key: it stays with whoever generated the CSR and cannot be recovered. Nothing here is secret — the certificate is public once it is in the log. " +
+    "There is no certificate until the agent reaches ACTIVE (ANS_NO_CERTIFICATE); run advance_ans_agent first.",
+  inputSchema: { agent_id: ANS_AGENT_ID },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) => call(config, `/ans/certificates/${encodeURIComponent(String(args.agent_id))}`, { method: "GET" }),
+};
+
 const rotate_ans_identity: Tool = {
   name: "rotate_ans_identity",
   description:
@@ -3515,6 +3529,7 @@ export const tools: Tool[] = [
   check_ans_agent,
   verify_ans_host,
   rotate_ans_identity,
+  get_ans_identity_certificates,
   enable_ans_dnssec,
   revoke_ans_agent,
   search_ans_agents,
