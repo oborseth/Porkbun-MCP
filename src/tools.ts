@@ -3252,7 +3252,7 @@ const register_ans_agent: Tool = {
     "EXPERIMENTAL: ANS is a draft standard and Porkbun's registry is new, so behaviour, fields and records may change; tell the user before they depend on it. PUBLIC AND PERMANENT: a registered agent is listed in the public directory and sealed in the transparency log; there is no unlisted option and revoking does not erase the record, so tell the user and don't register agents they want kept private. Give an AI agent a verifiable name with the Agent Name Service (free): `ans://v1.0.0.<host>`, an identity certificate, DNS discovery records, a public entry in Porkbun's transparency log, and a listing in the agent directory. " +
     "Needs: (0) the agent host to be a domain registered at Porkbun in this account, or a subdomain of one (ANS_DOMAIN_NOT_ELIGIBLE otherwise; external domains added to the account don't count); (1) the agent already serving HTTPS at `endpoint_url` with a publicly trusted certificate (Let's Encrypt is fine); its served chain is registered; " +
     "(2) `identity_csr_pem`, a certificate request the USER makes on their own machine so the private key never leaves them: " +
-    "`openssl req -new -newkey rsa:2048 -nodes -keyout identity.key -out identity.csr -subj \"/CN=<host>\" -addext \"subjectAltName=DNS:<host>,URI:ans://v<version>.<host>\"` (the version in the URI must match `version`). Never generate or ask for the private key yourself. " +
+    "`openssl ecparam -name prime256v1 -genkey -noout -out identity.key` then `openssl req -new -key identity.key -out identity.csr -subj \"/CN=<host>\" -addext \"subjectAltName=DNS:<host>,URI:ans://v<version>.<host>\"` (P-256 is the curve ES256 signing needs; RSA 2048+ and P-384 also work, but Ed25519, P-521 and EC keys with EXPLICIT curve parameters are refused — the one-step `-newkey ec -pkeyopt ec_paramgen_curve` form produces the explicit kind on macOS, which is why this is two commands) (the version in the URI must match `version`). Never generate or ask for the private key yourself. " +
     "Returns agentId and `agentStatus: PENDING_VALIDATION` (`status` is the SUCCESS/ERROR envelope), with `dnsResults` (records published for you when the domain is on Porkbun nameservers in this account; any with published=false must be added at the user's DNS host). Then call advance_ans_agent until `agentStatus` is ACTIVE. " +
     "Fill `capabilities` with what the agent really does: it is what people search the directory by. Errors: ANS_SERVER_CERT_UNREACHABLE (endpoint not serving HTTPS yet), ANS_SERVER_CERT_INVALID, ANS_ALREADY_REGISTERED (register a higher version).",
   inputSchema: {
@@ -3331,6 +3331,29 @@ const verify_ans_host: Tool = {
   annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     call(config, `/ans/verifyHost/${encodeURIComponent(String(args.host))}` + (args.version ? `?version=${encodeURIComponent(String(args.version))}` : ""), { method: "GET" }),
+};
+
+const rotate_ans_identity: Tool = {
+  name: "rotate_ans_identity",
+  description:
+    "EXPERIMENTAL. Issue a NEW identity certificate for a registered agent, keeping the same agent and the same version — so its `ans://` name does not change. Registering the same version again returns ANS_ALREADY_REGISTERED, so this is the way to change an agent's identity key without burning a version number. " +
+    "The usual reason: the agent was registered with an RSA key and now needs ECDSA P-256 so it can sign things with ES256. " +
+    "The user makes the new key and CSR themselves, exactly as for registration, so the private key never leaves them — NEVER ask for or accept a private key: " +
+    "`openssl ecparam -name prime256v1 -genkey -noout -out identity.key` then `openssl req -new -key identity.key -out identity.csr -subj \"/CN=<host>\" -addext \"subjectAltName=URI:ans://v<version>.<host>\"`, where the URI SAN must be the agent's EXISTING ANS name (same version). " +
+    "The agent must be ACTIVE. " +
+    "IMPORTANT, and tell the user: the previous certificate stays valid until it expires and stays listed in the transparency log, so this is NOT a way to deal with a key that leaked — revoke the agent for that. It also means anything verifying a signature must check WHICH certificate signed it (the `x5c` in the signature), not merely that a certificate is listed. " +
+    "Use dry_run first to check the CSR without issuing anything.",
+  inputSchema: {
+    agent_id: ANS_AGENT_ID,
+    identity_csr_pem: z.string().min(1).describe("PEM CSR for the NEW key, made by the user. URI SAN must equal the agent's existing ANS name."),
+    dry_run: z.boolean().optional().describe("Check the CSR and the agent without issuing a certificate."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  handler: async (config, args) =>
+    call(config, `/ans/rotateIdentity/${encodeURIComponent(String(args.agent_id))}`, {
+      method: "POST",
+      body: { identityCsrPEM: args.identity_csr_pem, ...(args.dry_run ? { dryRun: true } : {}) },
+    }),
 };
 
 const enable_ans_dnssec: Tool = {
@@ -3491,6 +3514,7 @@ export const tools: Tool[] = [
   get_ans_agent,
   check_ans_agent,
   verify_ans_host,
+  rotate_ans_identity,
   enable_ans_dnssec,
   revoke_ans_agent,
   search_ans_agents,
