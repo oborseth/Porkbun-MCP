@@ -2025,6 +2025,73 @@ const get_hosting: Tool = {
   },
 };
 
+const verify_agent_manifest: Tool = {
+  name: "verify_agent_manifest",
+  description:
+    "EXPERIMENTAL. Check whether a published document was really produced by the AI agent it names — works on ANY site, needs no API key, and covers agents registered with any ANS registry, not only Porkbun's. Use it before trusting data you pulled from a site that claims an agent produced it. " +
+    "Answers from public data alone: the document, the publishing host's DNS, and the transparency log that host's record points at. " +
+    "`authentic` and `agentLive` are SEPARATE answers and you should report both: authorship is a claim about the PAST, so a document stays authentic even if the agent has gone quiet or its signing certificate has since expired, while `agentLive`/`agentStatus`/`tier` say whether the agent is running now. " +
+    "`inconclusive: true` means we could not fetch or examine the document (the host refused us, rate-limited us, or the URL does not resolve) — say that, do NOT report it as forged. " +
+    "`artifacts[]` is the second half and the part people skip: the signature covers the MANIFEST, while the data files it lists are covered only by the hashes inside it, so a `fail` there means the file being served is not the one the agent vouched for even though the signature is valid.",
+  inputSchema: {
+    url: z.string().describe("https URL of the signed manifest, e.g. https://example.com/.well-known/apm.json"),
+    check_artifacts: z.boolean().optional().describe("Default true. Set false to check only the signature (then it says nothing about the content)."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    call(config, `/ans/verifyManifest?url=${encodeURIComponent(String(args.url))}` + (args.check_artifacts === false ? "&checkArtifacts=0" : ""), { method: "GET" }),
+};
+
+const build_agent_manifest: Tool = {
+  name: "build_agent_manifest",
+  description:
+    "EXPERIMENTAL, opt-in. Step 1 of 2: build a signed 'agent manifest' for a site — a machine-readable statement of what the site publishes and which AI agent produced it, so other agents can consume the data instead of scraping the page AND can verify the claim. Offer this only if the user asks for it; it is not part of a normal deploy. " +
+    "Requires an ACTIVE agent registered for that EXACT domain in the account (APM_NO_AGENT otherwise — register one first with register_ans_agent) whose identity key is ECDSA P-256 (APM_KEY_NOT_SIGNING_CAPABLE for RSA; rotate_ans_identity fixes that without changing the agent's name). " +
+    "Deploy the data files FIRST: this reads each artifact as actually deployed and records its real sha256, and a path that is not there is an error rather than a silent omission. " +
+    "This call writes NOTHING. It returns `signingInput` (the exact bytes to sign) and `manifestId` (names those bytes, valid 30 minutes). " +
+    "YOU ALMOST CERTAINLY CANNOT SIGN THIS YOURSELF: the agent's private key belongs to the user and Porkbun never has it. Unless you are running somewhere that holds the key, give the user the signingInput and ask them to sign it with their identity key (ES256, ECDSA P-256 + SHA-256) and hand back the 64-byte r||s signature base64url-encoded. NEVER ask the user to paste a private key, and never accept one.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name in the account, e.g. `example.com`"),
+    artifacts: z.array(z.object({
+      path: z.string().describe("Path relative to the site root of a file already deployed, e.g. apm/products.json"),
+      name: z.string().optional(),
+      type: z.string().optional().describe("What the data is, e.g. schema.org/Product"),
+      format: z.string().optional(),
+    })).describe("The files the manifest should vouch for."),
+    entity: z.record(z.string(), z.any()).optional().describe("Who publishes the site (name, location, links)."),
+    policy: z.record(z.string(), z.any()).optional().describe("How the data may be used, e.g. {training: 'disallow', quote: 'allow', attribution: 'required'}."),
+    endpoints: z.array(z.record(z.string(), z.any())).optional(),
+    notes: z.string().optional(),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) =>
+    call(config, `/hosting/manifest/${encodeURIComponent(String(args.domain))}`, {
+      method: "POST",
+      body: { artifacts: args.artifacts, entity: args.entity, policy: args.policy, endpoints: args.endpoints, notes: args.notes },
+    }),
+};
+
+const publish_agent_manifest: Tool = {
+  name: "publish_agent_manifest",
+  description:
+    "EXPERIMENTAL. Step 2 of 2: publish the signed agent manifest to the site, using the `manifestId` from build_agent_manifest and the signature the user produced over its `signingInput`. " +
+    "`signature` must be the 64-byte r||s pair base64url-encoded — NOT the DER/ASN.1 blob `openssl dgst -sign` writes, which has to be converted first. If the user hands you DER output, say so rather than sending it. " +
+    "Porkbun verifies the signature exactly as an outside party would BEFORE writing anything: if it does not verify, nothing is published and the failing check is named (APM_SIGNATURE_INVALID). The artifacts are re-hashed too, so if the site changed since the manifest was built you get APM_ARTIFACTS_CHANGED and should build again. " +
+    "On success the manifest is written to /.well-known/apm.json and the response includes a `verifyUrl` anyone can check with no API key. Tell the user they must re-publish whenever a listed file changes, because the manifest records hashes and an edited file stops matching until they do. Use dry_run to confirm the signature is good without writing.",
+  inputSchema: {
+    domain: z.string().min(3).describe("Fully qualified domain name in the account, e.g. `example.com`"),
+    manifest_id: z.string().describe("From build_agent_manifest. Guarantees the bytes verified are the bytes signed."),
+    signature: z.string().describe("ES256 signature over signingInput: 64-byte r||s, base64url."),
+    dry_run: z.boolean().optional().describe("Verify and report what would be published, without writing."),
+  },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  handler: async (config, args) =>
+    call(config, `/hosting/publishManifest/${encodeURIComponent(String(args.domain))}`, {
+      method: "POST",
+      body: { manifestId: args.manifest_id, signature: args.signature, ...(args.dry_run ? { dryRun: true } : {}) },
+    }),
+};
+
 const deploy_site: Tool = {
   name: "deploy_site",
   description:
@@ -3483,6 +3550,9 @@ export const tools: Tool[] = [
   create_hosting,
   get_hosting,
   deploy_site,
+  build_agent_manifest,
+  publish_agent_manifest,
+  verify_agent_manifest,
   list_hosting_files,
   read_hosting_file,
   delete_hosting_file,
