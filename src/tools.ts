@@ -2032,7 +2032,7 @@ const verify_agent_manifest: Tool = {
     "Answers from public data alone: the document, the publishing host's DNS, and the transparency log that host's record points at. " +
     "`authentic` and `agentLive` are SEPARATE answers and you should report both: authorship is a claim about the PAST, so a document stays authentic even if the agent has gone quiet or its signing certificate has since expired, while `agentLive`/`agentStatus`/`agentVerdict` say whether the agent is running now. " +
     "`inconclusive: true` means we could not fetch or examine the document (the host refused us, rate-limited us, or the URL does not resolve) — say that, do NOT report it as forged. " +
-    "`artifacts[]` is the second half and the part people skip: the signature covers the MANIFEST, while the data files it lists are covered only by the hashes inside it, so a `fail` there means the file being served is not the one the agent vouched for even though the signature is valid.",
+    "`artifacts[]` is the second half and the part people skip: the signature covers the MANIFEST, while the data files it lists are covered only by the hashes inside it. CHECK `artifactsOk` AS WELL AS `authentic` - a signed manifest whose file changed since is `authentic: true` with `artifactsOk: false`, and a caller reading only `authentic` misses it. If the file was edited or republished in the last few minutes a cached copy may still be served, so re-check before reporting tampering. `manifestSha256` says which document the verdict is about; results are cached 10 minutes, so compare it against the hash publish_agent_manifest returned rather than assuming a fresh answer.",
   inputSchema: {
     url: z.string().describe("https URL of the signed manifest, e.g. https://example.com/.well-known/apm.json"),
     check_artifacts: z.boolean().optional().describe("Default true. Set false to check only the signature (then it says nothing about the content)."),
@@ -2047,7 +2047,7 @@ const build_agent_manifest: Tool = {
   description:
     "EXPERIMENTAL, opt-in. Step 1 of 2: build a signed 'agent manifest' for a site — a machine-readable statement of what the site publishes and which AI agent produced it, so other agents can consume the data instead of scraping the page AND can verify the claim. Offer this only if the user asks for it; it is not part of a normal deploy. " +
     "Requires an ACTIVE agent registered for that EXACT domain in the account (APM_NO_AGENT otherwise — register one first with register_ans_agent) whose identity key is ECDSA P-256 (APM_KEY_NOT_SIGNING_CAPABLE for RSA; rotate_ans_identity fixes that without changing the agent's name). " +
-    "Deploy the data files FIRST: this reads each artifact as actually deployed and records its real sha256, and a path that is not there is an error rather than a silent omission. " +
+    "Deploy the data files FIRST: this reads each artifact as actually deployed and records its real sha256, and a path that is not there is an error rather than a silent omission. If the site already has a manifest, read it and pass its entity/policy/endpoints/notes and each collection's descriptive fields back in - publishing REPLACES the file, and anything you leave out is dropped. " +
     "This call writes NOTHING. It returns `signingInput` (the exact bytes to sign) and `manifestId` (names those bytes, valid 30 minutes). " +
     "YOU ALMOST CERTAINLY CANNOT SIGN THIS YOURSELF: the agent's private key belongs to the user and Porkbun never has it. Unless you are running somewhere that holds the key, give the user the signingInput and ask them to sign it with their identity key (ES256, ECDSA P-256 + SHA-256) and hand back the 64-byte r||s signature base64url-encoded. NEVER ask the user to paste a private key, and never accept one.",
   inputSchema: {
@@ -2057,6 +2057,12 @@ const build_agent_manifest: Tool = {
       name: z.string().optional(),
       type: z.string().optional().describe("What the data is, e.g. schema.org/Product"),
       format: z.string().optional(),
+      schema: z.string().optional().describe("Schema URL, e.g. https://schema.org/Product"),
+      source: z.string().optional().describe("Where the data came from."),
+      updated: z.string().optional().describe("When the data itself was last updated (ISO 8601)."),
+      ttl: z.number().optional().describe("How long a consumer may cache it, in seconds."),
+      id: z.string().optional(),
+      description: z.string().optional(),
     })).describe("The files the manifest should vouch for."),
     entity: z.record(z.string(), z.any()).optional().describe("Who publishes the site (name, location, links)."),
     policy: z.record(z.string(), z.any()).optional().describe("How the data may be used, e.g. {training: 'disallow', quote: 'allow', attribution: 'required'}."),
@@ -2077,7 +2083,7 @@ const publish_agent_manifest: Tool = {
     "EXPERIMENTAL. Step 2 of 2: publish the signed agent manifest to the site, using the `manifestId` from build_agent_manifest and the signature the user produced over its `signingInput`. " +
     "`signature` must be the 64-byte r||s pair base64url-encoded — NOT the DER/ASN.1 blob `openssl dgst -sign` writes, which has to be converted first. If the user hands you DER output, say so rather than sending it. " +
     "Porkbun verifies the signature exactly as an outside party would BEFORE writing anything: if it does not verify, nothing is published and the failing check is named (APM_SIGNATURE_INVALID). The artifacts are re-hashed too, so if the site changed since the manifest was built you get APM_ARTIFACTS_CHANGED and should build again. " +
-    "On success the manifest is written to /.well-known/apm.json and the response includes a `verifyUrl` anyone can check with no API key. Tell the user they must re-publish whenever a listed file changes, because the manifest records hashes and an edited file stops matching until they do. Use dry_run to confirm the signature is good without writing.",
+    "On success the manifest is written to /.well-known/apm.json and the response includes `manifestSha256` and a `verifyUrl` anyone can check with no API key. SERVING CAN LAG THE WRITE by up to a couple of minutes, so if you verify immediately and the response's manifestSha256 does not match the one you just published, you are reading the previous file - wait and check again rather than reporting a failure. The manifest_id is single-use once a publish succeeds (a failed one can be retried). Tell the user they must re-publish whenever a listed file changes, because the manifest records hashes and an edited file stops matching until they do. Use dry_run to confirm the signature is good without writing.",
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name in the account, e.g. `example.com`"),
     manifest_id: z.string().describe("From build_agent_manifest. Guarantees the bytes verified are the bytes signed."),
