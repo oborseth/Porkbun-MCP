@@ -173,8 +173,8 @@ The agent must already serve HTTPS with a publicly trusted certificate. The iden
 | `register_ans_agent` | Register an agent: `ans://` name, identity certificate, discovery records, transparency-log entry, directory listing |
 | `advance_ans_agent` | One validation round; repeat until ACTIVE (retry on ANS_DNS_PENDING) |
 | `list_ans_agents` / `get_ans_agent` | The account's agents and their status |
-| `check_ans_agent` | The independent trust check: verified, and the Bronze/Silver/Gold tier |
-| `enable_ans_dnssec` | Sign the agent domain's zone so DANE counts (Silver/Gold) |
+| `check_ans_agent` | The independent check: a PASS/FAIL verdict plus identity, liveness and possession proofs |
+| `enable_ans_dnssec` | Sign the agent domain's zone so its TLSA record counts (DANE) |
 | `revoke_ans_agent` | Permanent, public revocation (confirm with the user first) |
 | `search_ans_agents` | Search the public agent directory (same as porkbun.com/agents) |
 

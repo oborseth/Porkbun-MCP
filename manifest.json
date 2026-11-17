@@ -443,11 +443,35 @@
     },
     {
       "name": "check_ans_agent",
-      "description": "Run the independent trust check on an agent (Bronze/Silver/Gold)."
+      "description": "Run the independent check on an agent: a PASS/FAIL verdict plus identity, liveness and possession proofs."
+    },
+    {
+      "name": "verify_ans_host",
+      "description": "Verify any agent by hostname, on any trusted registry, with no API key."
+    },
+    {
+      "name": "build_agent_manifest",
+      "description": "Build a signed-manifest draft for a hosted site's artifacts."
+    },
+    {
+      "name": "publish_agent_manifest",
+      "description": "Publish a signed agent manifest after verifying its signature."
+    },
+    {
+      "name": "verify_agent_manifest",
+      "description": "Check whether a published document was produced by the agent it names."
     },
     {
       "name": "enable_ans_dnssec",
-      "description": "Turn on DNSSEC for an agent's domain so it can reach Silver/Gold."
+      "description": "Turn on DNSSEC for an agent's domain so its TLSA record counts (DANE)."
+    },
+    {
+      "name": "get_ans_identity_certificates",
+      "description": "Get an agent's identity certificates, ready to sign with."
+    },
+    {
+      "name": "rotate_ans_identity",
+      "description": "Issue a new identity certificate without changing the agent's name."
     },
     {
       "name": "revoke_ans_agent",
