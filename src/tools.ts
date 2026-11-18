@@ -2083,7 +2083,7 @@ const build_agent_manifest: Tool = {
       id: z.string().optional(),
       description: z.string().optional(),
     })).describe("The files the manifest should vouch for."),
-    mark_artifacts: z.boolean().optional().describe("Write an `agent-provenance` line into each file before hashing it, so the document itself points to its manifest and how to verify it. Survives copying and excerpting, which an HTTP header does not. THIS MODIFIES THE LIVE FILES, before anything is signed — it has to, or the recorded hashes would not match. Skipped for formats with no comment syntax (JSON, images)."),
+    mark_artifacts: z.boolean().optional().describe("Write an `agent-provenance` line into each file before hashing it, so the document itself points to its manifest and how to verify it. Survives copying and excerpting, which an HTTP header does not. THIS MODIFIES THE LIVE FILES, before anything is signed — it has to, or the recorded hashes would not match, so it needs the `hosting` permission just like publishing (a build WITHOUT this flag only reads, and works with a read-only key). Skipped for formats that cannot carry a comment safely: JSON, images, and CSV (a leading # line would be read as the header row)."),
     entity: z.record(z.string(), z.any()).optional().describe("Who publishes the site (name, location, links)."),
     policy: z.record(z.string(), z.any()).optional().describe("How the data may be used, e.g. {training: 'disallow', quote: 'allow', attribution: 'required'}."),
     endpoints: z.array(z.record(z.string(), z.any())).optional(),
