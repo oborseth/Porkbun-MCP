@@ -1015,7 +1015,8 @@ const get_nameservers: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: reads delegation live from the registry
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getNs/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1045,7 +1046,8 @@ const list_dnssec_records: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: reads DS data live from the registry
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/getDnssecRecords/${encodeURIComponent(domain)}`, {
@@ -1140,7 +1142,8 @@ const list_glue_records: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Domain to list glue records for, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: reads registry host objects
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getGlue/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1266,7 +1269,8 @@ const register_domain: Tool = {
       ),
     ...PAY_WITH_USDC_PARAMS,
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: creates the domain at the registry
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true), agreeToTerms: "yes" };
@@ -1295,7 +1299,8 @@ const renew_domain: Tool = {
       .describe("If true, validate and preview (`dryRun: true`, `wouldSucceed`) WITHOUT renewing or charging."),
     ...PAY_WITH_USDC_PARAMS,
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: renews the domain at the registry
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { cost: pickCents(args, "cost_cents", "cost", true) };
@@ -3125,7 +3130,8 @@ const reissue_wordpress_ssl: Tool = {
   description:
     "Restart SSL certificate issuance for a Cloud for WordPress site (the domain and its www. host) when `wordpress.site.ssl.issued` stays false. The domain must point at the site. Once per 5 minutes per site.",
   inputSchema: { domain: WP_DOMAIN, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: certificate issuance goes to an external CA
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "reissueSsl", args.domain, {}, args.dry_run),
 };
 
@@ -3468,7 +3474,8 @@ const enable_ans_dnssec: Tool = {
   description:
     "Turn on DNSSEC for an agent's domain in one step (signs the zone and publishes the DS at the registry), so its TLSA record counts: without DNSSEC a TLSA record is ignored and the DANE step of check_ans_agent does not apply. Only for domains registered at Porkbun on Porkbun nameservers in this account; ANS_DNSSEC_UNAVAILABLE otherwise. Resolvers see it within a few hours; run check_ans_agent again after that. Ask the user first: it changes how the whole domain resolves.",
   inputSchema: { agent_id: ANS_AGENT_ID, dry_run: z.boolean().optional().describe("Preview without changing anything.") },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  // openWorldHint: turns DNSSEC on for the domain at the registry
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => call(config, `/ans/enableDnssec/${encodeURIComponent(String(args.agent_id))}`, { method: "POST", body: args.dry_run ? { dryRun: true } : {} }),
 };
 
