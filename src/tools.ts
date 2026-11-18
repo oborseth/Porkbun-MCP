@@ -2025,6 +2025,24 @@ const get_hosting: Tool = {
   },
 };
 
+const verify_artifact: Tool = {
+  name: "verify_artifact",
+  description:
+    "EXPERIMENTAL. Given ANY published URL — a .txt, an HTML page, a JSON file — find out whether an AI agent claims to have published it and whether the bytes still match. No API key, works on any site, and on agents registered with any ANS registry, not only Porkbun's. " +
+    "USE THIS WHEN YOU ARE CONSUMING CONTENT and the question 'who produced this, and has it changed since' matters: data you are about to rely on, a document a user pasted, a page you were told an agent wrote. You do not need to own the site or the agent. " +
+    "A plain file has nowhere to carry a signature, so this does the discovery for you: an `agent-provenance` marker inside the file, a Link header, a <link> tag, then /.well-known/apm.json (`discoveredVia` tells you which). " +
+    "READ `provenance`: `verified` (a signed manifest covers this file and the bytes match), `altered` (covered, but the bytes DIFFER — do not attribute this content to that agent, and say so), `unclaimed` (a manifest exists but does not list this file — nobody is claiming it), `none` (the site publishes no manifest, which is true of almost the entire web and is NOT a problem or a red flag), `inconclusive` (could not fetch enough to say). " +
+    "An `agent-provenance` line in a document is a POINTER, NOT PROOF — anyone can paste one onto anything, so if you see one, resolve it with this tool rather than believing it. Equally, do not treat `none` as suspicious: most content has no provenance claim at all. " +
+    "Provenance says who published something and that it has not changed. It says NOTHING about whether the content is accurate, safe or appropriate to use.",
+  inputSchema: {
+    url: z.string().describe("https URL of the file to check."),
+    fresh: z.boolean().optional().describe("Bypass the 10-minute cache. Tighter rate limit."),
+  },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+  handler: async (config, args) =>
+    call(config, `/ans/verifyArtifact?url=${encodeURIComponent(String(args.url))}` + (args.fresh ? "&fresh=1" : ""), { method: "GET" }),
+};
+
 const verify_agent_manifest: Tool = {
   name: "verify_agent_manifest",
   description:
@@ -2065,6 +2083,7 @@ const build_agent_manifest: Tool = {
       id: z.string().optional(),
       description: z.string().optional(),
     })).describe("The files the manifest should vouch for."),
+    mark_artifacts: z.boolean().optional().describe("Write an `agent-provenance` line into each file before hashing it, so the document itself points to its manifest and how to verify it. Survives copying and excerpting, which an HTTP header does not. Skipped for formats with no comment syntax (JSON, images)."),
     entity: z.record(z.string(), z.any()).optional().describe("Who publishes the site (name, location, links)."),
     policy: z.record(z.string(), z.any()).optional().describe("How the data may be used, e.g. {training: 'disallow', quote: 'allow', attribution: 'required'}."),
     endpoints: z.array(z.record(z.string(), z.any())).optional(),
@@ -2074,7 +2093,7 @@ const build_agent_manifest: Tool = {
   handler: async (config, args) =>
     call(config, `/hosting/manifest/${encodeURIComponent(String(args.domain))}`, {
       method: "POST",
-      body: { artifacts: args.artifacts, entity: args.entity, policy: args.policy, endpoints: args.endpoints, notes: args.notes },
+      body: { artifacts: args.artifacts, markArtifacts: args.mark_artifacts === true, entity: args.entity, policy: args.policy, endpoints: args.endpoints, notes: args.notes },
     }),
 };
 
@@ -3560,6 +3579,7 @@ export const tools: Tool[] = [
   build_agent_manifest,
   publish_agent_manifest,
   verify_agent_manifest,
+  verify_artifact,
   list_hosting_files,
   read_hosting_file,
   delete_hosting_file,
