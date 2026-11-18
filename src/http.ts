@@ -184,7 +184,18 @@ function unauthorized(res: http.ServerResponse, invalidToken: boolean, profile: 
   const params = [`resource_metadata="${prmUrlFor(profile)}"`, `scope="${SCOPES.join(" ")}"`];
   if (invalidToken) params.unshift(`error="invalid_token"`);
 
-  send(res, 401, { error: invalidToken ? "invalid_token" : "unauthorized" }, {
+  // The header drives OAuth discovery and must stay exactly as it is. The BODY
+  // is for whoever is reading the response by hand, and it previously said only
+  // "unauthorized" -- leaving a caller with no hint that this server also takes
+  // an ordinary API key pair, which is the quickest way in for anything that is
+  // not an OAuth client. That fact lived only in the REST docs.
+  send(res, 401, {
+    error: invalidToken ? "invalid_token" : "unauthorized",
+    error_description: invalidToken
+      ? "The access token is expired or has been revoked. Refresh it, or reconnect."
+      : "No credentials. Either complete OAuth (the WWW-Authenticate header points at the authorization server), or send a Porkbun API key pair as X-API-Key and X-Secret-API-Key headers, or Authorization: Bearer pk1_...:sk1_... as a single value. Keys are created at https://porkbun.com/account/api",
+    docs: "https://porkbun.com/llms/guides/connect-chatgpt-or-claude",
+  }, {
     "WWW-Authenticate": `Bearer ${params.join(", ")}`,
   });
 }
