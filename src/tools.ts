@@ -804,7 +804,7 @@ const import_dns_records: Tool = {
       .optional()
       .describe("Exact records to create. Omit to import what a live scan of the domain finds."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true  /* it calls /dns/scan, which queries public DNS at other providers */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -1162,7 +1162,7 @@ const create_glue_record: Tool = {
       .min(1)
       .describe("Array of IPv4 and/or IPv6 addresses to associate with the host."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true  /* glue is a host object at the registry */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const subdomain = String(args.subdomain).toLowerCase();
@@ -1186,7 +1186,7 @@ const update_glue_record: Tool = {
       .min(1)
       .describe("Full replacement set of IPv4/IPv6 addresses for the host."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true  /* glue is a host object at the registry */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const subdomain = String(args.subdomain).toLowerCase();
@@ -1206,7 +1206,7 @@ const delete_glue_record: Tool = {
     domain: z.string().min(3).describe("Parent domain, e.g. `example.com`"),
     subdomain: z.string().min(1).describe("Host portion only, e.g. `ns1`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true  /* glue is a host object at the registry */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const subdomain = String(args.subdomain).toLowerCase();
@@ -1586,7 +1586,7 @@ const create_dnssec_record: Tool = {
     keyDataAlgo: z.string().optional().describe("DNSKEY algorithm (optional)."),
     keyDataPubKey: z.string().optional().describe("Base64-encoded public key (optional)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true  /* the DS record is published at the registry (secDNS) */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -1614,7 +1614,7 @@ const delete_dnssec_record: Tool = {
     domain: z.string().min(3).describe("Domain to remove the DS record from."),
     keyTag: z.string().describe("Key tag of the DS record to remove (from `list_dnssec_records`)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true  /* the DS record is removed at the registry */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const keyTag = String(args.keyTag);
@@ -1884,7 +1884,7 @@ const update_nameservers: Tool = {
       .optional()
       .describe("If true, validate only — returns wouldSucceed without changing the nameservers."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true  /* delegation is written at the domain registry */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { ns: args.nameservers };
@@ -1958,7 +1958,7 @@ const update_contacts: Tool = {
       .optional()
       .describe("For a registrant change on an address-validated TLD (.de/.nrw/.uk/.us/.ca/.nyc/.au/.eu/.in/.nz families) after an ADDRESS_VALIDATION_REQUIRED response: 'accept_suggestion' saves the standardized suggestedAddress returned there; 'use_as_entered' keeps the submitted address (rejected if a real correction was offered)."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true  /* registrant and WHOIS data is transmitted to the registry */ },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};

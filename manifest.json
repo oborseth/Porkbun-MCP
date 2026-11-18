@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "porkbun-mcp",
   "display_name": "Porkbun",
-  "version": "0.65.15",
+  "version": "0.65.16",
   "description": "Register and manage domains, DNS, DNSSEC, SSL, email forwarding, the marketplace, static hosting, and webhooks through the official Porkbun API.",
   "long_description": "The official Porkbun MCP server exposes the Porkbun v3 API as native tools for AI agents. Register, renew, and transfer domains; manage DNS and DNSSEC records; retrieve SSL bundles; configure nameservers, glue, URL and email forwarding, mailboxes, and domain contacts; provision and deploy Secure Static Hosting; and subscribe to signed webhooks — all from your assistant.\n\nBuilt for autonomous use: write tools attach an Idempotency-Key so retries never double-charge, and per-key domain/IP allowlists let you scope a key to exactly what an agent should touch. The documentation-search and mock tools work with no credentials, and you can mint a free, isolated **sandbox** key to rehearse the full lifecycle without spending money or touching a real registry.",
   "author": {
@@ -183,7 +183,7 @@
     },
     {
       "name": "get_transfer_setup",
-      "description": "Report where a held inbound transfer is and what it is waiting on: whether it is held at PENDINGDNS, whether its DNS zone exists, how many records it holds, what the domain currently delegates to..."
+      "description": "Report where a held inbound transfer is and what it is waiting on: whether it is held at PENDINGDNS, whether its DNS zone exists, how many records it holds, what the domain currently delegates to,..."
     },
     {
       "name": "prepare_transfer",
@@ -439,7 +439,7 @@
     },
     {
       "name": "update_link_in_bio_settings",
-      "description": "Set a Link in Bio page's `sensitive_content` (a `generic` warning or an age check of 18, 21 or 25 shown before the page; null turns it off) and, on paid plans, `analytics`: googleAnalyticsId..."
+      "description": "Set a Link in Bio page's `sensitive_content` (a `generic` warning or an age check of 18, 21 or 25 shown before the page; null turns it off) and, on paid plans, `analytics`: googleAnalyticsId,..."
     },
     {
       "name": "register_ans_agent",
@@ -599,7 +599,7 @@
     },
     {
       "name": "renew_mailbox",
-      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Add a year to an email hosting mailbox now, at its `renewalPrice` from `list_mailboxes` ($36.00..."
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Add a year to an email hosting mailbox now, at its `renewalPrice` from `list_mailboxes` ($36.00,..."
     },
     {
       "name": "set_email_password",
@@ -679,7 +679,7 @@
     },
     {
       "name": "list_cloudflare_inventory",
-      "description": "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers..."
+      "description": "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers,..."
     },
     {
       "name": "connect_domains_to_cloudflare",
