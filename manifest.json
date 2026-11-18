@@ -75,7 +75,7 @@
     },
     {
       "name": "check_domains",
-      "description": "Check up to 25 domains for availability and price in one call. Prefer this over looping check_domain."
+      "description": "Check up to 25 domains for availability and price in ONE call."
     },
     {
       "name": "get_registration_requirements",
@@ -83,27 +83,11 @@
     },
     {
       "name": "get_pricing",
-      "description": "Get current Porkbun pricing for all supported TLDs."
+      "description": "Get current Porkbun pricing: registration, renewal and transfer prices per TLD in USD."
     },
     {
       "name": "list_marketplace",
-      "description": "Browse domains for sale on the Porkbun marketplace (aftermarket — domains owned by other users, not new registrations)."
-    },
-    {
-      "name": "search_closeouts",
-      "description": "Search expired-domain closeouts; filter by age, price, TLD, length and sort by registration date."
-    },
-    {
-      "name": "search_aftermarket",
-      "description": "Find taken domains that are for sale on the aftermarket, with price, sale type and a link to buy on porkbun.com."
-    },
-    {
-      "name": "get_closeout",
-      "description": "Get one closeout plus its binding total price."
-    },
-    {
-      "name": "buy_closeout",
-      "description": "Buy a closeout outright. Spends account credit."
+      "description": "Browse domains for sale on Porkbun Marketplace: names other Porkbun customers listed themselves, not new registrations."
     },
     {
       "name": "list_domains",
@@ -119,35 +103,35 @@
     },
     {
       "name": "get_auto_topup",
-      "description": "Read the account's auto top-up configuration and what a top-up would charge."
+      "description": "Read the account's auto top-up configuration: whether it is on, the balance threshold that triggers it, the amount added, whether a payment method is actually on file, and `effectiveAmount` — what..."
     },
     {
       "name": "top_up_with_usdc",
-      "description": "Add account credit by paying USDC on Base through a Coinbase checkout: an x402 URL an agent's wallet pays directly, or a payment page for the user."
+      "description": "Add account credit by paying USDC on Base, through a Coinbase checkout."
     },
     {
       "name": "top_up_with_card_mpp",
-      "description": "Get a link that adds account credit when an agent pays it with the user's card over MPP (Stripe Shared Payment Token from the Link Agent Wallet)."
+      "description": "Get a payment link that adds account credit when paid with the user's CARD over MPP (Machine Payments Protocol), using a Stripe Shared Payment Token from their agent wallet (Stripe's Link Agent..."
     },
     {
       "name": "send_phone_verification_code",
-      "description": "Text a verification code to the phone number on the account, to clear VERIFICATION_REQUIRED."
+      "description": "Text a verification code to the phone number on the user's Porkbun account, to clear VERIFICATION_REQUIRED (purchases and top-ups need a verified phone and email, and new accounts are not asked to..."
     },
     {
       "name": "confirm_phone_verification",
-      "description": "Verify the account's phone number with the code the user received."
+      "description": "Verify the account's phone number with the code the user received from `send_phone_verification_code`."
     },
     {
       "name": "send_email_verification_code",
-      "description": "Email a verification code to the address on the account, to clear VERIFICATION_REQUIRED."
+      "description": "Email a verification code to the email address on the user's Porkbun account, to clear VERIFICATION_REQUIRED (purchases and top-ups need a verified email and phone)."
     },
     {
       "name": "confirm_email_verification",
-      "description": "Verify the account's email address with the code from the verification email."
+      "description": "Verify the account's email address with the code from the verification email (`send_email_verification_code`, or any verification email from the last 3 days)."
     },
     {
       "name": "get_usdc_topup_status",
-      "description": "Check whether a USDC top-up has been paid and credited, with the current balance."
+      "description": "Check a USDC top-up from `top_up_with_usdc`: `state` is ACTIVE (not paid yet), PROCESSING (paid, being credited), COMPLETED (credited: `credited` true), EXPIRED or FAILED."
     },
     {
       "name": "list_invoices",
@@ -155,23 +139,23 @@
     },
     {
       "name": "get_invoice",
-      "description": "Get one invoice as data: who it is billed to, how it was paid (card brand and last four only), each line with its product, term, resulting domain expiry and status, and the gross, refunded and net totals in cents."
+      "description": "Get one invoice as data: who it is billed to, how it was paid (card brand and last four only), each line with its product, term, resulting domain expiry and status, and the gross, refunded and net..."
     },
     {
       "name": "get_invoice_pdf",
-      "description": "Get an invoice PDF (the same document as Download PDF on porkbun.com) as an embedded file, with a 15-minute downloadUrl to hand the user."
+      "description": "Get an invoice PDF: the same document as Download PDF on porkbun.com."
     },
     {
       "name": "configure_auto_topup",
-      "description": "Turn auto top-up on or off and set its threshold and amount."
+      "description": "Set the top-up amount, and/or turn auto top-up on or off."
     },
     {
       "name": "top_up_account_credit",
-      "description": "Charge the saved payment method now and add the credit. Spends real money."
+      "description": "**Charges the user's saved payment method** (`amount_cents` is integer cents: 803 charges $8.03; tell the user the dollar figure first) and adds the money to their Porkbun account credit immediately."
     },
     {
       "name": "get_api_settings",
-      "description": "Get the authenticated account's API spend control configuration: monthly spend limit, low-balance alert threshold, auto top-up settings, and current month's API spend total."
+      "description": "Get the account's API spend controls and the limits actually enforced, in cents."
     },
     {
       "name": "get_nameservers",
@@ -182,12 +166,48 @@
       "description": "List all DNS records for a domain in the authenticated account."
     },
     {
+      "name": "search_closeouts",
+      "description": "Search expired-domain closeouts: names that did not sell at auction and are now offered at a fixed price that descends on a schedule."
+    },
+    {
+      "name": "search_aftermarket",
+      "description": "Find registered domains that are FOR SALE on the aftermarket: Afternic, Sedo, Atom, NameBright and DAX listings and auctions, plus Porkbun Marketplace, merged to the lowest price per name."
+    },
+    {
+      "name": "get_closeout",
+      "description": "Get one closeout plus `totalPrice` — the binding amount, which is the closeout price plus the registration year that comes with it."
+    },
+    {
+      "name": "buy_closeout",
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Buys a closeout at its current price and claims the name."
+    },
+    {
+      "name": "get_transfer_setup",
+      "description": "Report where a held inbound transfer is and what it is waiting on: whether it is held at PENDINGDNS, whether its DNS zone exists, how many records it holds, what the domain currently delegates to..."
+    },
+    {
+      "name": "prepare_transfer",
+      "description": "Create the Porkbun DNS zone for a domain whose inbound transfer is held, so records can be added before the domain moves."
+    },
+    {
+      "name": "start_transfer",
+      "description": "Release a held inbound transfer to the registry."
+    },
+    {
+      "name": "cancel_transfer",
+      "description": "**Cancels a paid inbound transfer and refunds the order.** Confirm with the user first."
+    },
+    {
+      "name": "update_transfer_auth_code",
+      "description": "Replace the authorization code on an inbound transfer that stalled because the code was wrong, and re-queue it — instead of cancelling, refunding and resubmitting."
+    },
+    {
       "name": "scan_dns_records",
-      "description": "Discover the DNS records a domain currently publishes, by querying its live nameservers."
+      "description": "Discover the DNS records a domain currently publishes by querying its live authoritative nameservers."
     },
     {
       "name": "import_dns_records",
-      "description": "Bulk-create DNS records on a domain, from a supplied list or a live scan."
+      "description": "Create many DNS records on a Porkbun domain in one call — the companion to scan_dns_records for keeping a transferred domain working."
     },
     {
       "name": "list_dnssec_records",
@@ -219,35 +239,15 @@
     },
     {
       "name": "register_domain",
-      "description": "**Spends account credit.** Registers a new domain on the authenticated Porkbun account."
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Registers a new domain on the authenticated Porkbun account."
     },
     {
       "name": "renew_domain",
-      "description": "**Spends account credit.** Renews an existing domain in the authenticated account."
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Renews an existing domain in the authenticated account."
     },
     {
       "name": "transfer_domain",
-      "description": "**Spends account credit.** Initiates a transfer of an external domain into Porkbun."
-    },
-    {
-      "name": "get_transfer_setup",
-      "description": "Report where a held inbound transfer is and what it is waiting on."
-    },
-    {
-      "name": "prepare_transfer",
-      "description": "Create the DNS zone for a held inbound transfer, before the domain moves."
-    },
-    {
-      "name": "start_transfer",
-      "description": "Release a held inbound transfer to the registry."
-    },
-    {
-      "name": "cancel_transfer",
-      "description": "Cancel a pending inbound transfer and refund the order."
-    },
-    {
-      "name": "update_transfer_auth_code",
-      "description": "Replace the auth code on a stalled inbound transfer and re-queue it."
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Initiates a transfer of an external domain into Porkbun."
     },
     {
       "name": "update_auto_renew",
@@ -263,11 +263,11 @@
     },
     {
       "name": "list_hosting_plans",
-      "description": "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost` to create_hosting), interval, trial length, and features."
+      "description": "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost_cents` to create_hosting), interval, trial length, and features."
     },
     {
       "name": "create_hosting",
-      "description": "Provision hosting for a domain — Secure Static Hosting, Cloud for WordPress, or a paid Link in Bio page, chosen by `sku`."
+      "description": "Provision hosting for a domain in the account — Secure Static Hosting, Cloud for WordPress (a managed WordPress site), or a paid Link in Bio page, chosen by `sku`."
     },
     {
       "name": "get_hosting",
@@ -275,7 +275,23 @@
     },
     {
       "name": "deploy_site",
-      "description": "Publish a site's files to its hosting: text files as plain text, images as base64."
+      "description": "Publish a website's files to a domain's Secure Static Hosting."
+    },
+    {
+      "name": "build_agent_manifest",
+      "description": "EXPERIMENTAL, opt-in."
+    },
+    {
+      "name": "publish_agent_manifest",
+      "description": "EXPERIMENTAL. Step 2 of 2: publish the signed agent manifest to the site, using the `manifestId` from build_agent_manifest and the signature the user produced over its `signingInput`."
+    },
+    {
+      "name": "verify_agent_manifest",
+      "description": "EXPERIMENTAL. Check whether a published document was really produced by the AI agent it names — works on ANY site, needs no API key, and covers agents registered with any ANS registry, not only..."
+    },
+    {
+      "name": "verify_artifact",
+      "description": "EXPERIMENTAL. Given ANY published URL — a .txt, an HTML page, a JSON file — find out whether an AI agent claims to have published it and whether the bytes still match."
     },
     {
       "name": "list_hosting_files",
@@ -283,11 +299,11 @@
     },
     {
       "name": "read_hosting_file",
-      "description": "Read a static site's files back (exact source), to edit a page instead of rebuilding it."
+      "description": "Read files back from a domain's Secure Static Hosting, so you can change a page without rebuilding it: read index.html, edit only what the user asked (e.g."
     },
     {
       "name": "delete_hosting_file",
-      "description": "Delete a file (or empty directory) at `path` in a domain's Secure Static Hosting space."
+      "description": "Delete a file or directory at `path` in a domain's Secure Static Hosting space."
     },
     {
       "name": "make_hosting_dir",
@@ -295,15 +311,15 @@
     },
     {
       "name": "wordpress_request",
-      "description": "Edit a WordPress site's pages, posts, menus and settings: one REST API call run inside the site, no password needed."
+      "description": "EDIT A CLOUD FOR WORDPRESS SITE'S CONTENT: pages, posts, menus, categories, comments, site title and anything else in the WordPress REST API."
     },
     {
       "name": "wordpress_upload_media",
-      "description": "Add an image or file to a WordPress site's media library from a URL or base64."
+      "description": "Add an image (or other file) to a Cloud for WordPress site's media library, from a public URL (WordPress downloads it) or from base64 `data` with a `filename`."
     },
     {
       "name": "create_wp_credentials",
-      "description": "CLOUD FOR WORDPRESS ONLY."
+      "description": "For agents that make their own HTTP requests (scripts, Claude Code): WordPress REST API credentials for a Cloud for WordPress site."
     },
     {
       "name": "list_wp_credentials",
@@ -315,87 +331,87 @@
     },
     {
       "name": "delete_hosting",
-      "description": "Deprovision (cancel) hosting on a domain; a paid Link in Bio page drops to the free plan."
+      "description": "Deprovision (cancel) hosting on a domain now; teardown is scheduled by Porkbun."
     },
     {
       "name": "update_hosting_auto_renew",
-      "description": "Turn auto-renew on or off for a domain's paid hosting."
+      "description": "Turn auto-renew on or off for a domain's paid hosting (Secure Static Hosting, Cloud for WordPress or Link in Bio), the same switch as on the website."
     },
     {
       "name": "set_wordpress_php_version",
-      "description": "Change a WordPress site's PHP version."
+      "description": "Change the PHP version a Cloud for WordPress site runs."
     },
     {
       "name": "set_wordpress_version",
-      "description": "Set a WordPress site to the latest or previous WordPress release."
+      "description": "Set a Cloud for WordPress site's WordPress version: `latest` follows releases; `previous` holds one major release back, the escape hatch when an update breaks the site (it then gets no newer..."
     },
     {
       "name": "reissue_wordpress_ssl",
-      "description": "Restart SSL issuance for a WordPress site."
+      "description": "Restart SSL certificate issuance for a Cloud for WordPress site (the domain and its www."
     },
     {
       "name": "set_wordpress_search_visibility",
-      "description": "Show or hide a WordPress site from search engines."
+      "description": "Show or hide a Cloud for WordPress site from search engines."
     },
     {
       "name": "list_wordpress_backups",
-      "description": "List a WordPress site's backups."
+      "description": "List a Cloud for WordPress site's backups, newest first: automatic file backups daily and database backups hourly, kept 30 days, plus up to one on-demand backup of each type."
     },
     {
       "name": "create_wordpress_backup",
-      "description": "Take an on-demand backup of a WordPress site."
+      "description": "Take an on-demand backup of a Cloud for WordPress site's files and database now, e.g."
     },
     {
       "name": "delete_wordpress_backup",
-      "description": "Delete an on-demand backup of a WordPress site."
+      "description": "Delete an on-demand backup of a Cloud for WordPress site by `id` (from list_wordpress_backups)."
     },
     {
       "name": "restore_wordpress_backup",
-      "description": "Restore a WordPress site from a backup."
+      "description": "REPLACE a Cloud for WordPress site's files and database with one files backup (`fs_id`) and one database backup (`db_id`) from list_wordpress_backups; anything changed since is lost."
     },
     {
       "name": "get_wordpress_staging",
-      "description": "Get a WordPress site's staging copy."
+      "description": "Get a Cloud for WordPress site's staging copy: URL, status (PROVISIONING / ACTIVE), the latest job and its state, password protection with the password, outbound email/API blocking, and environment..."
     },
     {
       "name": "create_wordpress_staging",
-      "description": "Create a staging copy of a WordPress site."
+      "description": "Create a private staging copy of a Cloud for WordPress site on a *.stagebun.com address, to try changes safely: from the live site, or from a backup pair (fs_id + db_id)."
     },
     {
       "name": "reset_wordpress_staging",
-      "description": "Rebuild a WordPress staging site."
+      "description": "Rebuild a staging site from the live site (or a backup pair); everything changed on staging is lost."
     },
     {
       "name": "publish_wordpress_staging",
-      "description": "Publish a staging site to live."
+      "description": "REPLACE the live site's files and database with the staging site's."
     },
     {
       "name": "delete_wordpress_staging",
-      "description": "Delete a WordPress staging site."
+      "description": "Delete a Cloud for WordPress site's staging copy and its backups."
     },
     {
       "name": "set_wordpress_staging_password",
-      "description": "Set staging password protection."
+      "description": "Staging password protection: `enabled` turns the password page on or off, `password` (4-64 characters) changes it."
     },
     {
       "name": "set_wordpress_staging_outbound",
-      "description": "Block or allow outbound email and API calls from staging."
+      "description": "Block or allow outbound traffic from a staging site: `block_email` stops it emailing real customers, `block_api_requests` stops outbound WordPress HTTP requests (payment gateways, CRMs, webhooks)."
     },
     {
       "name": "set_wordpress_staging_environment",
-      "description": "Set a staging site's environment type."
+      "description": "Set a staging site's WP_ENVIRONMENT_TYPE to `staging` (default) or `production`."
     },
     {
       "name": "get_link_in_bio",
-      "description": "Read a domain's Link in Bio page: plan, URL, profile, links, socials, appearance."
+      "description": "Read a domain's Link in Bio page (a single page of links, the kind people put in an Instagram or TikTok profile): its public `url` (the domain itself, or `<domain-with-dashes>.l.ink` for the free..."
     },
     {
       "name": "create_link_in_bio",
-      "description": "Turn on a free Link in Bio page on a domain."
+      "description": "Turn on a FREE Link in Bio page served on the domain itself (up to 50 links; no scheduling, animation, passcode protection or analytics IDs)."
     },
     {
       "name": "update_link_in_bio_profile",
-      "description": "Set a Link in Bio page's title, bio and avatar."
+      "description": "Set a Link in Bio page's `title` (up to 100 characters), `bio` (up to 500) and/or `avatar` (a base64 JPEG or PNG up to 5 MB; a data: URL works; null removes it)."
     },
     {
       "name": "add_link_in_bio_link",
@@ -403,107 +419,95 @@
     },
     {
       "name": "edit_link_in_bio_link",
-      "description": "Edit or hide a Link in Bio link."
+      "description": "Change a Link in Bio link (`id` from get_link_in_bio): only the fields sent change."
     },
     {
       "name": "delete_link_in_bio_link",
-      "description": "Delete a Link in Bio link."
+      "description": "Delete a link from a Link in Bio page for good, with its image, animation and protection."
     },
     {
       "name": "reorder_link_in_bio_links",
-      "description": "Reorder the links on a Link in Bio page."
+      "description": "Reorder a Link in Bio page: `ids` lists every link id on the page (from get_link_in_bio), once each, in the new order."
     },
     {
       "name": "update_link_in_bio_socials",
-      "description": "Set a Link in Bio page's social icons."
+      "description": "Set a Link in Bio page's social icons: `socials` maps email, instagram, facebook, tiktok, youtube, twitter, linkedin to a handle or profile URL (\"\" or null removes one); `location` puts them at the..."
     },
     {
       "name": "update_link_in_bio_appearance",
-      "description": "Change a Link in Bio page's preset, fonts, buttons and colours."
+      "description": "Change how a Link in Bio page looks."
     },
     {
       "name": "update_link_in_bio_settings",
-      "description": "Set a Link in Bio page's content warning and analytics IDs."
+      "description": "Set a Link in Bio page's `sensitive_content` (a `generic` warning or an age check of 18, 21 or 25 shown before the page; null turns it off) and, on paid plans, `analytics`: googleAnalyticsId..."
     },
     {
       "name": "register_ans_agent",
-      "description": "Give an AI agent a verifiable ANS name, identity certificate and transparency-log entry (you keep the key; send a CSR) (experimental)."
+      "description": "EXPERIMENTAL: ANS is a draft standard and Porkbun's registry is new, so behaviour, fields and records may change; tell the user before they depend on it."
     },
     {
       "name": "advance_ans_agent",
-      "description": "Advance a pending ANS agent one validation round; repeat until ACTIVE."
+      "description": "Move a pending ANS agent one validation round toward ACTIVE: publishes the DNS records the registry wants now and asks it to check them."
     },
     {
       "name": "list_ans_agents",
-      "description": "List the AI agents this account has registered with ANS."
+      "description": "List the AI agents this account has registered with the Agent Name Service: agentId, ansName, host, version, status (PENDING_VALIDATION, PENDING_DNS, ACTIVE, REVOKED, or LEGACY = a retired test..."
     },
     {
       "name": "get_ans_agent",
-      "description": "Get one registered AI agent with its current status."
+      "description": "One registered AI agent, with its status refreshed from the registry."
     },
     {
       "name": "check_ans_agent",
-      "description": "Run the independent check on an agent: a PASS/FAIL verdict plus identity, liveness and possession proofs."
+      "description": "Run the independent check on one of the account's agents, from public data only (the same check any third party can run with verify_ans_host): the badge record, a transparency log Porkbun trusts..."
     },
     {
       "name": "verify_ans_host",
-      "description": "Verify any agent by hostname, on any trusted registry, with no API key."
-    },
-    {
-      "name": "build_agent_manifest",
-      "description": "Build a signed-manifest draft for a hosted site's artifacts."
-    },
-    {
-      "name": "publish_agent_manifest",
-      "description": "Publish a signed agent manifest after verifying its signature."
-    },
-    {
-      "name": "verify_agent_manifest",
-      "description": "Check whether a published document was produced by the agent it names."
-    },
-    {
-      "name": "enable_ans_dnssec",
-      "description": "Turn on DNSSEC for an agent's domain so its TLSA record counts (DANE)."
-    },
-    {
-      "name": "get_ans_identity_certificates",
-      "description": "Get an agent's identity certificates, ready to sign with."
+      "description": "Verify ANY agent by hostname, including agents that are not in this account and agents registered with other ANS registries."
     },
     {
       "name": "rotate_ans_identity",
-      "description": "Issue a new identity certificate without changing the agent's name."
+      "description": "EXPERIMENTAL. Issue a NEW identity certificate for a registered agent, keeping the same agent and the same version — so its `ans://` name does not change."
+    },
+    {
+      "name": "get_ans_identity_certificates",
+      "description": "EXPERIMENTAL. Get a registered agent's identity certificates, newest first, INCLUDING the certificate itself — this is what you need to sign something AS the agent."
+    },
+    {
+      "name": "enable_ans_dnssec",
+      "description": "Turn on DNSSEC for an agent's domain in one step (signs the zone and publishes the DS at the registry), so its TLSA record counts: without DNSSEC a TLSA record is ignored and the DANE step of..."
     },
     {
       "name": "revoke_ans_agent",
-      "description": "Permanently revoke an agent's registration (public; confirm first)."
+      "description": "PERMANENT AND PUBLIC: revoke an agent's registration."
     },
     {
       "name": "search_ans_agents",
-      "description": "Search the public directory of AI agents registered with Porkbun's ANS registry (experimental)."
+      "description": "EXPERIMENTAL (ANS is a draft standard; the directory is new)."
     },
     {
       "name": "request_api_key",
-      "description": "Start creating a new live API key that the account holder approves in their browser."
+      "description": "Start creating a new LIVE Porkbun API key that the account holder approves in their browser (no credentials needed to call this)."
     },
     {
       "name": "retrieve_api_key",
-      "description": "Collect the approved API key pair, once."
+      "description": "Collect the API key the user approved after `request_api_key`."
     },
     {
       "name": "revoke_api_key",
-      "description": "Revoke the API key this server is using."
+      "description": "Permanently revoke the API key (or connection) this server is using right now, and only that one: a key cannot revoke any other."
     },
     {
       "name": "share_site_access",
-      "description": "Ask to let someone else's AI agent run one domain's website; the account holder approves on porkbun.com."
+      "description": "Ask to let someone else, and the AI agent they use, run ONE domain's website (Cloud for WordPress, static hosting or Link in Bio) without giving them the account."
     },
     {
       "name": "list_site_shares",
-      "description": "List site shares, with the link, QR code, share code and handoff prompt once approved."
+      "description": "List this account's site shares (share_site_access): domain, who it is for, and `status`: PENDING (waiting for the account holder to approve), ACTIVE (approved, link not used yet), CLAIMED (the..."
     },
     {
       "name": "revoke_site_share",
-      "description": "End a site share; a claimed key stops working within seconds."
+      "description": "End a site share by `id` (from list_site_shares)."
     },
     {
       "name": "create_sandbox_key",
@@ -511,39 +515,39 @@
     },
     {
       "name": "sandbox_topup",
-      "description": "SANDBOX ONLY."
+      "description": "SANDBOX ONLY. Grant fake account credit to the sandbox account so paid operations (register/renew/transfer) can keep being exercised after funds run out."
     },
     {
       "name": "sandbox_reset",
-      "description": "SANDBOX ONLY."
+      "description": "SANDBOX ONLY. Wipe the sandbox account's simulated state (domains, DNS, orders, credit) and re-grant $1000 fake credit — a clean slate between test runs."
     },
     {
       "name": "sandbox_trigger_webhook",
-      "description": "SANDBOX ONLY."
+      "description": "SANDBOX ONLY. Fire a sample signed webhook event to your registered endpoints so you can test your handler and HMAC signature verification for ANY event type on demand — including cron-driven..."
     },
     {
       "name": "mock_call",
       "description": "Get a schema-accurate EXAMPLE response for any API endpoint with NO credentials — nothing to set up."
     },
     {
+      "name": "create_dns_record",
+      "description": "Create a DNS record on a domain in the authenticated account."
+    },
+    {
       "name": "preflight_domain",
-      "description": "Check whether a change is about to break a domain, before making it. Read-only."
+      "description": "Ask whether a change is about to break a domain, BEFORE making it."
     },
     {
       "name": "list_dns_restore_points",
-      "description": "List saved versions of a domain's DNS zone, newest first. DNS undo."
+      "description": "List the saved versions of a domain's DNS zone, newest first."
     },
     {
       "name": "diff_dns_restore_point",
-      "description": "Compare a DNS restore point with the live zone before restoring."
+      "description": "Compare a DNS restore point with the live zone before changing anything."
     },
     {
       "name": "restore_dns_zone",
-      "description": "Put a DNS zone back to a saved restore point. Itself reversible."
-    },
-    {
-      "name": "create_dns_record",
-      "description": "Create a DNS record on a domain in the authenticated account."
+      "description": "Put a domain's DNS zone back to a saved restore point."
     },
     {
       "name": "update_dns_record",
@@ -571,35 +575,35 @@
     },
     {
       "name": "list_email_forwards",
-      "description": "List the email forwards on a domain."
+      "description": "List the email forwards on a domain: each `address` at the domain and the `forwardTo` mailbox it is delivered to (one address can forward to several)."
     },
     {
       "name": "create_email_forward",
-      "description": "Forward an address at the domain to another mailbox."
+      "description": "Forward an address at the domain (e.g."
     },
     {
       "name": "delete_email_forward",
-      "description": "Delete one email forward."
+      "description": "Delete one email forward, named by its `address` and `forward_to` (from `list_email_forwards`; an address can forward to several mailboxes, so both are needed)."
     },
     {
       "name": "list_mailboxes",
-      "description": "List a domain's email hosting mailboxes."
+      "description": "List a domain's email hosting mailboxes (real inboxes at the domain, read over IMAP/POP or webmail), with `status`, `address`, whether each is the free `trial`, and `expires`."
     },
     {
       "name": "setup_mailbox",
-      "description": "Give a waiting mailbox (paid, or the free trial) its address and password."
+      "description": "Give a waiting mailbox (already paid for, or the free trial that comes with a domain registration) its address and password."
     },
     {
       "name": "create_mailbox",
-      "description": "Buy an email hosting mailbox and set it up."
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Buy one email hosting mailbox ($36.00 a year, renewing automatically; the current price is..."
     },
     {
       "name": "renew_mailbox",
-      "description": "Renew an email hosting mailbox for a year now."
+      "description": "**Spends account credit, or pays directly by card (`pay_with_card`) or in USDC (`pay_with_usdc`).** Add a year to an email hosting mailbox now, at its `renewalPrice` from `list_mailboxes` ($36.00..."
     },
     {
       "name": "set_email_password",
-      "description": "Change the password of an email hosting mailbox."
+      "description": "Change the password of an email hosting mailbox (an active one, from `list_mailboxes`)."
     },
     {
       "name": "create_glue_record",
@@ -635,7 +639,7 @@
     },
     {
       "name": "get_webhook",
-      "description": "Fetch a single webhook endpoint by its numeric id, including its signing secret and delivery health (consecutive failures, last success/failure)."
+      "description": "Fetch a single webhook endpoint by its numeric id, with its delivery health (consecutive failures, last success/failure) and, for keys with full access or the account scope, its signing secret..."
     },
     {
       "name": "list_webhook_deliveries",
@@ -675,7 +679,7 @@
     },
     {
       "name": "list_cloudflare_inventory",
-      "description": "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers, uses Porkbun hosting, etc)."
+      "description": "List every domain in the account with its Cloudflare eligibility: `state` is eligible / warn / blocked / connected / inprogress, each with a human-readable reason (DNSSEC live, custom nameservers..."
     },
     {
       "name": "connect_domains_to_cloudflare",

@@ -177,6 +177,20 @@ The agent must already serve HTTPS with a publicly trusted certificate. The iden
 | `enable_ans_dnssec` | Sign the agent domain's zone so its TLSA record counts (DANE) |
 | `revoke_ans_agent` | Permanent, public revocation (confirm with the user first) |
 | `search_ans_agents` | Search the public agent directory (same as porkbun.com/agents) |
+| `rotate_ans_identity` | Re-issue the identity certificate against a new key, same agent and version (so the name does not change) |
+| `get_ans_identity_certificates` | The agent's identity certificates, including the certificate itself and a ready-to-use JOSE `x5c` |
+| `verify_ans_host` | Verify ANY agent by hostname, no key and any registry: the public third-party check |
+
+**Agent content provenance** (prove which agent published a file, and that it has not changed since; **experimental**)
+
+A site publishes a signed manifest listing its files by hash, and optionally a one-line `agent-provenance` marker inside each file so a copy can be traced back to its publisher. Porkbun never holds the signing key, so publishing is two calls: build returns the exact bytes, the user signs them, publish verifies the signature before writing anything. Full format and verification algorithm: https://porkbun.com/llms/guides/agent-content-format
+
+| Tool | Description |
+|---|---|
+| `verify_artifact` | Give it ANY published URL and find out whether an agent claims it and whether the bytes still match. No key, any site, any registry |
+| `verify_agent_manifest` | Verify a signed manifest directly |
+| `build_agent_manifest` | Hash the deployed files, optionally write the provenance marker, return the bytes to sign. Marking needs the `hosting` permission |
+| `publish_agent_manifest` | Verify the signature, then publish the manifest. The manifest path is writable only here |
 
 **Cloudflare connect** (move domains to the customer's own Cloudflare account)
 
