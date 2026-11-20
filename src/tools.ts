@@ -1456,7 +1456,7 @@ const restore_dns_zone: Tool = {
 const create_dns_record: Tool = {
   name: "create_dns_record",
   description:
-    "Create a DNS record on a domain in the authenticated account. Returns the new record's `id` (a JSON number; get_dns_records and `existingId` give ids as strings, so compare as strings) so it can be referenced by `update_dns_record` and `delete_dns_record`. For the `name` field: omit or pass empty string for the apex/root, otherwise pass the subdomain prefix only (e.g. `www`, not `www.example.com`). For MX and SRV records, set `prio` (priority). Free, doesn't spend account credit. If a record with this exact name, type and content already exists the call fails with `DUPLICATE_RECORD` and returns that record's id in `existingId` — use it rather than retrying or creating a variant. If a CNAME would share a name with another record type (forbidden by RFC 1034) the call fails with `RECORD_CONFLICT` and lists the blocking rows in `conflictingRecords`; delete those or pick another name.\n\n**Check `warnings` in the response and pass it on.** Porkbun keeps a DNS zone for every domain in the account whether or not the domain is delegated to Porkbun's nameservers, so this write succeeds either way. If the domain points somewhere else, the response is still `SUCCESS` but carries a `warnings` string naming the nameservers that actually answer — the record exists and nothing resolves differently. Do not report plain success in that case: either make the change at the provider that runs those nameservers, or offer `update_nameservers` to point the domain at Porkbun.",
+    "Create a DNS record on a domain in the authenticated account. Returns the new record's `id` as a string, the same form `list_dns_records` and `existingId` use, so it can be passed straight to `update_dns_record` and `delete_dns_record`. For the `name` field: omit or pass empty string for the apex/root, otherwise pass the subdomain prefix only (e.g. `www`, not `www.example.com`). For MX and SRV records, set `prio` (priority). Free, doesn't spend account credit. If a record with this exact name, type and content already exists the call fails with `DUPLICATE_RECORD` and returns that record's id in `existingId` — use it rather than retrying or creating a variant. If a CNAME would share a name with another record type (forbidden by RFC 1034) the call fails with `RECORD_CONFLICT` and lists the blocking rows in `conflictingRecords`; delete those or pick another name.\n\n**Check `warnings` in the response and pass it on.** Porkbun keeps a DNS zone for every domain in the account whether or not the domain is delegated to Porkbun's nameservers, so this write succeeds either way. If the domain points somewhere else, the response is still `SUCCESS` but carries a `warnings` string naming the nameservers that actually answer — the record exists and nothing resolves differently. Do not report plain success in that case: either make the change at the provider that runs those nameservers, or offer `update_nameservers` to point the domain at Porkbun.",
   inputSchema: {
     domain: z.string().min(3).describe("Domain to add the record to, e.g. `example.com`"),
     type: z
@@ -1499,11 +1499,22 @@ const create_dns_record: Tool = {
     if (args.prio !== undefined) body.prio = String(args.prio);
     if (args.dry_run) body.dryRun = true;
 
-    return await call(config, `/dns/create/${encodeURIComponent(domain)}`, {
+    const res = await call(config, `/dns/create/${encodeURIComponent(domain)}`, {
       method: "POST",
       idempotent: true,
       body,
     });
+
+    // The API returns `id` as a JSON number here while list_dns_records and
+    // `existingId` give ids as strings -- the same record, two types, depending
+    // on whether the write succeeded or hit DUPLICATE_RECORD. Fixing the wire
+    // format would repurpose a field, which v3 forbids, so normalise it here:
+    // every id an agent sees from these tools is a string, which is also what
+    // update_dns_record and delete_dns_record take as input.
+    if (res && typeof res === "object" && typeof (res as Record<string, unknown>).id === "number")
+      (res as Record<string, unknown>).id = String((res as Record<string, unknown>).id);
+
+    return res;
   },
 };
 
