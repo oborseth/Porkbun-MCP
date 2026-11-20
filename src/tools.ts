@@ -2432,11 +2432,13 @@ const create_webhook: Tool = {
       .describe(
         "Event types to subscribe to, e.g. `['domain.registered','dns.*']`. Omit or use `['*']` for all events. Call get_webhook_event_types for the catalog."
       ),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { url: args.url };
     if (Array.isArray(args.events) && args.events.length > 0) body.events = args.events;
+    if (args.dry_run) body.dryRun = true;
     return await call(config, "/webhook/create", { method: "POST", body });
   },
 };
@@ -2450,6 +2452,7 @@ const update_webhook: Tool = {
     url: z.string().url().optional().describe("New HTTPS URL. Same rules as create_webhook: port 443, publicly resolvable hostname, no embedded credentials."),
     events: z.array(z.string()).optional().describe("Replacement event subscription list (or `['*']` for all)."),
     status: z.enum(["ACTIVE", "DISABLED"]).optional().describe("Enable or pause the endpoint."),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
@@ -2457,6 +2460,7 @@ const update_webhook: Tool = {
     if (args.url !== undefined) body.url = args.url;
     if (args.events !== undefined) body.events = args.events;
     if (args.status !== undefined) body.status = args.status;
+    if (args.dry_run) body.dryRun = true;
     return await call(config, "/webhook/update", { method: "POST", body, idempotent: true });
   },
 };
@@ -2467,10 +2471,11 @@ const rotate_webhook_secret: Tool = {
     "Generate a new signing secret for a webhook endpoint and return the endpoint with the new secret. Deliveries are signed with the new secret immediately, so update your verifier as part of the same operation.",
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id."),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
   handler: async (config, args) => {
-    return await call(config, "/webhook/rotateSecret", { method: "POST", body: { id: args.id } });
+    return await call(config, "/webhook/rotateSecret", { method: "POST", body: { id: args.id, ...(args.dry_run ? { dryRun: true } : {}) } });
   },
 };
 
@@ -2480,10 +2485,11 @@ const test_webhook: Tool = {
     "Send a `webhook.test` event to an endpoint to confirm it's reachable and that signature verification works. The endpoint must be ACTIVE. Delivery happens asynchronously (usually within a minute); check the endpoint's last_success_date via get_webhook afterward.",
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id to send a test event to."),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
-    return await call(config, "/webhook/test", { method: "POST", body: { id: args.id } });
+    return await call(config, "/webhook/test", { method: "POST", body: { id: args.id, ...(args.dry_run ? { dryRun: true } : {}) } });
   },
 };
 
@@ -2493,10 +2499,11 @@ const delete_webhook: Tool = {
     "Delete a webhook endpoint by id. Deliveries stop immediately. Idempotent in effect: deleting a non-existent endpoint returns an error you can safely ignore.",
   inputSchema: {
     id: z.number().int().positive().describe("The webhook endpoint id to delete."),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
   handler: async (config, args) => {
-    return await call(config, "/webhook/delete", { method: "POST", body: { id: args.id } });
+    return await call(config, "/webhook/delete", { method: "POST", body: { id: args.id, ...(args.dry_run ? { dryRun: true } : {}) } });
   },
 };
 
@@ -2544,10 +2551,11 @@ const resend_webhook: Tool = {
     "Re-queue a past webhook delivery to its endpoint. Clones the delivery into a fresh attempt, reusing the ORIGINAL event id — so a consumer that dedupes on X-Porkbun-Webhook-Id treats the resend as the same event. The endpoint must still exist and be ACTIVE. Use after fixing a downstream bug to replay a delivery that previously FAILED.",
   inputSchema: {
     id: z.number().int().positive().describe("The delivery id to resend (from list_webhook_deliveries)."),
+    dry_run: z.boolean().optional().describe("If true, validate only \u2014 returns wouldSucceed and changes nothing."),
   },
   annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
-    return await call(config, "/webhook/resend", { method: "POST", body: { id: args.id } });
+    return await call(config, "/webhook/resend", { method: "POST", body: { id: args.id, ...(args.dry_run ? { dryRun: true } : {}) } });
   },
 };
 
