@@ -385,16 +385,40 @@ const server = http.createServer(async (req, res) => {
 
     const token = bearerFrom(req);
     const keys = token && token.startsWith("pbo_at_") ? null : keyPairFrom(req, token);
-    if (!token && !keys) {
+
+    // Catalogue discovery without credentials. A directory reviewer or a tool
+    // generator reads names, schemas and annotations before anyone signs in,
+    // and the catalogue is public anyway (the npm package, the MCP registry and
+    // porkbun.com/llms all carry it). Deliberately narrow: ONLY tools/list, and
+    // only when that is the entire request. Everything else -- initialize
+    // included -- still answers 401 with WWW-Authenticate, so real clients
+    // start the OAuth flow exactly as before. No tool can run on this path: the
+    // config it would need has no credentials.
+    let body: unknown;
+    let anonymousList = false;
+    if (!token && !keys && req.method === "POST") {
+      try {
+        body = await readJson(req);
+      } catch (e) {
+        ev.reason = (e as Error).message;
+        return send(res, (e as Error).message === "too_large" ? 413 : 400, { error: (e as Error).message });
+      }
+      const msgs = Array.isArray(body) ? body : body ? [body] : [];
+      anonymousList =
+        msgs.length > 0 &&
+        msgs.every((m) => !!m && typeof m === "object" && (m as { method?: unknown }).method === "tools/list");
+    }
+
+    if (!token && !keys && !anonymousList) {
       ev.reason = "no_token";
       return unauthorized(res, false, profile);
     }
     if (!keys && token && !token.startsWith("pbo_at_")) return unauthorized(res, true, profile);
-    ev.auth = keys ? "api_key" : "oauth";
+    ev.auth = anonymousList ? "anonymous_list" : keys ? "api_key" : "oauth";
 
     let valid: boolean;
     try {
-      const check = keys ? await keyPairIsValid(keys) : await tokenIsValid(token!);
+      const check = anonymousList ? { ok: true, conn: null } : keys ? await keyPairIsValid(keys) : await tokenIsValid(token!);
       valid = check.ok;
       ev.conn = check.conn;
     } catch {
@@ -413,12 +437,13 @@ const server = http.createServer(async (req, res) => {
       return send(res, 405, { error: "method_not_allowed" }, { Allow: "POST" });
     }
 
-    let body: unknown;
-    try {
-      body = await readJson(req);
-    } catch (e) {
-      ev.reason = (e as Error).message;
-      return send(res, (e as Error).message === "too_large" ? 413 : 400, { error: (e as Error).message });
+    if (body === undefined) {
+      try {
+        body = await readJson(req);
+      } catch (e) {
+        ev.reason = (e as Error).message;
+        return send(res, (e as Error).message === "too_large" ? 413 : 400, { error: (e as Error).message });
+      }
     }
     describeRequest(body, ev);
 
@@ -451,7 +476,9 @@ const server = http.createServer(async (req, res) => {
       return origEnd(chunk, ...rest);
     };
 
-    const mcp = buildServer(() => (keys
+    const mcp = buildServer(() => (anonymousList
+      ? { ...baseConfig, apiKey: "", secretApiKey: "", viaConnector: true }
+      : keys
       ? { ...baseConfig, apiKey: keys.apiKey, secretApiKey: keys.secretApiKey, viaConnector: true }
       : { ...baseConfig, bearerToken: token! }), {
       exclude: profile.exclude,
