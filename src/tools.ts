@@ -1675,7 +1675,13 @@ const create_url_forward: Tool = {
       .optional()
       .describe("Subdomain prefix to forward. Empty/omitted = the apex (root domain). Examples: `www`, `shop`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  // destructive=false, openWorld=true at the OpenAI directory reviewer's
+  // request (2026-11-24): a forward points at an arbitrary external
+  // destination, and replacing a forwarding rule is not the kind of
+  // irreversible loss destructiveHint is meant to flag. Note the behaviour
+  // either way: /domain/addUrlForward submits confirmOverwrite=1, so it
+  // does replace any forwarding already set on that host.
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {

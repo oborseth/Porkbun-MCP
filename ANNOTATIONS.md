@@ -25,9 +25,12 @@ something the user had. 26 of 81, all of them writes. Deletes
 are true. Purely additive writes are false: `create_dns_record` adds a record
 and leaves existing ones alone, `make_hosting_dir` creates a directory,
 `test_webhook` sends one test delivery. Every read-only tool is false. A `create_` prefix does not
-by itself mean additive: `create_url_forward` is destructive because it is
-submitted with overwrite confirmed, replacing any forwarding already set on
-that host.
+by itself mean additive -- `create_url_forward` is submitted with overwrite
+confirmed, so it replaces any forwarding already set on that host. It is
+nonetheless marked destructiveHint: false, at the reviewer's request
+(2026-11-24): replacing a forwarding rule the caller is deliberately setting is
+not the irreversible loss the hint exists to flag. It is openWorldHint: true
+because the forward points at an arbitrary external destination.
 
 **`idempotentHint`** — true when repeating the call with the same arguments
 has no further effect. 74 of 81. All reads are idempotent. Deletes are
@@ -70,7 +73,7 @@ from the account's own records — even though `update_contacts` and
 | `create_dns_record` | false | false | true | false |
 | `create_dnssec_record` | false | true | true | true |
 | `create_glue_record` | false | false | true | true |
-| `create_url_forward` | false | true | true | false |
+| `create_url_forward` | false | false | true | true |
 | `delete_cloudflare_record` | false | true | true | true |
 | `delete_dns_record` | false | true | true | false |
 | `delete_dnssec_record` | false | true | true | true |
