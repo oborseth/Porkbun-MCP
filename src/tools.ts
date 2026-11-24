@@ -755,7 +755,7 @@ const list_dns_records: Tool = {
       .min(3)
       .describe("Fully qualified domain name registered at Porkbun, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/retrieve/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1030,7 +1030,7 @@ const list_url_forwards: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Fully qualified domain name, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/domain/getUrlForwarding/${encodeURIComponent(domain)}`, {
@@ -1398,7 +1398,7 @@ const list_dns_restore_points: Tool = {
   inputSchema: {
     domain: z.string().min(3).describe("Domain whose zone history to list, e.g. `example.com`"),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/dns/history/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -1416,7 +1416,7 @@ const diff_dns_restore_point: Tool = {
       .int()
       .describe("Restore point id from `list_dns_restore_points`."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(
@@ -1446,7 +1446,7 @@ const restore_dns_zone: Tool = {
       .optional()
       .describe("If true, report what would change without changing anything."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { snapshotId: args.snapshot_id };
@@ -1490,7 +1490,7 @@ const create_dns_record: Tool = {
       .optional()
       .describe("If true, validate only — returns wouldSucceed without creating the record."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {
@@ -1541,7 +1541,7 @@ const update_dns_record: Tool = {
       .optional()
       .describe("If true, validate only — confirms the record exists and is editable, returns wouldSucceed without changing it."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const recordId = String(args.record_id);
@@ -1573,7 +1573,7 @@ const delete_dns_record: Tool = {
       .optional()
       .describe("If true, validate only — confirms the record exists and is deletable, returns wouldSucceed without deleting it."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const recordId = String(args.record_id);
@@ -1711,7 +1711,7 @@ const delete_url_forward: Tool = {
       .min(1)
       .describe("Numeric forward record ID from `list_url_forwards`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const recordId = String(args.record_id);
@@ -1753,7 +1753,7 @@ const create_email_forward: Tool = {
       .describe("Set only after the user has agreed to the DNS changes a `DNS_CHANGE_CONFIRMATION_REQUIRED` result described."),
     dry_run: z.boolean().optional().describe("If true, validate and report the DNS changes without making any."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { address: String(args.address), forwardTo: String(args.forward_to) };
@@ -1772,7 +1772,7 @@ const delete_email_forward: Tool = {
     address: z.string().min(1).describe("The forwarded address, `info` or `info@example.com`."),
     forward_to: z.string().min(3).describe("The destination mailbox of the forward to delete."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/email/deleteForward/${encodeURIComponent(domain)}`, {
@@ -2006,7 +2006,7 @@ const list_hosting_plans: Tool = {
   description:
     "List the hosting plans provisionable via the API, with price (cents — pass as `acknowledged_cost_cents` to create_hosting), interval, trial length, and features. Use this to discover plans + costs before create_hosting rather than hardcoding them. Covers Secure Static Hosting, Cloud for WordPress and paid Link in Bio; `product` tells them apart (`managedLinks` is Link in Bio). Each row has `displayName`, `bestFor` and `featuresText` in plain words: use them to recommend one and explain why. Rule of thumb: a site you build and keep up as files = static (cheapest; publish with deploy_site); a site the owner wants to edit themselves, or that needs plugins = WordPress (edit with wordpress_request); just a page of links = Link in Bio. Ask the user which fits if unsure.",
   inputSchema: {},
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config) => {
     return await call(config, "/hosting/plans", { method: "GET" });
   },
@@ -2028,7 +2028,7 @@ const create_hosting: Tool = {
     dry_run: z.boolean().optional().describe("Validate + preview without provisioning or charging."),
     ...PAY_WITH_USDC_PARAMS,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = { sku: args.sku, acknowledgedCost: pickCents(args, "acknowledged_cost_cents", "acknowledged_cost", true), agreeToTerms: args.agree_to_terms };
@@ -2043,7 +2043,7 @@ const get_hosting: Tool = {
   description:
     "Get the hosting on a domain (product, plan, status, trial, expiry, auto-renew), or null if there is none. For Secure Static Hosting, deploy_site publishes files once it is ACTIVE. For a Cloud for WordPress site: to change its content (pages, posts, images, settings), use wordpress_request and wordpress_upload_media; `wordpress.site` adds the PHP version and the versions available, the WordPress version setting, SSL, storage used, search visibility, any staging copy, and recent background jobs (`operations`, e.g. a restore in progress).",
   inputSchema: { domain: z.string().min(3).describe("Domain to check.") },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/get/${encodeURIComponent(domain)}`, { method: "GET" });
@@ -2135,7 +2135,7 @@ const publish_agent_manifest: Tool = {
     signature: z.string().describe("ES256 signature over signingInput: 64-byte r||s, base64url."),
     dry_run: z.boolean().optional().describe("Verify and report what would be published, without writing."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) =>
     call(config, `/hosting/publishManifest/${encodeURIComponent(String(args.domain))}`, {
       method: "POST",
@@ -2160,7 +2160,7 @@ const deploy_site: Tool = {
       .min(1)
       .describe("Files to upload."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     // Text is base64-encoded here, so the model never has to, and any API version accepts it.
@@ -2186,7 +2186,7 @@ const read_hosting_file: Tool = {
     domain: z.string().min(3).describe("Domain whose hosting files to read."),
     paths: z.array(z.string()).min(1).max(20).describe("File paths, e.g. [\"index.html\", \"style.css\"]."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => call(config, `/hosting/getFile/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST", body: { paths: args.paths } }),
 };
 
@@ -2197,7 +2197,7 @@ const list_hosting_files: Tool = {
     domain: z.string().min(3).describe("Domain whose hosting files to list."),
     path: z.string().optional().describe("Subdirectory to list (default: root)."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -2214,7 +2214,7 @@ const delete_hosting_file: Tool = {
     path: z.string().min(1).describe("Path to delete, e.g. `old/page.html` or `assets`."),
     recursive: z.boolean().optional().describe("Delete a directory together with everything inside it. Default false."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/deleteFile/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path), ...(args.recursive ? { recursive: true } : {}) } });
@@ -2229,7 +2229,7 @@ const make_hosting_dir: Tool = {
     domain: z.string().min(3).describe("Domain whose hosting to create the directory in."),
     path: z.string().min(1).describe("Directory path to create, e.g. `assets/img`."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/makeDir/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true, body: { path: String(args.path) } });
@@ -2258,7 +2258,7 @@ const wordpress_request: Tool = {
     acknowledge_full_access: z.boolean().optional().describe("Confirms the user agreed to administrator-level changes."),
     dry_run: z.boolean().optional().describe("For writes: check the request without sending it to WordPress."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = { path: args.path };
     if (args.method) body.method = args.method;
@@ -2306,7 +2306,7 @@ const create_wp_credentials: Tool = {
     name: z.string().max(40).optional().describe("Label shown in wp-admin (letters, digits, dashes), e.g. `Acme-Agent`."),
     dry_run: z.boolean().optional().describe("Validate without creating anything."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -2326,7 +2326,7 @@ const list_wp_credentials: Tool = {
     domain: z.string().min(3).describe("Domain whose WordPress site to inspect."),
     wp_user: z.string().optional().describe("WordPress username (defaults to the dedicated `porkbun-agent` user)."),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const qs = args.wp_user ? `?wpUser=${encodeURIComponent(String(args.wp_user))}` : "";
@@ -2345,7 +2345,7 @@ const delete_wp_credentials: Tool = {
     wp_user: z.string().optional().describe("WordPress username (defaults to `porkbun-agent`)."),
     dry_run: z.boolean().optional().describe("Validate without revoking."),
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     const body: Record<string, unknown> = {};
@@ -2362,7 +2362,7 @@ const delete_hosting: Tool = {
   description:
     "Deprovision (cancel) hosting on a domain now; teardown is scheduled by Porkbun. A paid Link in Bio page is taken down too; its content is archived (support can restore it), and create_link_in_bio starts a new free page from placeholder content. A free Link in Bio page can't be cancelled (NOT_SUPPORTED_FOR_PRODUCT). Note: the domain has already used its one free trial, so provisioning it again later will be charged (no second free trial). To let a plan run to the end of its term instead, use update_hosting_auto_renew with auto_renew false.",
   inputSchema: { domain: z.string().min(3).describe("Domain to deprovision hosting for.") },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const domain = String(args.domain).toLowerCase();
     return await call(config, `/hosting/delete/${encodeURIComponent(domain)}`, { method: "POST", idempotent: true });
@@ -2974,7 +2974,7 @@ const get_link_in_bio: Tool = {
   description:
     "Read a domain's Link in Bio page (a single page of links, the kind people put in an Instagram or TikTok profile): its public `url` (the domain itself, or `<domain-with-dashes>.l.ink` for the free page most .com domains registered at Porkbun come with), `plan` and `features` (what the plan allows), `profile`, `links` in display order with their `id`s, `socials`, `appearance` and `settings`. Call it before editing. LINKINBIO_NOT_FOUND means there is no page: offer create_link_in_bio (free) or create_hosting with a PIXIELINKS sku (paid).",
   inputSchema: { domain: LIB_DOMAIN },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => call(config, `/linkinbio/get/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "GET" }),
 };
 
@@ -2987,7 +2987,7 @@ const create_link_in_bio: Tool = {
     agree_to_nameserver_change: z.boolean().optional().describe("Allow switching the domain to Porkbun nameservers (needed when it uses others). Ask the user first."),
     dry_run: LIB_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => libPost(config, "create", args.domain, args.agree_to_nameserver_change ? { agreeToNameserverChange: true } : {}, args.dry_run),
 };
 
@@ -3002,7 +3002,7 @@ const update_link_in_bio_profile: Tool = {
     avatar: z.string().nullable().optional().describe("Base64 JPEG or PNG, or null to remove the avatar."),
     dry_run: LIB_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     for (const k of ["title", "bio", "avatar"]) if (args[k] !== undefined) body[k] = args[k];
@@ -3021,7 +3021,7 @@ const add_link_in_bio_link: Tool = {
     position: z.enum(["bottom", "top"]).optional().describe("Where to add it. Default bottom."),
     dry_run: LIB_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => {
     const body = libLinkBody(args);
     if (args.position) body.position = args.position;
@@ -3034,7 +3034,7 @@ const edit_link_in_bio_link: Tool = {
   description:
     "Change a Link in Bio link (`id` from get_link_in_bio): only the fields sent change. `enabled: false` hides it without deleting it. Paid-only fields (start_date, end_date, animation, passcode protection) return FEATURE_NOT_IN_PLAN on the free on-domain plan.",
   inputSchema: { domain: LIB_DOMAIN, id: z.number().int().describe("Link id from get_link_in_bio."), ...LIB_LINK_FIELDS, dry_run: LIB_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => libPost(config, "editLink", args.domain, { id: args.id, ...libLinkBody(args) }, args.dry_run),
 };
 
@@ -3043,7 +3043,7 @@ const delete_link_in_bio_link: Tool = {
   description:
     "Delete a link from a Link in Bio page for good, with its image, animation and protection. To hide it instead, use edit_link_in_bio_link with `enabled: false`. Confirm with the user first.",
   inputSchema: { domain: LIB_DOMAIN, id: z.number().int().describe("Link id from get_link_in_bio."), dry_run: LIB_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => libPost(config, "deleteLink", args.domain, { id: args.id }, args.dry_run),
 };
 
@@ -3051,7 +3051,7 @@ const reorder_link_in_bio_links: Tool = {
   name: "reorder_link_in_bio_links",
   description: "Reorder a Link in Bio page: `ids` lists every link id on the page (from get_link_in_bio), once each, in the new order.",
   inputSchema: { domain: LIB_DOMAIN, ids: z.array(z.number().int()).min(1).describe("Every link id, in display order."), dry_run: LIB_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => libPost(config, "reorderLinks", args.domain, { ids: args.ids }, args.dry_run),
 };
 
@@ -3065,7 +3065,7 @@ const update_link_in_bio_socials: Tool = {
     socials: z.record(z.string(), z.string().nullable()).optional().describe('e.g. {"instagram": "janebakes", "email": "jane@example.com"}'),
     dry_run: LIB_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.location) body.location = args.location;
@@ -3094,7 +3094,7 @@ const update_link_in_bio_appearance: Tool = {
     border_color: LIB_COLOR,
     dry_run: LIB_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const map: Record<string, string> = {
       preset: "preset", font_family: "fontFamily", button_style: "buttonStyle", radius: "radius", page_background_mode: "pageBackgroundMode",
@@ -3117,7 +3117,7 @@ const update_link_in_bio_settings: Tool = {
     analytics: z.record(z.string(), z.string()).optional().describe('e.g. {"googleAnalyticsId": "G-ABC123"}'),
     dry_run: LIB_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.sensitive_content !== undefined) body.sensitiveContent = args.sensitive_content;
@@ -3140,7 +3140,7 @@ const set_wordpress_php_version: Tool = {
   description:
     "Change the PHP version a Cloud for WordPress site runs. `version` must be one of `wordpress.site.availablePhpVersions` from get_hosting. Takes effect within a minute or two; if the site misbehaves, switch back the same way. Confirm with the user first.",
   inputSchema: { domain: WP_DOMAIN, version: z.string().describe("e.g. `8.3`, from availablePhpVersions."), dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "setPhpVersion", args.domain, { version: args.version }, args.dry_run),
 };
 
@@ -3149,7 +3149,7 @@ const set_wordpress_version: Tool = {
   description:
     "Set a Cloud for WordPress site's WordPress version: `latest` follows releases; `previous` holds one major release back, the escape hatch when an update breaks the site (it then gets no newer releases until set back to `latest`). No pinned version numbers. Takes a few minutes.",
   inputSchema: { domain: WP_DOMAIN, version: z.enum(["latest", "previous"]), dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "setWordPressVersion", args.domain, { version: args.version }, args.dry_run),
 };
 
@@ -3168,7 +3168,7 @@ const set_wordpress_search_visibility: Tool = {
   description:
     "Show or hide a Cloud for WordPress site from search engines. `visible: false` asks them not to index it (WordPress \"discourage search engines\"), useful while a site is being built; `true` allows indexing again.",
   inputSchema: { domain: WP_DOMAIN, visible: z.boolean(), dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "setSearchVisibility", args.domain, { visible: Boolean(args.visible) }, args.dry_run),
 };
 
@@ -3182,7 +3182,7 @@ const list_wordpress_backups: Tool = {
     limit: z.number().int().min(1).max(1000).optional().describe("How many to return. Default 100."),
     type: z.enum(["files", "database"]).optional(),
   },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.staging) body.staging = true;
@@ -3197,7 +3197,7 @@ const create_wordpress_backup: Tool = {
   description:
     "Take an on-demand backup of a Cloud for WordPress site's files and database now, e.g. before a risky change. Only one on-demand backup of each type can exist: delete the old one first (otherwise BACKUP_FAILED, \"Quota Reached\"). It appears in list_wordpress_backups when finished, usually within a few minutes.",
   inputSchema: { domain: WP_DOMAIN, staging: WP_STAGING, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "createBackup", args.domain, args.staging ? { staging: true } : {}, args.dry_run),
 };
 
@@ -3205,7 +3205,7 @@ const delete_wordpress_backup: Tool = {
   name: "delete_wordpress_backup",
   description: "Delete an on-demand backup of a Cloud for WordPress site by `id` (from list_wordpress_backups). Automatic backups cannot be deleted. Confirm with the user first.",
   inputSchema: { domain: WP_DOMAIN, id: z.string().describe("Backup id from list_wordpress_backups."), staging: WP_STAGING, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "deleteBackup", args.domain, { id: args.id, ...(args.staging ? { staging: true } : {}) }, args.dry_run),
 };
 
@@ -3220,7 +3220,7 @@ const restore_wordpress_backup: Tool = {
     staging: WP_STAGING,
     dry_run: WP_DRY_RUN,
   },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "restoreBackup", args.domain, { fsId: args.fs_id, dbId: args.db_id, ...(args.staging ? { staging: true } : {}) }, args.dry_run),
 };
 
@@ -3238,7 +3238,7 @@ const get_wordpress_staging: Tool = {
   description:
     "Get a Cloud for WordPress site's staging copy: URL, status (PROVISIONING / ACTIVE), the latest job and its state, password protection with the password, outbound email/API blocking, and environment type. `staging` is null when there is none. Poll it after create/reset/publish/delete.",
   inputSchema: { domain: WP_DOMAIN },
-  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => call(config, `/hosting/getStaging/${encodeURIComponent(String(args.domain).toLowerCase())}`, { method: "POST" }),
 };
 
@@ -3247,7 +3247,7 @@ const create_wordpress_staging: Tool = {
   description:
     "Create a private staging copy of a Cloud for WordPress site on a *.stagebun.com address, to try changes safely: from the live site, or from a backup pair (fs_id + db_id). One per site. It starts password protected (password in the response), with outgoing email blocked. Takes a few minutes; poll get_wordpress_staging until status is ACTIVE.",
   inputSchema: { domain: WP_DOMAIN, ...WP_PAIR, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "createStaging", args.domain, wpPairBody(args), args.dry_run),
 };
 
@@ -3255,7 +3255,7 @@ const reset_wordpress_staging: Tool = {
   name: "reset_wordpress_staging",
   description: "Rebuild a staging site from the live site (or a backup pair); everything changed on staging is lost. Queued; poll get_wordpress_staging. Confirm with the user first.",
   inputSchema: { domain: WP_DOMAIN, ...WP_PAIR, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "resetStaging", args.domain, wpPairBody(args), args.dry_run),
 };
 
@@ -3264,7 +3264,7 @@ const publish_wordpress_staging: Tool = {
   description:
     "REPLACE the live site's files and database with the staging site's. A fresh on-demand backup of live is taken first (replacing any existing on-demand backup), so it can be undone with restore_wordpress_backup. Takes several minutes; poll get_wordpress_staging. Always confirm with the user first.",
   inputSchema: { domain: WP_DOMAIN, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "publishStaging", args.domain, {}, args.dry_run),
 };
 
@@ -3272,7 +3272,7 @@ const delete_wordpress_staging: Tool = {
   name: "delete_wordpress_staging",
   description: "Delete a Cloud for WordPress site's staging copy and its backups. The live site is not affected. Confirm with the user first.",
   inputSchema: { domain: WP_DOMAIN, dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "deleteStaging", args.domain, {}, args.dry_run),
 };
 
@@ -3281,7 +3281,7 @@ const set_wordpress_staging_password: Tool = {
   description:
     "Staging password protection: `enabled` turns the password page on or off, `password` (4-64 characters) changes it. Turning it off makes a copy of the live site public (still marked not to be indexed). Returns the current password.",
   inputSchema: { domain: WP_DOMAIN, enabled: z.boolean().optional(), password: z.string().min(4).max(64).optional(), dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.enabled !== undefined) body.enabled = args.enabled;
@@ -3295,7 +3295,7 @@ const set_wordpress_staging_outbound: Tool = {
   description:
     "Block or allow outbound traffic from a staging site: `block_email` stops it emailing real customers, `block_api_requests` stops outbound WordPress HTTP requests (payment gateways, CRMs, webhooks). New staging sites block email and allow API requests. Ask before unblocking email.",
   inputSchema: { domain: WP_DOMAIN, block_email: z.boolean().optional(), block_api_requests: z.boolean().optional(), dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => {
     const body: Record<string, unknown> = {};
     if (args.block_email !== undefined) body.blockEmail = args.block_email;
@@ -3308,7 +3308,7 @@ const set_wordpress_staging_environment: Tool = {
   name: "set_wordpress_staging_environment",
   description: "Set a staging site's WP_ENVIRONMENT_TYPE to `staging` (default) or `production`. Production may make plugins act live (payments, email); use it only to test production behaviour.",
   inputSchema: { domain: WP_DOMAIN, type: z.enum(["staging", "production"]), dry_run: WP_DRY_RUN },
-  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
   handler: async (config, args) => wpPost(config, "setStagingEnvironment", args.domain, { type: args.type }, args.dry_run),
 };
 

@@ -45,22 +45,25 @@ delivery), `create_cloudflare_record` (unlike the Porkbun equivalent there is no
 duplicate check on our side, and Cloudflare is the system of record, so we do
 not claim a repeat is a no-op).
 
-**`openWorldHint`** — true when the call reaches a system outside Porkbun,
-whether it reads or writes. 36 of 81. True for: domain registries (nameserver
-delegation, contacts, DNSSEC DS records, glue host objects, transfers),
-availability checks against registries, public DNS lookups, the user's own
-Cloudflare account, and outbound webhook deliveries to the user's endpoint.
-False for operations confined to the account's own data and Porkbun's own
-infrastructure: listing domains, reading settings, editing records in a
-Porkbun-hosted zone, files on Porkbun hosting.
+**`openWorldHint`** — true when the call reaches a system that is not ours to
+control. 55 of 81. We widened this rule on 2026-11-24 after the directory's scan
+flagged `deploy_site`, `create_dns_record`, `update_dns_record` and
+`restore_dns_zone`: our earlier reading was "does it leave Porkbun", which
+understated two real dependencies. Porkbun's authoritative DNS runs on
+Cloudflare, so every DNS read and write touches a third party and ends up in the
+public DNS; Cloud for WordPress runs on WP Cloud; and hosting writes publish to
+the open internet. Those are all true now, reads included, because where the
+data lives does not depend on whether the call mutates it.
 
-Read and write are treated alike here, because the hint is about where the
-data goes, not about whether anything changes. `get_nameservers`,
-`list_dnssec_records` and `list_glue_records` are read-only and open-world:
-each is answered by a live query to the registry, not from our database.
-Conversely `get_contacts` and `get_transfer_status` are false — both are served
-from the account's own records — even though `update_contacts` and
-`start_transfer` are true, because those writes are submitted to the registry.
+Also true: domain registries (registrations, renewals, transfers, nameservers,
+contacts, DNSSEC, glue), availability checks, public DNS lookups, the user's own
+Cloudflare account, outbound webhook deliveries, email forwards (mail is handed
+to the recipient's provider), and certificate issuance via an external CA.
+
+False is reserved for what stays inside the account and our own systems: billing
+and credit, invoices, API keys and settings, documentation, marketplace and
+transfer records read from our database, webhook configuration (as opposed to
+delivery), and mailbox administration.
 
 ## Every tool
 
@@ -70,21 +73,21 @@ from the account's own records — even though `update_contacts` and
 | `check_domains` | true | false | true | true |
 | `connect_domains_to_cloudflare` | false | true | true | true |
 | `create_cloudflare_record` | false | false | false | true |
-| `create_dns_record` | false | false | true | false |
+| `create_dns_record` | false | false | true | true |
 | `create_dnssec_record` | false | true | true | true |
 | `create_glue_record` | false | false | true | true |
 | `create_url_forward` | false | false | true | true |
 | `delete_cloudflare_record` | false | true | true | true |
-| `delete_dns_record` | false | true | true | false |
+| `delete_dns_record` | false | true | true | true |
 | `delete_dnssec_record` | false | true | true | true |
 | `delete_glue_record` | false | true | true | true |
-| `delete_hosting` | false | true | true | false |
-| `delete_hosting_file` | false | true | true | false |
-| `delete_url_forward` | false | true | true | false |
+| `delete_hosting` | false | true | true | true |
+| `delete_hosting_file` | false | true | true | true |
+| `delete_url_forward` | false | true | true | true |
 | `delete_webhook` | false | true | true | false |
-| `delete_wp_credentials` | false | true | true | false |
-| `deploy_site` | false | true | false | false |
-| `diff_dns_restore_point` | true | false | true | false |
+| `delete_wp_credentials` | false | true | true | true |
+| `deploy_site` | false | true | false | true |
+| `diff_dns_restore_point` | true | false | true | true |
 | `disconnect_cloudflare` | false | true | true | true |
 | `edit_cloudflare_record` | false | true | true | true |
 | `get_api_settings` | true | false | true | false |
@@ -99,7 +102,7 @@ from the account's own records — even though `update_contacts` and
 | `get_cloudflare_zone_settings` | true | false | true | true |
 | `get_contacts` | true | false | true | false |
 | `get_domain` | true | false | true | false |
-| `get_hosting` | true | false | true | false |
+| `get_hosting` | true | false | true | true |
 | `get_nameservers` | true | false | true | true |
 | `get_pricing` | true | false | true | false |
 | `get_registration_requirements` | true | false | true | false |
@@ -110,21 +113,21 @@ from the account's own records — even though `update_contacts` and
 | `get_webhook_event_types` | true | false | true | false |
 | `import_dns_records` | false | false | true | true |
 | `list_cloudflare_inventory` | true | false | true | true |
-| `list_dns_records` | true | false | true | false |
-| `list_dns_restore_points` | true | false | true | false |
+| `list_dns_records` | true | false | true | true |
+| `list_dns_restore_points` | true | false | true | true |
 | `list_dnssec_records` | true | false | true | true |
 | `list_doc_topics` | true | false | true | false |
 | `list_domains` | true | false | true | false |
 | `list_glue_records` | true | false | true | true |
-| `list_hosting_files` | true | false | true | false |
-| `list_hosting_plans` | true | false | true | false |
+| `list_hosting_files` | true | false | true | true |
+| `list_hosting_plans` | true | false | true | true |
 | `list_marketplace` | true | false | true | false |
 | `list_transfers` | true | false | true | false |
-| `list_url_forwards` | true | false | true | false |
+| `list_url_forwards` | true | false | true | true |
 | `list_webhook_deliveries` | true | false | true | false |
 | `list_webhooks` | true | false | true | false |
-| `list_wp_credentials` | true | false | true | false |
-| `make_hosting_dir` | false | false | true | false |
+| `list_wp_credentials` | true | false | true | true |
+| `make_hosting_dir` | false | false | true | true |
 | `mock_call` | true | false | true | false |
 | `ping` | true | false | true | false |
 | `preflight_domain` | true | false | true | true |
@@ -132,7 +135,7 @@ from the account's own records — even though `update_contacts` and
 | `preview_cloudflare_move` | true | false | true | true |
 | `read_doc` | true | false | true | false |
 | `resend_webhook` | false | false | false | true |
-| `restore_dns_zone` | false | true | false | false |
+| `restore_dns_zone` | false | true | false | true |
 | `retry_cloudflare_domain` | false | true | true | true |
 | `rollback_cloudflare_domain` | false | true | true | true |
 | `scan_dns_records` | true | false | true | true |
@@ -143,7 +146,7 @@ from the account's own records — even though `update_contacts` and
 | `start_transfer` | false | true | false | true |
 | `test_webhook` | false | false | false | true |
 | `update_contacts` | false | true | false | true |
-| `update_dns_record` | false | true | true | false |
+| `update_dns_record` | false | true | true | true |
 | `update_glue_record` | false | true | true | true |
 | `update_nameservers` | false | true | true | true |
 | `update_webhook` | false | true | true | true |
